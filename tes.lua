@@ -1,117 +1,508 @@
+-- credit: Xraxor1 (Original GUI/Intro structure)
+-- Modification for Dual-Tab GUI, Impersonate Player & Core Features: [AI Assistant]
+
+local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
 local player = Players.LocalPlayer
 
--- ** ⬇️ VARIABEL & FUNGSI FITUR UTAMA ⬇️ **
-local isDestroyerActive = false
+-- ** ⬇️ STATUS FITUR CORE ⬇️ **
+local isDestroyerActive = false -- Status untuk fitur Destroyer BARU
+local destroyerTouchConnection = nil -- Koneksi spesifik untuk Destroyer
+local isPhantomTouchActive = false
 local touchConnection = nil
+local partsTouched = {}
+local isSuperJumpActive = false
+local isNoclipActive = false
+local originalJumpPower = 50
+local originalCanCollide = true
 
-local function activatePartDestroyer()
-    if isDestroyerActive then return end
-    isDestroyerActive = true
-    
-    local character = player.Character
-    local humanoid = character and character:FindFirstChild("Humanoid")
-    
-    if not humanoid then 
-        warn("Humanoid tidak ditemukan, tidak bisa mengaktifkan destroyer.")
-        isDestroyerActive = false
-        return 
-    end
+-- 🔽 ANIMASI "BY : Xraxor" 🔽
+do
+    local introGui = Instance.new("ScreenGui")
+    introGui.Name = "IntroAnimation"
+    introGui.ResetOnSpawn = false
+    introGui.Parent = player:WaitForChild("PlayerGui")
 
-    print("Aggressive Local Destroyer AKTIF.")
-    
-    local rootPart = character:WaitForChild("HumanoidRootPart")
-    
-    touchConnection = rootPart.Touched:Connect(function(otherPart)
-        -- HANYA EFEK LOKAL (KLIEN)
-        if isDestroyerActive and otherPart and otherPart.Parent and otherPart.Name ~= "HumanoidRootPart" then
-            if otherPart:IsA("BasePart") or otherPart:IsA("MeshPart") or otherPart:IsA("UnionOperation") then
-                
-                local parentModel = otherPart.Parent
-                local hitHumanoid = parentModel:FindFirstChildOfClass("Humanoid")
-                
-                -- Cek apakah bagian yang disentuh adalah bagian dari karakter pemain lain
-                if hitHumanoid and parentModel ~= player.Character then
-                    -- ** EFEK PEMBUNUHAN LOKAL (Non-Visual Illusion) **
-                    hitHumanoid.Health = 0 -- Pembunuhan LOKAL
-                end
-                
-                -- Penghancuran Bagian LOKAL
-                otherPart:Destroy()
-            end
-        end
+    local introLabel = Instance.new("TextLabel")
+    introLabel.Size = UDim2.new(0, 300, 0, 50)
+    introLabel.Position = UDim2.new(0.5, -150, 0.4, 0)
+    introLabel.BackgroundTransparency = 1
+    introLabel.Text = "By : Xraxor"
+    introLabel.TextColor3 = Color3.fromRGB(40, 40, 40)
+    introLabel.TextScaled = true
+    introLabel.Font = Enum.Font.GothamBold
+    introLabel.Parent = introGui
+
+    local tweenInfoMove = TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+    local tweenMove = TweenService:Create(introLabel, tweenInfoMove, {Position = UDim2.new(0.5, -150, 0.42, 0)})
+
+    local tweenInfoColor = TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+    local tweenColor = TweenService:Create(introLabel, tweenInfoColor, {TextColor3 = Color3.fromRGB(0, 0, 0)})
+
+    tweenMove:Play()
+    tweenColor:Play()
+
+    task.wait(2)
+    local fadeOut = TweenService:Create(introLabel, TweenInfo.new(0.5), {TextTransparency = 1})
+    fadeOut:Play()
+    fadeOut.Completed:Connect(function()
+        introGui:Destroy()
     end)
 end
 
-local function deactivatePartDestroyer()
-    if not isDestroyerActive then return end
-    isDestroyerActive = false
-    
-    if touchConnection then
-        touchConnection:Disconnect()
-        touchConnection = nil
-    end
-    print("Aggressive Local Destroyer NONAKTIF.")
+-- 🔽 Status AutoFarm (Dipertahankan) 🔽
+local statusValue = ReplicatedStorage:FindFirstChild("AutoFarmStatus")
+if not statusValue then
+    statusValue = Instance.new("BoolValue")
+    statusValue.Name = "AutoFarmStatus"
+    statusValue.Value = false
+    statusValue.Parent = ReplicatedStorage
 end
 
----
-## 💻 GUI: Stealth Mode (Minimalis)
-
--- 🔽 GUI UTAMA 🔽
+-- 🔽 GUI Utama (Dual-Tab Structure) 🔽
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DestroyerGUI"
+screenGui.Name = "ImpersonateGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 150, 0, 50) -- Ukuran Frame dikembalikan ke minimal
-frame.Position = UDim2.new(1, -160, 0, 10) 
+frame.Size = UDim2.new(0, 220, 0, 260) 
+frame.Position = UDim2.new(0.4, -110, 0.5, -130)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-frame.BackgroundTransparency = 0.8 -- Semi-transparan
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
 frame.Parent = screenGui
 
 local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 10)
+corner.CornerRadius = UDim.new(0, 15)
 corner.Parent = frame
 
--- Tombol On/Off
-local toggleButton = Instance.new("TextButton")
-toggleButton.Name = "ToggleButton"
-toggleButton.Size = UDim2.new(1, 0, 1, 0)
-toggleButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Merah (OFF)
-toggleButton.BackgroundTransparency = 1 -- **Transparan penuh**
-toggleButton.Text = "DESTROYER: OFF"
-toggleButton.TextColor3 = Color3.new(1, 1, 1)
-toggleButton.Font = Enum.Font.GothamBold
-toggleButton.TextSize = 14
-toggleButton.Parent = frame
+-- Judul GUI
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.Text = "IMPERSONATE MENU"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.Parent = frame
+
+-- Header Tab
+local tabHeader = Instance.new("Frame")
+tabHeader.Size = UDim2.new(1, 0, 0, 30)
+tabHeader.Position = UDim2.new(0, 0, 0, 30)
+tabHeader.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+tabHeader.BorderSizePixel = 0
+tabHeader.Parent = frame
+
+-- Container untuk konten tab
+local tabContainer = Instance.new("Frame")
+tabContainer.Size = UDim2.new(1, -20, 1, -70) 
+tabContainer.Position = UDim2.new(0.5, -100, 0, 65)
+tabContainer.BackgroundTransparency = 1
+tabContainer.Parent = frame
+
+-- Membuat Tab Content (Main Features)
+local featureScrollFrame = Instance.new("ScrollingFrame")
+featureScrollFrame.Name = "MainFeatures"
+featureScrollFrame.Size = UDim2.new(1, 0, 1, 0)
+featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+featureScrollFrame.ScrollBarThickness = 6
+featureScrollFrame.BackgroundTransparency = 1
+featureScrollFrame.Parent = tabContainer
+
+local featureListLayout = Instance.new("UIListLayout")
+featureListLayout.Padding = UDim.new(0, 5)
+featureListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+featureListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+featureListLayout.Parent = featureScrollFrame
+
+featureListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, featureListLayout.AbsoluteContentSize.Y + 10)
+end)
+
+-- Membuat Tab Content (Player List)
+local playerScrollFrame = Instance.new("ScrollingFrame")
+playerScrollFrame.Name = "PlayerList"
+playerScrollFrame.Size = UDim2.new(1, 0, 1, 0)
+playerScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+playerScrollFrame.ScrollBarThickness = 6
+playerScrollFrame.BackgroundTransparency = 1
+playerScrollFrame.Visible = false 
+playerScrollFrame.Parent = tabContainer
+
+local playerListLayout = Instance.new("UIListLayout")
+playerListLayout.Padding = UDim.new(0, 5)
+playerListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+playerListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+playerListLayout.Parent = playerScrollFrame
+
+playerListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    playerScrollFrame.CanvasSize = UDim2.new(0, 0, 0, playerListLayout.AbsoluteContentSize.Y + 10)
+end)
 
 
--- 🔽 LOGIKA TOMBOL 🔽
+-- FUNGSI TAB SWITCHING
+local tabs = {
+    ["Main"] = featureScrollFrame,
+    ["Players"] = playerScrollFrame
+}
+local tabButtons = {}
 
-toggleButton.MouseButton1Click:Connect(function()
-    if isDestroyerActive then
-        deactivatePartDestroyer()
-        toggleButton.Text = "DESTROYER: OFF"
-        toggleButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-        toggleButton.BackgroundTransparency = 1
+local function populatePlayerList()
+    -- Hapus tombol lama
+    for _, child in ipairs(playerScrollFrame:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    
+    local playerList = Players:GetPlayers()
+    table.sort(playerList, function(a, b) return a.Name < b.Name end)
+
+    -- Tambahkan tombol baru
+    for _, target in ipairs(playerList) do
+        if target.Character then -- Pastikan pemain memiliki karakter
+            makePlayerButton(target)
+        end
+    end
+end
+
+local function switchTab(tabName)
+    for name, content in pairs(tabs) do
+        content.Visible = (name == tabName)
+        tabButtons[name].BackgroundColor3 = (name == tabName) and Color3.fromRGB(40, 40, 40) or Color3.fromRGB(30, 30, 30)
+    end
+    if tabName == "Players" then
+        populatePlayerList()
+    end
+end
+
+local function createTabButton(name, positionX)
+    local button = Instance.new("TextButton")
+    button.Name = name .. "TabButton"
+    button.Size = UDim2.new(0.5, 0, 1, 0)
+    button.Position = UDim2.new(positionX, 0, 0, 0)
+    button.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    button.Text = name
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 12
+    button.Parent = tabHeader
+
+    button.MouseButton1Click:Connect(function()
+        switchTab(name)
+    end)
+    return button
+end
+
+tabButtons["Main"] = createTabButton("Main", 0)
+tabButtons["Players"] = createTabButton("Players", 0.5)
+
+-- Set default tab
+switchTab("Main")
+
+
+-- 🔽 FUNGSI FITUR UTAMA 🔽
+
+local function updateButtonStatus(button, isActive)
+    local featureName = button.Name:gsub("Button", ""):gsub("_", " "):upper()
+    if isActive then
+        button.Text = featureName .. ": ON"
+        button.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Hijau
     else
-        activatePartDestroyer()
-        toggleButton.Text = "DESTROYER: ON"
-        toggleButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-        toggleButton.BackgroundTransparency = 0.7 -- Sedikit terlihat saat aktif
+        button.Text = featureName .. ": OFF"
+        button.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Merah
+    end
+end
+
+-- ** 1. AGGRESSIVE LOCAL DESTROYER **
+local function destroyerTouch(otherPart)
+    if not isDestroyerActive or not otherPart or not otherPart.Parent then return end
+    
+    local parentModel = otherPart.Parent
+    local hitHumanoid = parentModel:FindFirstChildOfClass("Humanoid")
+    
+    -- Hindari menghancurkan/membunuh diri sendiri atau part karakter sendiri
+    if parentModel == player.Character then return end
+    
+    if otherPart:IsA("BasePart") or otherPart:IsA("MeshPart") or otherPart:IsA("UnionOperation") then
+        
+        if hitHumanoid and parentModel:FindFirstChild("HumanoidRootPart") then
+            hitHumanoid.Health = 0 -- Pembunuhan LOKAL
+        end
+        
+        otherPart:Destroy() -- Penghancuran Bagian LOKAL
+    end
+end
+
+local function activatePartDestroyer(button)
+    if isDestroyerActive then return end
+    isDestroyerActive = true
+    
+    local character = player.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    
+    if not rootPart then 
+        warn("HumanoidRootPart tidak ditemukan.")
+        isDestroyerActive = false
+        updateButtonStatus(button, false)
+        return 
+    end
+
+    updateButtonStatus(button, true)
+    
+    -- Gunakan Touched event yang sudah ada, atau buat jika perlu
+    if not destroyerTouchConnection then
+        destroyerTouchConnection = rootPart.Touched:Connect(destroyerTouch)
+    end
+    
+    print("Aggressive Local Destroyer AKTIF.")
+end
+
+local function deactivatePartDestroyer(button)
+    if not isDestroyerActive then return end
+    isDestroyerActive = false
+    updateButtonStatus(button, false)
+    
+    if destroyerTouchConnection then
+        destroyerTouchConnection:Disconnect()
+        destroyerTouchConnection = nil
+    end
+    print("Aggressive Local Destroyer NONAKTIF.")
+end
+
+
+-- 2. Super Jump
+local function toggleSuperJump(button)
+    local char = player.Character or player.CharacterAdded:Wait()
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    isSuperJumpActive = not isSuperJumpActive
+
+    if isSuperJumpActive then
+        humanoid.JumpPower = 150 
+    else
+        humanoid.JumpPower = originalJumpPower 
+    end
+    updateButtonStatus(button, isSuperJumpActive)
+end
+
+-- 3. Noclip
+local function toggleNoclip(button)
+    local char = player.Character or player.CharacterAdded:Wait()
+    local rootPart = char:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+
+    isNoclipActive = not isNoclipActive
+
+    if isNoclipActive then
+        rootPart.CanCollide = false
+    else
+        rootPart.CanCollide = originalCanCollide
+    end
+    updateButtonStatus(button, isNoclipActive)
+end
+
+-- 4. Phantom Touch
+local function onPartTouched(otherPart)
+    if not isPhantomTouchActive or not otherPart or not otherPart:IsA("BasePart") then return end
+    -- Cek jika part adalah bagian dari karakter sendiri atau aksesori
+    if otherPart:IsDescendantOf(player.Character) or otherPart.Parent:IsA("Accessory") or partsTouched[otherPart] then return end
+
+    -- Efek Lokal: Menghilangkan tabrakan dan visual
+    otherPart.Transparency = 1
+    otherPart.CanCollide = false
+    
+    partsTouched[otherPart] = true
+    print("Phantom Touched: " .. otherPart.Name .. " menghilang.")
+end
+
+local function enablePhantomTouch(button)
+    isPhantomTouchActive = true
+    updateButtonStatus(button, true)
+    
+    local char = player.Character or player.CharacterAdded:Wait()
+    local root = char:WaitForChild("HumanoidRootPart")
+    
+    if touchConnection then touchConnection:Disconnect() end
+    touchConnection = root.Touched:Connect(onPartTouched)
+    print("Phantom Touch Dinyalakan.")
+}
+
+local function disablePhantomTouch(button)
+    isPhantomTouchActive = false
+    updateButtonStatus(button, false)
+    
+    if touchConnection then
+        touchConnection:Disconnect()
+        touchConnection = nil
+    end
+    
+    -- Kembalikan transparansi dan CanCollide part yang telah disentuh (optional, tapi disarankan)
+    for part, _ in pairs(partsTouched) do
+        if part and part.Parent then -- Cek apakah part masih ada
+             part.Transparency = 0 
+             part.CanCollide = true
+        end
+    end
+    partsTouched = {}
+    print("Phantom Touch Dimatikan.")
+end
+
+-- 🔽 FUNGSI PEMBUAT TOMBOL FITUR 🔽
+
+local function makeFeatureButton(container, name, color, callback)
+    local featButton = Instance.new("TextButton")
+    featButton.Name = name:gsub(" ", ""):gsub(":", "") .. "Button" -- Menghilangkan spasi dan kolon untuk nama
+    featButton.Size = UDim2.new(0, 180, 0, 40)
+    featButton.BackgroundColor3 = color
+    featButton.Text = name
+    featButton.TextColor3 = Color3.new(1, 1, 1)
+    featButton.Font = Enum.Font.GothamBold
+    featButton.TextSize = 12
+    featButton.Parent = container
+
+    local featCorner = Instance.new("UICorner")
+    featCorner.CornerRadius = UDim.new(0, 10)
+    featCorner.Parent = featButton
+
+    featButton.MouseButton1Click:Connect(function()
+        callback(featButton)
+    end)
+    return featButton
+end
+
+-- 🔽 PENAMBAHAN TOMBOL KE MAIN FEATURES (Tab 1) 🔽
+
+-- 1. Tombol DESTROYER 
+local destroyerButton = makeFeatureButton(featureScrollFrame, "DESTROYER: OFF", Color3.fromRGB(150, 0, 0), function(button)
+    if isDestroyerActive then
+        deactivatePartDestroyer(button)
+    else
+        activatePartDestroyer(button)
     end
 end)
 
--- Penanganan Karakter Reset (CharacterAdded)
-player.CharacterAdded:Connect(function(character)
-    if isDestroyerActive then
-        character:WaitForChild("HumanoidRootPart")
-        -- Hentikan dan mulai kembali koneksi sentuhan pada karakter baru
-        deactivatePartDestroyer() 
-        activatePartDestroyer()
+
+-- 2. Tombol Noclip
+local noclipButton = makeFeatureButton(featureScrollFrame, "NOCLIP: OFF", Color3.fromRGB(150, 0, 0), toggleNoclip)
+
+-- 3. Tombol Super Jump
+local jumpButton = makeFeatureButton(featureScrollFrame, "SUPER JUMP: OFF", Color3.fromRGB(150, 0, 0), toggleSuperJump)
+
+-- 4. Tombol PHANTOM TOUCH
+local phantomButton = makeFeatureButton(featureScrollFrame, "PHANTOM TOUCH: OFF", Color3.fromRGB(150, 0, 0), function(button)
+    if isPhantomTouchActive then
+        disablePhantomTouch(button)
+    else
+        enablePhantomTouch(button)
     end
 end)
+
+-- 5. Tombol RESET
+makeFeatureButton(featureScrollFrame, "RESET AVATAR", Color3.fromRGB(150, 0, 0), function()
+    player:LoadCharacter()
+end)
+
+
+-- 🔽 Logika Impersonate Player (Tab 2) 🔽
+
+local function makePlayerButton(targetPlayer)
+    local tpButton = Instance.new("TextButton")
+    tpButton.Size = UDim2.new(0, 180, 0, 35)
+    tpButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    tpButton.Text = targetPlayer.Name .. (targetPlayer == player and " (You)" or "")
+    tpButton.TextColor3 = Color3.new(1, 1, 1)
+    tpButton.Font = Enum.Font.SourceSansBold
+    tpButton.TextSize = 14
+    tpButton.Parent = playerScrollFrame
+
+    local tpCorner = Instance.new("UICorner")
+    tpCorner.CornerRadius = UDim.new(0, 8)
+    tpCorner.Parent = tpButton
+
+    tpButton.MouseButton1Click:Connect(function()
+        local char = player.Character
+        local targetChar = targetPlayer.Character
+
+        if not char or not targetChar then warn("Karakter tidak ditemukan!") return end
+        local playerHumanoid = char:FindFirstChildOfClass("Humanoid")
+        local targetHumanoid = targetChar:FindFirstChildOfClass("Humanoid")
+        if not playerHumanoid or not targetHumanoid then warn("Humanoid tidak ditemukan!") return end
+
+        -- CLONING KOSTUM/AKSESORIS
+        for _, obj in ipairs(char:GetChildren()) do
+            if obj:IsA("Accessory") or obj:IsA("Shirt") or obj:IsA("Pants") then obj:Destroy() end
+        end
+        for _, obj in ipairs(targetChar:GetChildren()) do
+            if obj:IsA("Accessory") or obj:IsA("Shirt") or obj:IsA("Pants") then
+                local clone = obj:Clone()
+                clone.Parent = char
+            end
+        end
+
+        -- STATS DAN LOKASI
+        local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+        local playerRoot = char:FindFirstChild("HumanoidRootPart")
+        
+        -- Sesuaikan stat sesuai target, tetapi hormati status fitur ON/OFF
+        playerHumanoid.WalkSpeed = targetHumanoid.WalkSpeed 
+        if not isSuperJumpActive then
+             playerHumanoid.JumpPower = targetHumanoid.JumpPower
+        end
+        
+        if targetRoot and playerRoot then
+            playerRoot.CFrame = targetRoot.CFrame
+        end
+        print("Meniru properti dari: " .. targetPlayer.Name)
+    end)
+end
+
+
+-- 🔽 Penanganan Karakter Reset (CharacterAdded) 🔽
+player.CharacterAdded:Connect(function(char)
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local rootPart = char:FindFirstChild("HumanoidRootPart")
+
+    -- Ambil kembali nilai asli jika belum diset (hanya di awal)
+    if humanoid and originalJumpPower == 50 then
+         originalJumpPower = humanoid.JumpPower
+    end
+
+    -- Pertahankan status fitur
+    if isDestroyerActive and rootPart then
+        activatePartDestroyer(destroyerButton)
+    end
+    
+    if isPhantomTouchActive and rootPart then
+        enablePhantomTouch(phantomButton)
+    end
+    
+    if isSuperJumpActive and humanoid then
+        humanoid.JumpPower = 150
+    elseif humanoid then
+        humanoid.JumpPower = originalJumpPower -- Pastikan kembali ke nilai normal setelah reset jika nonaktif
+    end
+
+    if isNoclipActive and rootPart then
+        rootPart.CanCollide = false
+    elseif rootPart then
+        rootPart.CanCollide = originalCanCollide -- Pastikan kembali ke nilai normal setelah reset jika nonaktif
+    end
+    
+    -- Update status tombol setelah CharacterAdded
+    updateButtonStatus(destroyerButton, isDestroyerActive)
+    updateButtonStatus(noclipButton, isNoclipActive)
+    updateButtonStatus(jumpButton, isSuperJumpActive)
+    updateButtonStatus(phantomButton, isPhantomTouchActive)
+end)
+
+-- Atur status awal tombol
+updateButtonStatus(destroyerButton, isDestroyerActive)
+updateButtonStatus(noclipButton, isNoclipActive)
+updateButtonStatus(jumpButton, isSuperJumpActive)
+updateButtonStatus(phantomButton, isPhantomTouchActive)
