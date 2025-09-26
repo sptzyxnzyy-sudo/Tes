@@ -125,7 +125,7 @@ local function updateButtonStatus(button, isActive, featureName)
 end
 
 
--- 🔽 1. FUNGSI AGGRESSIVE LOCAL DESTROYER 🔽
+-- 🔽 1. FUNGSI AGGRESSIVE GLOBAL DESTROYER 🔽
 
 local function destroyerTouch(otherPart)
     if not isDestroyerActive or not otherPart or not otherPart.Parent then return end
@@ -137,11 +137,13 @@ local function destroyerTouch(otherPart)
     
     if otherPart:IsA("BasePart") or otherPart:IsA("MeshPart") or otherPart:IsA("UnionOperation") then
         
-        if hitHumanoid and parentModel:FindFirstChild("HumanoidRootPart") then
-            hitHumanoid.Health = 0 -- Pembunuhan LOKAL
-        end
+        -- MENGHANCURKAN: Berharap Server menerima ini dan mereplikasi ke pemain lain.
+        pcall(function() otherPart:Destroy() end)
         
-        pcall(function() otherPart:Destroy() end) -- Penghancuran Bagian LOKAL
+        if hitHumanoid and parentModel:FindFirstChild("HumanoidRootPart") then
+             -- MEMBUNUH: Berharap Server menerima perubahan Health dan mereplikasi ke pemain lain.
+            hitHumanoid.Health = 0 
+        end
     end
 end
 
@@ -164,7 +166,7 @@ local function activatePartDestroyer(button)
     if destroyerTouchConnection then destroyerTouchConnection:Disconnect() end
     destroyerTouchConnection = rootPart.Touched:Connect(destroyerTouch)
     
-    print("Aggressive Local Destroyer AKTIF.")
+    print("Aggressive Destroyer AKTIF (Berharap perubahan terkirim ke Server).")
 end
 
 local function deactivatePartDestroyer(button)
@@ -176,21 +178,22 @@ local function deactivatePartDestroyer(button)
         destroyerTouchConnection:Disconnect()
         destroyerTouchConnection = nil
     end
-    print("Aggressive Local Destroyer NONAKTIF.")
+    print("Aggressive Destroyer NONAKTIF.")
 end
 
 
--- 🔽 2. FUNGSI PHANTOM TOUCH 🔽
+-- 🔽 2. FUNGSI PHANTOM TOUCH (GLOBAL) 🔽
 
 local function onPartTouched(otherPart)
     if not isPhantomTouchActive or not otherPart or not otherPart:IsA("BasePart") then return end
     if otherPart:IsDescendantOf(player.Character) or otherPart.Parent:IsA("Accessory") or partsTouched[otherPart] then return end
 
+    -- MENGUBAH PROPERTI: Berharap Server menerima ini dan mereplikasi ke pemain lain.
     otherPart.Transparency = 1
     otherPart.CanCollide = false
     
     partsTouched[otherPart] = true
-    print("Phantom Touched: " .. otherPart.Name .. " menghilang.")
+    print("Phantom Touched: " .. otherPart.Name .. " menghilang (Berharap perubahan terkirim ke Server).")
 end
 
 local function updatePhantomButton(button)
@@ -208,7 +211,7 @@ local function enablePhantomTouch(button)
     if touchConnection then touchConnection:Disconnect() end
     touchConnection = root.Touched:Connect(onPartTouched)
     
-    print("Phantom Touch Dinyalakan.")
+    print("Phantom Touch Dinyalakan (Berharap perubahan terkirim ke Server).")
 end
 
 local function disablePhantomTouch(button)
@@ -220,8 +223,10 @@ local function disablePhantomTouch(button)
         touchConnection = nil
     end
     
+    -- Mengembalikan properti ke nilai normal
     for part, _ in pairs(partsTouched) do
         if part and part.Parent then 
+             -- MENGEMBALIKAN PROPERTI: Berharap Server menerima ini dan mereplikasi ke pemain lain.
              part.Transparency = 0 
              part.CanCollide = true
         end
@@ -279,18 +284,14 @@ player.CharacterAdded:Connect(function(char)
     -- Pertahankan status Destroyer
     if isDestroyerActive then
         local button = featureScrollFrame:FindFirstChild("DestroyerButton")
-        -- Periksa kembali tombol sudah dibuat sebelum memanggil activatePartDestroyer
         if button then activatePartDestroyer(button) end
     end
     
     -- Pertahankan status Phantom Touch
     if isPhantomTouchActive then
         local button = featureScrollFrame:FindFirstChild("PhantomTouchButton")
-        -- Periksa kembali tombol sudah dibuat sebelum memanggil enablePhantomTouch
         if button then enablePhantomTouch(button) end
     end
-    
-    -- Tidak perlu reset stat default (WalkSpeed/JumpPower) karena fitur reset sudah dihapus.
 end)
 
 
