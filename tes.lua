@@ -4,13 +4,13 @@
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService") -- Ditambahkan untuk potensi penggunaan RunService, meskipun saat ini tidak digunakan
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 
 -- ** ⬇️ STATUS FITUR CORE ⬇️ **
-local isDestroyerActive = false -- Status BARU untuk fitur Destroyer
-local destroyerTouchConnection = nil -- Koneksi BARU untuk Destroyer
+local isDestroyerActive = false -- STATUS BARU untuk fitur Destroyer
+local destroyerTouchConnection = nil -- KONEKSI BARU untuk Destroyer
 local isPhantomTouchActive = false
 local touchConnection = nil
 local partsTouched = {} -- Tabel untuk melacak part yang telah disentuh
@@ -113,6 +113,7 @@ end)
 -- 🔽 FUNGSI UTILITY GLOBAL 🔽
 
 local function updateButtonStatus(button, isActive, featureName)
+    if not button or not button.Parent then return end
     local name = featureName or button.Name:gsub("Button", ""):gsub("_", " "):upper()
     if isActive then
         button.Text = name .. ": ON"
@@ -254,7 +255,7 @@ end
 
 -- 🔽 PENAMBAHAN TOMBOL KE FEATURE LIST 🔽
 
--- 1. Tombol DESTROYER BARU
+-- 1. Tombol DESTROYER (BARU DITAMBAHKAN)
 local destroyerButton = makeFeatureButton("DESTROYER: OFF", Color3.fromRGB(150, 0, 0), function(button)
     if isDestroyerActive then
         deactivatePartDestroyer(button)
