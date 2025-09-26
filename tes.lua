@@ -3,8 +3,137 @@
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService") 
 
 local player = Players.LocalPlayer
+
+-- ** ⬇️ VARIABLE AUTO-FOLLOW & BEAM ⬇️ **
+local currentTarget = nil        -- Pemain yang sedang diikuti
+local autoFollowConnection = nil -- Koneksi RunService untuk loop follow
+local followBeam = nil           -- Objek Beam yang akan kita gunakan (tali)
+
+
+-- ** ⬇️ FUNGSI UNTUK MENGELOLA BEAM ⬇️ **
+local function createFollowBeam(targetPlayer)
+    local char = player.Character
+    local targetChar = targetPlayer.Character
+
+    if char and char:FindFirstChild("HumanoidRootPart") and targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
+        local myRoot = char.HumanoidRootPart
+        local targetRoot = targetChar.HumanoidRootPart
+
+        -- Hapus Beam lama jika ada
+        if followBeam and followBeam.Parent then
+            followBeam:Destroy()
+        end
+
+        -- Buat Attachment pada kedua RootPart
+        local attachment0 = Instance.new("Attachment")
+        attachment0.Parent = myRoot
+        
+        local attachment1 = Instance.new("Attachment")
+        attachment1.Parent = targetRoot
+
+        -- Buat Beam itu sendiri (Tali)
+        followBeam = Instance.new("Beam")
+        followBeam.Color = BrickColor.new("Really red") -- Warna tali
+        followBeam.Texture = "rbxassetid://5499965042" -- Texture garis lurus
+        followBeam.TextureLength = 10 
+        followBeam.Segments = 10
+        followBeam.Width0 = 0.2 -- Ketebalan di ujung 0 (Anda)
+        followBeam.Width1 = 0.2 -- Ketebalan di ujung 1 (Target)
+        followBeam.Attachment0 = attachment0
+        followBeam.Attachment1 = attachment1
+        followBeam.LightInfluence = 1 
+        followBeam.Parent = game.Workspace.Terrain -- Taruh di tempat yang aman (atau game.Workspace)
+
+        print("Tali penghubung dibuat ke:", targetPlayer.Name)
+    end
+end
+
+local function destroyFollowBeam()
+    if followBeam and followBeam.Parent then
+        -- Hapus Beam dan Attachments yang dibuatnya
+        local att0 = followBeam.Attachment0
+        local att1 = followBeam.Attachment1
+        
+        followBeam:Destroy()
+        
+        -- Cek Parent sebelum Destroy untuk menghindari error jika Parent sudah hilang
+        if att0 and att0.Parent then att0:Destroy() end
+        if att1 and att1.Parent then att1:Destroy() end
+        
+        followBeam = nil
+        print("Tali penghubung dihapus.")
+    end
+end
+
+-- ** ⬇️ FUNGSI AUTO-FOLLOW YANG DIPERBARUI ⬇️ **
+local function setTargetToFollow(targetPlayer)
+    if autoFollowConnection then
+        -- Hentikan auto-follow yang sedang berjalan
+        autoFollowConnection:Disconnect()
+        autoFollowConnection = nil
+        destroyFollowBeam() -- Hapus Beam saat follow berhenti
+        
+        -- Hentikan pergerakan karakter (Opsional: agar karakter tidak terus berjalan)
+        local character = player.Character
+        local humanoid = character and character:FindFirstChild("Humanoid")
+        if humanoid then
+             humanoid:MoveTo(player.Character.HumanoidRootPart.Position) -- Pindah ke posisi saat ini
+        end
+
+        currentTarget = nil
+    end
+
+    if targetPlayer and targetPlayer ~= player then
+        -- Mulai auto-follow ke pemain baru
+        currentTarget = targetPlayer
+        
+        -- Buat Beam baru ke pemain target
+        createFollowBeam(targetPlayer) 
+
+        local character = player.Character
+        local humanoid = character and character:FindFirstChild("Humanoid")
+
+        if character and humanoid then
+            print("Mulai mengikuti pemain:", currentTarget.Name)
+
+            -- Fungsi yang dijalankan setiap frame (RunService.Stepped)
+            autoFollowConnection = RunService.Stepped:Connect(function()
+                if not currentTarget or not currentTarget.Character or not currentTarget.Character:FindFirstChild("Humanoid") then
+                    -- Target hilang, hentikan mengikuti
+                    print("Target hilang, auto-follow dihentikan.")
+                    setTargetToFollow(nil)
+                    return
+                end
+                
+                -- Pastikan Beam masih ada. Jika tidak, buat ulang.
+                if not followBeam then 
+                    createFollowBeam(currentTarget) 
+                end
+
+                local targetTorso = currentTarget.Character:FindFirstChild("HumanoidRootPart")
+                local myTorso = player.Character:FindFirstChild("HumanoidRootPart")
+
+                if targetTorso and myTorso then
+                    local distance = (targetTorso.Position - myTorso.Position).Magnitude
+
+                    -- Jika jarak lebih dari 7 studs, bergerak menuju target
+                    if distance > 7 then
+                        humanoid:MoveTo(targetTorso.Position)
+                    end
+                end
+            end)
+        end
+    end
+    
+    -- Perbarui GUI Player List jika sedang terlihat
+    if screenGui.ImpersonateGUI and screenGui.ImpersonateGUI.Frame.sideFrame.Visible then
+        populatePlayerList()
+    end
+end
+
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -115,15 +244,13 @@ local function makeFeatureButton(name, color, callback)
     return featButton
 end
 
--- Tombol RESET (Fitur murni yang diperbolehkan)
+-- Tombol RESET 
 makeFeatureButton("RESET AVATAR & STATS", Color3.fromRGB(150, 0, 0), function(button)
     local success, err = pcall(function()
-        -- Fungsi standar Roblox untuk memuat ulang karakter
         player:LoadCharacter() 
     end)
 
     if success then
-        -- Reset statistik dasar (bisa diubah sesuai kebutuhan game)
         local humanoid = player.Character:WaitForChild("Humanoid")
         humanoid.WalkSpeed = 16
         humanoid.JumpPower = 50
@@ -131,8 +258,14 @@ makeFeatureButton("RESET AVATAR & STATS", Color3.fromRGB(150, 0, 0), function(bu
     print("Karakter berhasil di-reset.")
 end)
 
+-- Tombol baru untuk menghentikan Follow
+makeFeatureButton("STOP FOLLOW", Color3.fromRGB(0, 150, 150), function(button)
+    setTargetToFollow(nil)
+    populatePlayerList()
+end)
 
--- 🔽 GUI Samping Player List (Hanya tampilan daftar) 🔽
+
+-- 🔽 GUI Samping Player List 🔽
 local flagButton = Instance.new("ImageButton")
 flagButton.Size = UDim2.new(0, 20, 0, 20)
 flagButton.Position = UDim2.new(1, -30, 0, 5)
@@ -141,6 +274,7 @@ flagButton.Image = "rbxassetid://6031097229"
 flagButton.Parent = frame
 
 local sideFrame = Instance.new("Frame")
+sideFrame.Name = "sideFrame"
 sideFrame.Size = UDim2.new(0, 170, 0, 250)
 sideFrame.Position = UDim2.new(1, 10, 0, 0)
 sideFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
@@ -180,12 +314,14 @@ listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
 end)
 
--- 🔽 Logika Player List (Tanpa Aksi Teleport/Impersonate) 🔽
+-- 🔽 Logika Player List (Dengan Aksi Auto-Follow) 🔽
 
 local function makePlayerButton(targetPlayer)
     local tpButton = Instance.new("TextButton")
     tpButton.Size = UDim2.new(0, 140, 0, 30)
-    tpButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    -- Perbarui warna tombol jika pemain sedang di-follow
+    local buttonColor = (currentTarget == targetPlayer) and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(40, 40, 40)
+    tpButton.BackgroundColor3 = buttonColor
     tpButton.Text = targetPlayer.Name .. (targetPlayer == player and " (You)" or "")
     tpButton.TextColor3 = Color3.new(1, 1, 1)
     tpButton.Font = Enum.Font.SourceSansBold
@@ -197,8 +333,21 @@ local function makePlayerButton(targetPlayer)
     tpCorner.Parent = tpButton
 
     tpButton.MouseButton1Click:Connect(function()
-        -- Tombol daftar pemain tidak melakukan aksi manipulasi apa pun
-        print("Pemain dipilih: " .. targetPlayer.Name)
+        if targetPlayer == player then
+            print("Tidak bisa mengikuti diri sendiri.")
+            return
+        end
+        
+        if currentTarget == targetPlayer then
+            -- Jika sudah di-follow, hentikan follow
+            setTargetToFollow(nil)
+        else
+            -- Jika belum/follow pemain lain, mulai follow pemain ini
+            setTargetToFollow(targetPlayer)
+        end
+        
+        -- Perbarui daftar pemain untuk menampilkan status follow yang baru
+        populatePlayerList()
     end)
 end
 
@@ -220,5 +369,10 @@ flagButton.MouseButton1Click:Connect(function()
     sideFrame.Visible = not sideFrame.Visible
     if sideFrame.Visible then
         populatePlayerList()
+    else
+        -- Pastikan Beam di-destroy jika frame ditutup dan follow aktif
+        if not currentTarget then
+            destroyFollowBeam()
+        end
     end
 end)
