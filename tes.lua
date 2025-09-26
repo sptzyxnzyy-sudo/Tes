@@ -1,5 +1,5 @@
 -- credit: Xraxor1 (Original GUI/Intro structure)
--- Modification for Impersonate Player & Phantom Touch: [AI Assistant]
+-- Modification for List-based GUI, Impersonate Player & Phantom Touch: [AI Assistant]
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
@@ -55,14 +55,14 @@ if not statusValue then
     statusValue.Parent = ReplicatedStorage
 end
 
--- 🔽 GUI Utama 🔽
+-- 🔽 GUI Utama (Diubah menjadi List Menu) 🔽
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ImpersonateGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
--- Ukuran Frame diperbesar untuk menampung tombol baru (160 -> 220)
+-- Ukuran Frame diubah untuk menampung List
 frame.Size = UDim2.new(0, 220, 0, 220) 
 frame.Position = UDim2.new(0.4, -110, 0.5, -110)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
@@ -79,45 +79,143 @@ corner.Parent = frame
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
-title.Text = "IMPERSONATE"
+title.Text = "IMPERSONATE MENU"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
--- Tombol RESET
-local buttonReset = Instance.new("TextButton")
-buttonReset.Name = "ResetButton"
-buttonReset.Size = UDim2.new(0, 160, 0, 40)
-buttonReset.Position = UDim2.new(0.5, -80, 0.35, -20) -- Posisi disesuaikan
-buttonReset.BackgroundColor3 = Color3.fromRGB(150, 0, 0) 
-buttonReset.Text = "RESET AVATAR & STATS"
-buttonReset.TextColor3 = Color3.new(1, 1, 1)
-buttonReset.Font = Enum.Font.GothamBold
-buttonReset.TextSize = 12
-buttonReset.Parent = frame
+-- ScrollingFrame untuk Daftar Pilihan Fitur
+local featureScrollFrame = Instance.new("ScrollingFrame")
+featureScrollFrame.Name = "FeatureList"
+featureScrollFrame.Size = UDim2.new(1, -20, 1, -40)
+featureScrollFrame.Position = UDim2.new(0.5, -100, 0, 35)
+featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+featureScrollFrame.ScrollBarThickness = 6
+featureScrollFrame.BackgroundTransparency = 1
+featureScrollFrame.Parent = frame
 
-local buttonResetCorner = Instance.new("UICorner")
-buttonResetCorner.CornerRadius = UDim.new(0, 10)
-buttonResetCorner.Parent = buttonReset
+local featureListLayout = Instance.new("UIListLayout")
+featureListLayout.Padding = UDim.new(0, 5)
+featureListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+featureListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+featureListLayout.Parent = featureScrollFrame
 
--- Tombol PHANTOM TOUCH (Fitur Baru)
-local buttonPhantom = Instance.new("TextButton")
-buttonPhantom.Name = "PhantomButton"
-buttonPhantom.Size = UDim2.new(0, 160, 0, 40)
-buttonPhantom.Position = UDim2.new(0.5, -80, 0.65, -20) -- Posisi disesuaikan
-buttonPhantom.BackgroundColor3 = Color3.fromRGB(40, 40, 40) -- Default OFF
-buttonPhantom.Text = "PHANTOM TOUCH: OFF"
-buttonPhantom.TextColor3 = Color3.new(1, 1, 1)
-buttonPhantom.Font = Enum.Font.GothamBold
-buttonPhantom.TextSize = 12
-buttonPhantom.Parent = frame
+-- Sesuaikan CanvasSize saat item ditambahkan
+featureListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, featureListLayout.AbsoluteContentSize.Y + 10)
+end)
 
-local buttonPhantomCorner = Instance.new("UICorner")
-buttonPhantomCorner.CornerRadius = UDim.new(0, 10)
-buttonPhantomCorner.Parent = buttonPhantom
 
--- 🔽 GUI Samping Player List (Tidak berubah) 🔽
+-- 🔽 FUNGSI PHANTOM TOUCH 🔽
+
+local function onPartTouched(otherPart)
+    if not isPhantomTouchActive or not otherPart or not otherPart:IsA("BasePart") then return end
+    if otherPart:IsDescendantOf(player.Character) or otherPart.Parent:IsA("Accessory") or partsTouched[otherPart] then return end
+
+    otherPart.Transparency = 1
+    otherPart.CanCollide = false
+    
+    partsTouched[otherPart] = true
+    print("Phantom Touched: " .. otherPart.Name .. " menghilang.")
+end
+
+local function updatePhantomButton(button)
+    if isPhantomTouchActive then
+        button.Text = "PHANTOM TOUCH: ON"
+        button.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Hijau untuk ON
+    else
+        button.Text = "PHANTOM TOUCH: OFF"
+        button.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Merah untuk OFF
+    end
+end
+
+local function enablePhantomTouch(button)
+    isPhantomTouchActive = true
+    updatePhantomButton(button)
+    
+    local char = player.Character or player.CharacterAdded:Wait()
+    local root = char:WaitForChild("HumanoidRootPart")
+    
+    if touchConnection then touchConnection:Disconnect() end
+    touchConnection = root.Touched:Connect(onPartTouched)
+    
+    print("Phantom Touch Dinyalakan.")
+end
+
+local function disablePhantomTouch(button)
+    isPhantomTouchActive = false
+    updatePhantomButton(button)
+    
+    if touchConnection then
+        touchConnection:Disconnect()
+        touchConnection = nil
+    end
+    
+    partsTouched = {}
+    print("Phantom Touch Dimatikan.")
+end
+
+-- Listener CharacterAdded untuk mengaktifkan kembali Touch
+player.CharacterAdded:Connect(function(char)
+    if isPhantomTouchActive then
+        local button = featureScrollFrame:FindFirstChild("PhantomTouchButton")
+        if button then
+            enablePhantomTouch(button)
+        end
+    end
+end)
+
+
+-- 🔽 FUNGSI PEMBUAT TOMBOL FITUR 🔽
+
+local function makeFeatureButton(name, color, callback)
+    local featButton = Instance.new("TextButton")
+    featButton.Name = name:gsub(" ", "") .. "Button"
+    featButton.Size = UDim2.new(0, 180, 0, 40)
+    featButton.BackgroundColor3 = color
+    featButton.Text = name
+    featButton.TextColor3 = Color3.new(1, 1, 1)
+    featButton.Font = Enum.Font.GothamBold
+    featButton.TextSize = 12
+    featButton.Parent = featureScrollFrame
+
+    local featCorner = Instance.new("UICorner")
+    featCorner.CornerRadius = UDim.new(0, 10)
+    featCorner.Parent = featButton
+
+    featButton.MouseButton1Click:Connect(function()
+        callback(featButton)
+    end)
+    return featButton
+end
+
+-- Tambahkan Tombol RESET
+makeFeatureButton("RESET AVATAR & STATS", Color3.fromRGB(150, 0, 0), function(button)
+    local success, err = pcall(function()
+        player:LoadCharacter()
+    end)
+
+    if success then
+        player.Character:WaitForChild("Humanoid").WalkSpeed = 16
+        player.Character:WaitForChild("Humanoid").JumpPower = 50
+    end
+    print("Karakter berhasil di-reset.")
+end)
+
+-- Tambahkan Tombol PHANTOM TOUCH
+local phantomButton = makeFeatureButton("PHANTOM TOUCH: OFF", Color3.fromRGB(150, 0, 0), function(button)
+    if isPhantomTouchActive then
+        disablePhantomTouch(button)
+    else
+        enablePhantomTouch(button)
+    end
+end)
+-- Atur status awal tombol Phantom Touch
+updatePhantomButton(phantomButton) 
+
+
+-- 🔽 GUI Samping Player List 🔽
 local flagButton = Instance.new("ImageButton")
 flagButton.Size = UDim2.new(0, 20, 0, 20)
 flagButton.Position = UDim2.new(1, -30, 0, 5)
@@ -154,121 +252,7 @@ listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
 end)
 
-
--- 🔽 LOGIKA PHANTOM TOUCH (Fitur Baru) 🔽
-
-local function onPartTouched(otherPart)
-    -- Pastikan fitur aktif dan part yang disentuh valid
-    if not isPhantomTouchActive or not otherPart or not otherPart:IsA("BasePart") then return end
-
-    -- Abaikan jika bagian tersebut milik karakter, GUI, atau sudah dihilangkan
-    if otherPart:IsDescendantOf(player.Character) or otherPart.Parent:IsA("Accessory") or partsTouched[otherPart] then return end
-
-    -- Logika Klien Side Exploit: Hilangkan part
-    otherPart.Transparency = 1
-    otherPart.CanCollide = false
-    
-    -- Tandai part agar tidak diproses berulang
-    partsTouched[otherPart] = true
-    
-    print("Phantom Touched: " .. otherPart.Name .. " menghilang.")
-end
-
-local function enablePhantomTouch()
-    isPhantomTouchActive = true
-    buttonPhantom.Text = "PHANTOM TOUCH: ON"
-    buttonPhantom.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Hijau untuk ON
-    
-    local char = player.Character
-    if not char then 
-        warn("Karakter belum dimuat!") 
-        return 
-    end
-
-    -- Hubungkan fungsi onPartTouched ke semua bagian tubuh karakter
-    for _, part in ipairs(char:GetChildren()) do
-        if part:IsA("BasePart") then
-            -- Putuskan koneksi yang mungkin sudah ada sebelumnya untuk menghindari duplikasi
-            if touchConnection then touchConnection:Disconnect() end 
-            
-            -- Koneksi Touch hanya perlu dibuat sekali pada salah satu bagian tubuh (misal: HumanoidRootPart)
-            if part.Name == "HumanoidRootPart" then
-                 touchConnection = part.Touched:Connect(onPartTouched)
-            end
-        end
-    end
-    print("Phantom Touch Dinyalakan.")
-end
-
-local function disablePhantomTouch()
-    isPhantomTouchActive = false
-    buttonPhantom.Text = "PHANTOM TOUCH: OFF"
-    buttonPhantom.BackgroundColor3 = Color3.fromRGB(40, 40, 40) -- Abu-abu untuk OFF
-    
-    -- Putuskan koneksi sentuhan
-    if touchConnection then
-        touchConnection:Disconnect()
-        touchConnection = nil
-    end
-    
-    -- Membersihkan daftar part yang telah disentuh (optional, tapi baik)
-    partsTouched = {}
-    print("Phantom Touch Dimatikan.")
-end
-
-buttonPhantom.MouseButton1Click:Connect(function()
-    if isPhantomTouchActive then
-        disablePhantomTouch()
-    else
-        enablePhantomTouch()
-    end
-end)
-
--- Pastikan koneksi diaktifkan kembali jika karakter mati/respawn (Wajib untuk LocalScript)
-player.CharacterAdded:Connect(function(char)
-    if isPhantomTouchActive then
-        -- Tunggu HumanoidRootPart muncul lalu hubungkan kembali
-        local root = char:WaitForChild("HumanoidRootPart")
-        if root and touchConnection then
-            -- Putuskan koneksi lama (jika ada) dan buat koneksi baru
-            touchConnection:Disconnect()
-            touchConnection = root.Touched:Connect(onPartTouched)
-        elseif root and not touchConnection then
-            -- Jika sedang ON tapi koneksi hilang (misal saat skrip pertama kali jalan), buat koneksi
-             touchConnection = root.Touched:Connect(onPartTouched)
-        end
-    end
-end)
-
--- 🔽 Fungsi "Meniru Pemain" dan Logika Player List (Tidak Berubah) 🔽
--- ... (Fungsi makePlayerButton, populatePlayerList, dan Logika flagButton.MouseButton1Click tetap sama) ...
--- ... (Diletakkan di sini dalam kode lengkap) ...
-
--- 🔽 Logika Tombol Samping (Toggle Player List)
-flagButton.MouseButton1Click:Connect(function()
-    sideFrame.Visible = not sideFrame.Visible
-    if sideFrame.Visible then
-        populatePlayerList()
-    end
-end)
-
--- 🔽 Logika Tombol RESET 🔽
-buttonReset.MouseButton1Click:Connect(function()
-    -- Memuat ulang karakter (cara tercepat untuk reset penampilan dan tool)
-    local success, err = pcall(function()
-        player:LoadCharacter()
-    end)
-
-    if success then
-        -- Atur ulang kecepatan ke default Roblox
-        player.Character:WaitForChild("Humanoid").WalkSpeed = 16
-        player.Character:WaitForChild("Humanoid").JumpPower = 50
-    end
-    
-    print("Karakter berhasil di-reset.")
-end)
-
--- [Sisipan Fungsi makePlayerButton dan populatePlayerList di sini]
+-- 🔽 Logika Impersonate Player (Tidak Berubah) 🔽
 
 local function makePlayerButton(targetPlayer)
     local tpButton = Instance.new("TextButton")
@@ -288,26 +272,15 @@ local function makePlayerButton(targetPlayer)
         local char = player.Character
         local targetChar = targetPlayer.Character
 
-        if not char or not targetChar then
-            warn("Karakter tidak ditemukan!")
-            return
-        end
-
+        if not char or not targetChar then warn("Karakter tidak ditemukan!") return end
         local playerHumanoid = char:FindFirstChildOfClass("Humanoid")
         local targetHumanoid = targetChar:FindFirstChildOfClass("Humanoid")
+        if not playerHumanoid or not targetHumanoid then warn("Humanoid tidak ditemukan!") return end
 
-        if not playerHumanoid or not targetHumanoid then
-            warn("Humanoid tidak ditemukan!")
-            return
-        end
-
-        -- 1. CLONING KOSTUM/AKSESORIS
+        -- CLONING KOSTUM/AKSESORIS
         for _, obj in ipairs(char:GetChildren()) do
-            if obj:IsA("Accessory") or obj:IsA("Shirt") or obj:IsA("Pants") then
-                obj:Destroy()
-            end
+            if obj:IsA("Accessory") or obj:IsA("Shirt") or obj:IsA("Pants") then obj:Destroy() end
         end
-
         for _, obj in ipairs(targetChar:GetChildren()) do
             if obj:IsA("Accessory") or obj:IsA("Shirt") or obj:IsA("Pants") then
                 local clone = obj:Clone()
@@ -315,7 +288,7 @@ local function makePlayerButton(targetPlayer)
             end
         end
 
-        -- 2. STATS DAN LOKASI
+        -- STATS DAN LOKASI
         local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
         local playerRoot = char:FindFirstChild("HumanoidRootPart")
         
@@ -325,24 +298,27 @@ local function makePlayerButton(targetPlayer)
         if targetRoot and playerRoot then
             playerRoot.CFrame = targetRoot.CFrame
         end
-
         print("Meniru properti dari: " .. targetPlayer.Name)
     end)
 end
 
 local function populatePlayerList()
     for _, child in ipairs(scrollFrame:GetChildren()) do
-        if child:IsA("TextButton") then
-            child:Destroy()
-        end
+        if child:IsA("TextButton") then child:Destroy() end
     end
     
     local playerList = Players:GetPlayers()
-    table.sort(playerList, function(a, b)
-        return a.Name < b.Name
-    end)
+    table.sort(playerList, function(a, b) return a.Name < b.Name end)
 
     for _, target in ipairs(playerList) do
         makePlayerButton(target)
     end
 end
+
+-- Logika Tombol Samping (Toggle Player List)
+flagButton.MouseButton1Click:Connect(function()
+    sideFrame.Visible = not sideFrame.Visible
+    if sideFrame.Visible then
+        populatePlayerList()
+    end
+end)
