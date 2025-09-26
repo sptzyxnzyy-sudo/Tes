@@ -1,7 +1,7 @@
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
--- ** ⬇️ VARIABEL & FUNGSI FITUR BARU ⬇️ **
+-- ** ⬇️ VARIABEL & FUNGSI FITUR UTAMA ⬇️ **
 local isDestroyerActive = false
 local touchConnection = nil
 
@@ -18,19 +18,27 @@ local function activatePartDestroyer()
         return 
     end
 
-    print("Local Part Destroyer AKTIF.")
+    print("Aggressive Local Destroyer AKTIF. Efek hanya terlihat oleh klien ini.")
     
-    -- Hubungkan fungsi saat HumanoidRootPart menyentuh sesuatu
     local rootPart = character:WaitForChild("HumanoidRootPart")
     
     touchConnection = rootPart.Touched:Connect(function(otherPart)
-        -- HANYA HAPUS DI SISI KLIEN (LOCAL)
+        -- HANYA EFEK LOKAL (KLIEN)
         if isDestroyerActive and otherPart and otherPart.Parent and otherPart.Name ~= "HumanoidRootPart" then
             if otherPart:IsA("BasePart") or otherPart:IsA("MeshPart") or otherPart:IsA("UnionOperation") then
-                -- Pastikan tidak menghapus bagian karakter pemain lain
-                if not otherPart.Parent:FindFirstChildOfClass("Humanoid") then
-                    otherPart:Destroy()
+                
+                local parentModel = otherPart.Parent
+                local hitHumanoid = parentModel:FindFirstChildOfClass("Humanoid")
+                
+                -- Cek apakah bagian yang disentuh adalah bagian dari karakter pemain lain
+                if hitHumanoid and parentModel ~= player.Character then
+                    -- ** EFEK PEMBUNUHAN LOKAL (Non-Visual Illusion) **
+                    -- Pemain lain akan terlihat 'mati' (ragdoll) hanya di klien ini.
+                    hitHumanoid.Health = 0 
                 end
+                
+                -- Penghancuran Bagian LOKAL
+                otherPart:Destroy()
             end
         end
     end)
@@ -44,54 +52,43 @@ local function deactivatePartDestroyer()
         touchConnection:Disconnect()
         touchConnection = nil
     end
-    print("Local Part Destroyer NONAKTIF.")
+    print("Aggressive Local Destroyer NONAKTIF.")
 end
 
+---
+## 💻 GUI: Stealth Mode
 
--- 🔽 GUI UTAMA (Tombol Destroyer) 🔽
+-- 🔽 GUI UTAMA 🔽
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DestroyerGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 100) 
-frame.Position = UDim2.new(0.5, -110, 0.5, -50)
+frame.Size = UDim2.new(0, 150, 0, 50) 
+frame.Position = UDim2.new(1, -160, 0, 10) -- Pojok atas kanan
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.BackgroundTransparency = 0.8 -- Semi-transparan
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
 frame.Parent = screenGui
 
 local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 15)
+corner.CornerRadius = UDim.new(0, 10)
 corner.Parent = frame
-
--- Judul GUI
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 30)
-title.BackgroundTransparency = 1
-title.Text = "LOCAL PART DESTROYER"
-title.TextColor3 = Color3.new(1, 1, 1)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 16
-title.Parent = frame
 
 -- Tombol On/Off
 local toggleButton = Instance.new("TextButton")
 toggleButton.Name = "ToggleButton"
-toggleButton.Size = UDim2.new(0, 180, 0, 40)
-toggleButton.Position = UDim2.new(0.5, -90, 0, 45)
+toggleButton.Size = UDim2.new(1, 0, 1, 0)
 toggleButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Merah (OFF)
-toggleButton.Text = "DESTROYER: OFF"
+toggleButton.BackgroundTransparency = 1 -- **Transparan penuh**
+toggleButton.Text = "DESTROYER"
 toggleButton.TextColor3 = Color3.new(1, 1, 1)
 toggleButton.Font = Enum.Font.GothamBold
 toggleButton.TextSize = 14
 toggleButton.Parent = frame
-
-local featCorner = Instance.new("UICorner")
-featCorner.CornerRadius = UDim.new(0, 10)
-featCorner.Parent = toggleButton
 
 
 -- 🔽 LOGIKA TOMBOL 🔽
@@ -99,21 +96,22 @@ featCorner.Parent = toggleButton
 toggleButton.MouseButton1Click:Connect(function()
     if isDestroyerActive then
         deactivatePartDestroyer()
-        toggleButton.Text = "DESTROYER: OFF"
-        toggleButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Merah
+        toggleButton.Text = "DESTROYER"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+        toggleButton.BackgroundTransparency = 1
     else
         activatePartDestroyer()
-        toggleButton.Text = "DESTROYER: ON"
-        toggleButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0) -- Hijau
+        toggleButton.Text = "ACTIVE"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        toggleButton.BackgroundTransparency = 0.7 -- Sedikit terlihat saat aktif
     end
 end)
 
--- Pastikan koneksi diaktifkan kembali jika karakter di-reset
+-- Penanganan Karakter Reset (CharacterAdded)
 player.CharacterAdded:Connect(function(character)
     if isDestroyerActive then
-        -- Tunggu HumanoidRootPart muncul
         character:WaitForChild("HumanoidRootPart")
-        -- Hentikan dan mulai kembali koneksi sentuhan
+        -- Hentikan dan mulai kembali koneksi sentuhan pada karakter baru
         deactivatePartDestroyer() 
         activatePartDestroyer()
     end
