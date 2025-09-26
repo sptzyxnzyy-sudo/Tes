@@ -8,7 +8,7 @@ local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 
--- Status untuk fitur Phantom Touch
+-- Status untuk fitur baru
 local isPhantomTouchActive = false
 local touchConnection = nil
 local partsTouched = {} -- Tabel untuk melacak part yang telah disentuh
@@ -18,7 +18,6 @@ local isKeepAvatarActive = false -- Status untuk fitur Jaga-Avatar
 local isFollowingPlayer = false -- Status untuk fitur Gendong/Ikuti
 local currentTargetPlayer = nil -- Pemain yang sedang diikuti
 local followConnection = nil -- Koneksi untuk loop following (RunService)
-local phantomTouchButtonReference = nil -- Referensi untuk tombol Phantom Touch di sidebar
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -63,14 +62,14 @@ if not statusValue then
     statusValue.Parent = ReplicatedStorage
 end
 
--- 🔽 GUI Utama (List Menu) 🔽
+-- 🔽 GUI Utama (Diubah menjadi List Menu) 🔽
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ImpersonateGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
--- Ukuran Frame disesuaikan karena Phantom Touch dipindah
+-- Ukuran Frame disesuaikan kembali (lebih pendek karena Phantom Touch dipindah)
 frame.Size = UDim2.new(0, 220, 0, 180) 
 frame.Position = UDim2.new(0.4, -110, 0.5, -90)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
@@ -129,13 +128,14 @@ end
 
 local function toggleKeepAvatar(button)
     isKeepAvatarActive = not isKeepAvatarActive
-    -- Mencegah klien menjalankan ulang CharacterAdded event secara default
     player.CharacterAdded:SetScriptable(isKeepAvatarActive) 
     updateKeepAvatarButton(button)
     print("Jaga Avatar: " .. (isKeepAvatarActive and "Aktif" or "Tidak Aktif"))
 end
 
--- 🔽 FUNGSI PHANTOM TOUCH 🔽
+-- 🔽 FUNGSI PHANTOM TOUCH (Dipertahankan, tetapi akan dipanggil dari tombol di samping) 🔽
+
+local phantomTouchButtonReference = nil -- Referensi untuk tombol Phantom Touch di sidebar
 
 local function onPartTouched(otherPart)
     if not isPhantomTouchActive or not otherPart or not otherPart:IsA("BasePart") then return end
@@ -151,7 +151,7 @@ end
 local function updatePhantomButton(button)
     if not button then return end
     if isPhantomTouchActive then
-        button.Text = "PHANTOM TOUCH: ON (Hapus Part)"
+        button.Text = "PHANTOM TOUCH: ON"
         button.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Hijau untuk ON
     else
         button.Text = "PHANTOM TOUCH: OFF"
@@ -170,7 +170,7 @@ local function enablePhantomTouch(button)
     touchConnection = root.Touched:Connect(onPartTouched)
     
     print("Phantom Touch Dinyalakan.")
-}
+end
 
 local function disablePhantomTouch(button)
     isPhantomTouchActive = false
@@ -193,7 +193,7 @@ player.CharacterAdded:Connect(function(char)
 end)
 
 
--- 🔽 FUNGSI TELEPORT & FOLLOW (GENDONG) 🔽
+-- 🔽 FUNGSI TELEPORT & FOLLOW 🔽
 
 local function stopFollowing(targetPlayer, button)
     isFollowingPlayer = false
@@ -209,6 +209,14 @@ local function stopFollowing(targetPlayer, button)
         button.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
     end
     
+    local char = player.Character
+    if char then
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = root.CFrame -- Hanya untuk memicu update CFrame terakhir
+        end
+    end
+
     print("Berhenti mengikuti: " .. (targetPlayer and targetPlayer.Name or "Pemain tidak diketahui"))
 end
 
@@ -232,15 +240,13 @@ local function startFollowing(targetPlayer, button)
     end
 
     -- 1. TELEPORT ke target
-    -- CFrame.new(0, 3, 0) menempatkan pemain di atas kepala target (efek gendong)
-    playerRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 3, 0) 
+    playerRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 3, 0) -- Teleport di atas target
     
-    -- 2. SETUP FOLLOWING 
+    -- 2. SETUP FOLLOWING (Menggunakan RunService.Heartbeat untuk pergerakan halus)
     isFollowingPlayer = true
     currentTargetPlayer = targetPlayer
 
     if followConnection then followConnection:Disconnect() end
-    -- Menggunakan Heartbeat untuk pergerakan halus
     followConnection = RunService.Heartbeat:Connect(function()
         if not isFollowingPlayer or not currentTargetPlayer or not currentTargetPlayer.Character then
             stopFollowing(currentTargetPlayer, button)
@@ -249,7 +255,7 @@ local function startFollowing(targetPlayer, button)
         
         local currentTargetRoot = currentTargetPlayer.Character:FindFirstChild("HumanoidRootPart")
         if currentTargetRoot and playerRoot then
-            -- Memperbarui CFrame pemain setiap frame
+            -- Set CFrame pemain ke atas target (+3 di sumbu Y)
             playerRoot.CFrame = currentTargetRoot.CFrame * CFrame.new(0, 3, 0)
         else
             stopFollowing(currentTargetPlayer, button)
@@ -288,7 +294,7 @@ local function makeFeatureButton(name, color, callback)
     return featButton
 end
 
--- Tombol RESET
+-- Tambahkan Tombol RESET
 makeFeatureButton("RESET AVATAR & STATS", Color3.fromRGB(150, 0, 0), function(button)
     local success, err = pcall(function()
         player:LoadCharacter()
@@ -301,14 +307,15 @@ makeFeatureButton("RESET AVATAR & STATS", Color3.fromRGB(150, 0, 0), function(bu
     print("Karakter berhasil di-reset.")
 end)
 
--- Tombol JAGA AVATAR
+-- Tambahkan Tombol JAGA AVATAR
 local keepAvatarButton = makeFeatureButton("JAGA AVATAR: OFF", Color3.fromRGB(150, 0, 0), function(button)
     toggleKeepAvatar(button)
 end)
 updateKeepAvatarButton(keepAvatarButton)
 
--- Tombol IKUTI PEMAIN (Hanya untuk Matikan Status Follow)
+-- Tambahkan Tombol IKUTI PEMAIN (Hanya untuk Matikan)
 local followButton = makeFeatureButton("IKUTI PEMAIN: OFF", Color3.fromRGB(150, 0, 0), function(button)
+    -- Tombol ini hanya untuk mematikan fungsi
     if isFollowingPlayer then
         stopFollowing(currentTargetPlayer, button)
     else
@@ -326,7 +333,7 @@ flagButton.Image = "rbxassetid://6031097229"
 flagButton.Parent = frame
 
 local sideFrame = Instance.new("Frame")
-sideFrame.Size = UDim2.new(0, 170, 0, 300) -- Ditinggikan untuk tombol tambahan
+sideFrame.Size = UDim2.new(0, 170, 0, 300) -- Ditinggikan untuk tombol Phantom Touch
 sideFrame.Position = UDim2.new(1, 10, 0, 0)
 sideFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 sideFrame.Visible = false
@@ -340,7 +347,7 @@ sideCorner.Parent = sideFrame
 local sideTitle = Instance.new("TextLabel")
 sideTitle.Size = UDim2.new(1, 0, 0, 25)
 sideTitle.BackgroundTransparency = 1
-sideTitle.Text = "PLAYER LIST & EXTRAS"
+sideTitle.Text = "PLAYER LIST"
 sideTitle.TextColor3 = Color3.new(1, 1, 1)
 sideTitle.Font = Enum.Font.GothamBold
 sideTitle.TextSize = 14
@@ -390,7 +397,7 @@ listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
 end)
 
--- 🔽 Logika Impersonate Player & GENDONG/IKUTI 🔽
+-- 🔽 Logika Impersonate Player & GENDONG/IKUTI (Diperbarui) 🔽
 
 local function makePlayerButton(targetPlayer)
     local tpButton = Instance.new("TextButton")
@@ -440,7 +447,6 @@ local function makePlayerButton(targetPlayer)
 end
 
 local function populatePlayerList()
-    -- Hapus tombol lama
     for _, child in ipairs(scrollFrame:GetChildren()) do
         if child:IsA("TextButton") then child:Destroy() end
     end
@@ -448,7 +454,6 @@ local function populatePlayerList()
     local playerList = Players:GetPlayers()
     table.sort(playerList, function(a, b) return a.Name < b.Name end)
 
-    -- Buat tombol baru untuk setiap pemain
     for _, target in ipairs(playerList) do
         makePlayerButton(target)
     end
