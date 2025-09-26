@@ -1,11 +1,16 @@
 -- credit: Xraxor1 (Original GUI/Intro structure)
--- Modification for Impersonate Player: [AI Assistant]
+-- Modification for Impersonate Player & Phantom Touch: [AI Assistant]
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
+
+-- Status untuk fitur baru
+local isPhantomTouchActive = false
+local touchConnection = nil
+local partsTouched = {} -- Tabel untuk melacak part yang telah disentuh
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -41,7 +46,7 @@ do
     end)
 end
 
--- 🔽 Status AutoFarm (Dipertahankan untuk struktur GUI awal, walau tidak dipakai) 🔽
+-- 🔽 Status AutoFarm (Dipertahankan) 🔽
 local statusValue = ReplicatedStorage:FindFirstChild("AutoFarmStatus")
 if not statusValue then
     statusValue = Instance.new("BoolValue")
@@ -57,8 +62,9 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 160)
-frame.Position = UDim2.new(0.4, -110, 0.5, -80)
+-- Ukuran Frame diperbesar untuk menampung tombol baru (160 -> 220)
+frame.Size = UDim2.new(0, 220, 0, 220) 
+frame.Position = UDim2.new(0.4, -110, 0.5, -110)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -79,27 +85,44 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
--- Tombol RESET (Menggantikan SUMMIT)
-local button = Instance.new("TextButton")
-button.Size = UDim2.new(0, 160, 0, 40)
-button.Position = UDim2.new(0.5, -80, 0.5, -20)
-button.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Merah untuk Reset
-button.Text = "RESET AVATAR & STATS"
-button.TextColor3 = Color3.new(1, 1, 1)
-button.Font = Enum.Font.GothamBold
-button.TextSize = 12
-button.Parent = frame
+-- Tombol RESET
+local buttonReset = Instance.new("TextButton")
+buttonReset.Name = "ResetButton"
+buttonReset.Size = UDim2.new(0, 160, 0, 40)
+buttonReset.Position = UDim2.new(0.5, -80, 0.35, -20) -- Posisi disesuaikan
+buttonReset.BackgroundColor3 = Color3.fromRGB(150, 0, 0) 
+buttonReset.Text = "RESET AVATAR & STATS"
+buttonReset.TextColor3 = Color3.new(1, 1, 1)
+buttonReset.Font = Enum.Font.GothamBold
+buttonReset.TextSize = 12
+buttonReset.Parent = frame
 
-local buttonCorner = Instance.new("UICorner")
-buttonCorner.CornerRadius = UDim.new(0, 10)
-buttonCorner.Parent = button
+local buttonResetCorner = Instance.new("UICorner")
+buttonResetCorner.CornerRadius = UDim.new(0, 10)
+buttonResetCorner.Parent = buttonReset
 
--- 🔽 GUI Samping Player List 🔽
+-- Tombol PHANTOM TOUCH (Fitur Baru)
+local buttonPhantom = Instance.new("TextButton")
+buttonPhantom.Name = "PhantomButton"
+buttonPhantom.Size = UDim2.new(0, 160, 0, 40)
+buttonPhantom.Position = UDim2.new(0.5, -80, 0.65, -20) -- Posisi disesuaikan
+buttonPhantom.BackgroundColor3 = Color3.fromRGB(40, 40, 40) -- Default OFF
+buttonPhantom.Text = "PHANTOM TOUCH: OFF"
+buttonPhantom.TextColor3 = Color3.new(1, 1, 1)
+buttonPhantom.Font = Enum.Font.GothamBold
+buttonPhantom.TextSize = 12
+buttonPhantom.Parent = frame
+
+local buttonPhantomCorner = Instance.new("UICorner")
+buttonPhantomCorner.CornerRadius = UDim.new(0, 10)
+buttonPhantomCorner.Parent = buttonPhantom
+
+-- 🔽 GUI Samping Player List (Tidak berubah) 🔽
 local flagButton = Instance.new("ImageButton")
 flagButton.Size = UDim2.new(0, 20, 0, 20)
 flagButton.Position = UDim2.new(1, -30, 0, 5)
 flagButton.BackgroundTransparency = 1
-flagButton.Image = "rbxassetid://6031097229" -- Ikon Bendera (Bisa diganti ikon User)
+flagButton.Image = "rbxassetid://6031097229" 
 flagButton.Parent = frame
 
 local sideFrame = Instance.new("Frame")
@@ -131,7 +154,121 @@ listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
 end)
 
--- 🔽 Fungsi Inti "Meniru Pemain" 🔽
+
+-- 🔽 LOGIKA PHANTOM TOUCH (Fitur Baru) 🔽
+
+local function onPartTouched(otherPart)
+    -- Pastikan fitur aktif dan part yang disentuh valid
+    if not isPhantomTouchActive or not otherPart or not otherPart:IsA("BasePart") then return end
+
+    -- Abaikan jika bagian tersebut milik karakter, GUI, atau sudah dihilangkan
+    if otherPart:IsDescendantOf(player.Character) or otherPart.Parent:IsA("Accessory") or partsTouched[otherPart] then return end
+
+    -- Logika Klien Side Exploit: Hilangkan part
+    otherPart.Transparency = 1
+    otherPart.CanCollide = false
+    
+    -- Tandai part agar tidak diproses berulang
+    partsTouched[otherPart] = true
+    
+    print("Phantom Touched: " .. otherPart.Name .. " menghilang.")
+end
+
+local function enablePhantomTouch()
+    isPhantomTouchActive = true
+    buttonPhantom.Text = "PHANTOM TOUCH: ON"
+    buttonPhantom.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Hijau untuk ON
+    
+    local char = player.Character
+    if not char then 
+        warn("Karakter belum dimuat!") 
+        return 
+    end
+
+    -- Hubungkan fungsi onPartTouched ke semua bagian tubuh karakter
+    for _, part in ipairs(char:GetChildren()) do
+        if part:IsA("BasePart") then
+            -- Putuskan koneksi yang mungkin sudah ada sebelumnya untuk menghindari duplikasi
+            if touchConnection then touchConnection:Disconnect() end 
+            
+            -- Koneksi Touch hanya perlu dibuat sekali pada salah satu bagian tubuh (misal: HumanoidRootPart)
+            if part.Name == "HumanoidRootPart" then
+                 touchConnection = part.Touched:Connect(onPartTouched)
+            end
+        end
+    end
+    print("Phantom Touch Dinyalakan.")
+end
+
+local function disablePhantomTouch()
+    isPhantomTouchActive = false
+    buttonPhantom.Text = "PHANTOM TOUCH: OFF"
+    buttonPhantom.BackgroundColor3 = Color3.fromRGB(40, 40, 40) -- Abu-abu untuk OFF
+    
+    -- Putuskan koneksi sentuhan
+    if touchConnection then
+        touchConnection:Disconnect()
+        touchConnection = nil
+    end
+    
+    -- Membersihkan daftar part yang telah disentuh (optional, tapi baik)
+    partsTouched = {}
+    print("Phantom Touch Dimatikan.")
+end
+
+buttonPhantom.MouseButton1Click:Connect(function()
+    if isPhantomTouchActive then
+        disablePhantomTouch()
+    else
+        enablePhantomTouch()
+    end
+end)
+
+-- Pastikan koneksi diaktifkan kembali jika karakter mati/respawn (Wajib untuk LocalScript)
+player.CharacterAdded:Connect(function(char)
+    if isPhantomTouchActive then
+        -- Tunggu HumanoidRootPart muncul lalu hubungkan kembali
+        local root = char:WaitForChild("HumanoidRootPart")
+        if root and touchConnection then
+            -- Putuskan koneksi lama (jika ada) dan buat koneksi baru
+            touchConnection:Disconnect()
+            touchConnection = root.Touched:Connect(onPartTouched)
+        elseif root and not touchConnection then
+            -- Jika sedang ON tapi koneksi hilang (misal saat skrip pertama kali jalan), buat koneksi
+             touchConnection = root.Touched:Connect(onPartTouched)
+        end
+    end
+end)
+
+-- 🔽 Fungsi "Meniru Pemain" dan Logika Player List (Tidak Berubah) 🔽
+-- ... (Fungsi makePlayerButton, populatePlayerList, dan Logika flagButton.MouseButton1Click tetap sama) ...
+-- ... (Diletakkan di sini dalam kode lengkap) ...
+
+-- 🔽 Logika Tombol Samping (Toggle Player List)
+flagButton.MouseButton1Click:Connect(function()
+    sideFrame.Visible = not sideFrame.Visible
+    if sideFrame.Visible then
+        populatePlayerList()
+    end
+end)
+
+-- 🔽 Logika Tombol RESET 🔽
+buttonReset.MouseButton1Click:Connect(function()
+    -- Memuat ulang karakter (cara tercepat untuk reset penampilan dan tool)
+    local success, err = pcall(function()
+        player:LoadCharacter()
+    end)
+
+    if success then
+        -- Atur ulang kecepatan ke default Roblox
+        player.Character:WaitForChild("Humanoid").WalkSpeed = 16
+        player.Character:WaitForChild("Humanoid").JumpPower = 50
+    end
+    
+    print("Karakter berhasil di-reset.")
+end)
+
+-- [Sisipan Fungsi makePlayerButton dan populatePlayerList di sini]
 
 local function makePlayerButton(targetPlayer)
     local tpButton = Instance.new("TextButton")
@@ -165,52 +302,41 @@ local function makePlayerButton(targetPlayer)
         end
 
         -- 1. CLONING KOSTUM/AKSESORIS
-        -- Menghapus aksesoris yang ada di pemain saat ini
         for _, obj in ipairs(char:GetChildren()) do
             if obj:IsA("Accessory") or obj:IsA("Shirt") or obj:IsA("Pants") then
                 obj:Destroy()
             end
         end
 
-        -- Kloning Aksesoris/Pakaian dari pemain target (hanya di klien)
         for _, obj in ipairs(targetChar:GetChildren()) do
             if obj:IsA("Accessory") or obj:IsA("Shirt") or obj:IsA("Pants") then
                 local clone = obj:Clone()
                 clone.Parent = char
             end
-            -- CATATAN: Kloning Tool/Senjata dan Pakaian sempurna memerlukan Server/Remote Event
         end
 
         -- 2. STATS DAN LOKASI
         local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
         local playerRoot = char:FindFirstChild("HumanoidRootPart")
         
-        -- Meniru Kecepatan Berjalan/Melompat
         playerHumanoid.WalkSpeed = targetHumanoid.WalkSpeed
         playerHumanoid.JumpPower = targetHumanoid.JumpPower
         
-        -- Teleportasi ke Lokasi Target
         if targetRoot and playerRoot then
             playerRoot.CFrame = targetRoot.CFrame
         end
-        
-        -- Coba memuat deskripsi avatar (efeknya seringkali tidak bekerja tanpa exploit)
-        -- player:LoadCharacterWithHumanoidDescription(targetHumanoid:GetAppliedDescription())
 
         print("Meniru properti dari: " .. targetPlayer.Name)
     end)
 end
 
--- Fungsi untuk mengisi daftar pemain
 local function populatePlayerList()
-    -- Hapus tombol lama
     for _, child in ipairs(scrollFrame:GetChildren()) do
         if child:IsA("TextButton") then
             child:Destroy()
         end
     end
     
-    -- Tambahkan tombol baru
     local playerList = Players:GetPlayers()
     table.sort(playerList, function(a, b)
         return a.Name < b.Name
@@ -220,27 +346,3 @@ local function populatePlayerList()
         makePlayerButton(target)
     end
 end
-
--- Logika Tombol Samping (Toggle Player List)
-flagButton.MouseButton1Click:Connect(function()
-    sideFrame.Visible = not sideFrame.Visible
-    if sideFrame.Visible then
-        populatePlayerList()
-    end
-end)
-
--- 🔽 FITUR RESET (Tombol Utama) 🔽
-button.MouseButton1Click:Connect(function()
-    -- Memuat ulang karakter (cara tercepat untuk reset penampilan dan tool)
-    local success, err = pcall(function()
-        player:LoadCharacter()
-    end)
-
-    if success then
-        -- Atur ulang kecepatan ke default Roblox
-        player.Character:WaitForChild("Humanoid").WalkSpeed = 16
-        player.Character:WaitForChild("Humanoid").JumpPower = 50
-    end
-    
-    print("Karakter berhasil di-reset.")
-end)
