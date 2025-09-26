@@ -18,7 +18,7 @@ local function activatePartDestroyer()
         return 
     end
 
-    print("Aggressive Local Destroyer AKTIF. Efek hanya terlihat oleh klien ini.")
+    print("Aggressive Local Destroyer AKTIF.")
     
     local rootPart = character:WaitForChild("HumanoidRootPart")
     
@@ -33,8 +33,7 @@ local function activatePartDestroyer()
                 -- Cek apakah bagian yang disentuh adalah bagian dari karakter pemain lain
                 if hitHumanoid and parentModel ~= player.Character then
                     -- ** EFEK PEMBUNUHAN LOKAL (Non-Visual Illusion) **
-                    -- Pemain lain akan terlihat 'mati' (ragdoll) hanya di klien ini.
-                    hitHumanoid.Health = 0 
+                    hitHumanoid.Health = 0 -- Pembunuhan LOKAL
                 end
                 
                 -- Penghancuran Bagian LOKAL
@@ -56,7 +55,7 @@ local function deactivatePartDestroyer()
 end
 
 ---
-## 💻 GUI: Stealth Mode
+## 💻 GUI: Stealth Mode (Minimalis)
 
 -- 🔽 GUI UTAMA 🔽
 local screenGui = Instance.new("ScreenGui")
@@ -65,8 +64,8 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 150, 0, 50) 
-frame.Position = UDim2.new(1, -160, 0, 10) -- Pojok atas kanan
+frame.Size = UDim2.new(0, 150, 0, 50) -- Ukuran Frame dikembalikan ke minimal
+frame.Position = UDim2.new(1, -160, 0, 10) 
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BackgroundTransparency = 0.8 -- Semi-transparan
 frame.BorderSizePixel = 0
@@ -84,7 +83,7 @@ toggleButton.Name = "ToggleButton"
 toggleButton.Size = UDim2.new(1, 0, 1, 0)
 toggleButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Merah (OFF)
 toggleButton.BackgroundTransparency = 1 -- **Transparan penuh**
-toggleButton.Text = "DESTROYER"
+toggleButton.Text = "DESTROYER: OFF"
 toggleButton.TextColor3 = Color3.new(1, 1, 1)
 toggleButton.Font = Enum.Font.GothamBold
 toggleButton.TextSize = 14
@@ -96,12 +95,12 @@ toggleButton.Parent = frame
 toggleButton.MouseButton1Click:Connect(function()
     if isDestroyerActive then
         deactivatePartDestroyer()
-        toggleButton.Text = "DESTROYER"
+        toggleButton.Text = "DESTROYER: OFF"
         toggleButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
         toggleButton.BackgroundTransparency = 1
     else
         activatePartDestroyer()
-        toggleButton.Text = "ACTIVE"
+        toggleButton.Text = "DESTROYER: ON"
         toggleButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
         toggleButton.BackgroundTransparency = 0.7 -- Sedikit terlihat saat aktif
     end
