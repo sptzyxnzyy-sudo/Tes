@@ -9,7 +9,7 @@ local player = Players.LocalPlayer
 
 -- ** ⬇️ VARIABLE AUTO-FOLLOW & BEAM ⬇️ **
 local currentTarget = nil        -- Pemain yang sedang diikuti
-local autoFollowConnection = nil -- Koneksi RunService untuk loop follow
+local autoFollowConnection = nil -- Koneksi RunService untuk loop teleport
 local followBeam = nil           -- Objek Beam yang akan kita gunakan (tali)
 
 
@@ -45,7 +45,7 @@ local function createFollowBeam(targetPlayer)
         followBeam.Attachment0 = attachment0
         followBeam.Attachment1 = attachment1
         followBeam.LightInfluence = 1 
-        followBeam.Parent = game.Workspace.Terrain -- Taruh di tempat yang aman (atau game.Workspace)
+        followBeam.Parent = game.Workspace.Terrain -- Taruh di tempat yang aman
 
         print("Tali penghubung dibuat ke:", targetPlayer.Name)
     end
@@ -68,42 +68,41 @@ local function destroyFollowBeam()
     end
 end
 
--- ** ⬇️ FUNGSI AUTO-FOLLOW YANG DIPERBARUI ⬇️ **
+-- ** ⬇️ FUNGSI AUTO-TELEPORT UTAMA ⬇️ **
 local function setTargetToFollow(targetPlayer)
     if autoFollowConnection then
-        -- Hentikan auto-follow yang sedang berjalan
+        -- Hentikan auto-teleport yang sedang berjalan
         autoFollowConnection:Disconnect()
         autoFollowConnection = nil
         destroyFollowBeam() -- Hapus Beam saat follow berhenti
         
-        -- Hentikan pergerakan karakter (Opsional: agar karakter tidak terus berjalan)
+        -- Hentikan pergerakan karakter 
         local character = player.Character
         local humanoid = character and character:FindFirstChild("Humanoid")
         if humanoid then
-             humanoid:MoveTo(player.Character.HumanoidRootPart.Position) -- Pindah ke posisi saat ini
+             humanoid:MoveTo(player.Character.HumanoidRootPart.Position)
         end
 
         currentTarget = nil
     end
 
     if targetPlayer and targetPlayer ~= player then
-        -- Mulai auto-follow ke pemain baru
+        -- Mulai auto-teleport ke pemain baru
         currentTarget = targetPlayer
         
         -- Buat Beam baru ke pemain target
         createFollowBeam(targetPlayer) 
 
         local character = player.Character
-        local humanoid = character and character:FindFirstChild("Humanoid")
-
-        if character and humanoid then
-            print("Mulai mengikuti pemain:", currentTarget.Name)
+        
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            print("Mulai Auto-Teleport ke pemain:", currentTarget.Name)
 
             -- Fungsi yang dijalankan setiap frame (RunService.Stepped)
             autoFollowConnection = RunService.Stepped:Connect(function()
-                if not currentTarget or not currentTarget.Character or not currentTarget.Character:FindFirstChild("Humanoid") then
+                if not currentTarget or not currentTarget.Character or not currentTarget.Character:FindFirstChild("HumanoidRootPart") then
                     -- Target hilang, hentikan mengikuti
-                    print("Target hilang, auto-follow dihentikan.")
+                    print("Target hilang, auto-teleport dihentikan.")
                     setTargetToFollow(nil)
                     return
                 end
@@ -117,11 +116,20 @@ local function setTargetToFollow(targetPlayer)
                 local myTorso = player.Character:FindFirstChild("HumanoidRootPart")
 
                 if targetTorso and myTorso then
+                    
                     local distance = (targetTorso.Position - myTorso.Position).Magnitude
+                    
+                    -- Lakukan Teleport jika jarak lebih dari 1 stud (Hampir selalu aktif)
+                    if distance > 1 then 
+                        -- Ambil posisi target
+                        local targetCFrame = targetTorso.CFrame 
+                        
+                        -- Tentukan posisi offset (5 studs di belakang target)
+                        local offset = targetCFrame.LookVector * -5 
+                        local newCFrame = targetCFrame + offset 
 
-                    -- Jika jarak lebih dari 7 studs, bergerak menuju target
-                    if distance > 7 then
-                        humanoid:MoveTo(targetTorso.Position)
+                        -- ** TELEPORTASI UTAMA: Atur CFrame karakter lokal **
+                        myTorso.CFrame = newCFrame 
                     end
                 end
             end)
@@ -134,7 +142,11 @@ local function setTargetToFollow(targetPlayer)
     end
 end
 
+---
 
+## 🎨 Logika GUI dan Animasi
+
+```lua
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
     local introGui = Instance.new("ScreenGui")
@@ -259,7 +271,7 @@ makeFeatureButton("RESET AVATAR & STATS", Color3.fromRGB(150, 0, 0), function(bu
 end)
 
 -- Tombol baru untuk menghentikan Follow
-makeFeatureButton("STOP FOLLOW", Color3.fromRGB(0, 150, 150), function(button)
+makeFeatureButton("STOP TELEPORT", Color3.fromRGB(0, 150, 150), function(button)
     setTargetToFollow(nil)
     populatePlayerList()
 end)
@@ -314,12 +326,12 @@ listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
 end)
 
--- 🔽 Logika Player List (Dengan Aksi Auto-Follow) 🔽
+-- 🔽 Logika Player List (Dengan Aksi Auto-Teleport) 🔽
 
 local function makePlayerButton(targetPlayer)
     local tpButton = Instance.new("TextButton")
     tpButton.Size = UDim2.new(0, 140, 0, 30)
-    -- Perbarui warna tombol jika pemain sedang di-follow
+    -- Perbarui warna tombol jika pemain sedang di-teleport
     local buttonColor = (currentTarget == targetPlayer) and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(40, 40, 40)
     tpButton.BackgroundColor3 = buttonColor
     tpButton.Text = targetPlayer.Name .. (targetPlayer == player and " (You)" or "")
@@ -370,7 +382,7 @@ flagButton.MouseButton1Click:Connect(function()
     if sideFrame.Visible then
         populatePlayerList()
     else
-        -- Pastikan Beam di-destroy jika frame ditutup dan follow aktif
+        -- Pastikan Beam di-destroy jika frame ditutup dan follow tidak aktif
         if not currentTarget then
             destroyFollowBeam()
         end
