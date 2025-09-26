@@ -9,15 +9,68 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
 -- ** ⬇️ STATUS FITUR CORE ⬇️ **
-local isDestroyerActive = false -- Status untuk fitur Destroyer BARU
-local destroyerTouchConnection = nil -- Koneksi spesifik untuk Destroyer
+local isDestroyerActive = false 
+local destroyerTouchConnection = nil 
 local isPhantomTouchActive = false
 local touchConnection = nil
 local partsTouched = {}
 local isSuperJumpActive = false
 local isNoclipActive = false
-local originalJumpPower = 50
+-- Nilai awal akan diambil dari karakter saat pertama kali dimuat
+local originalJumpPower = 50 
 local originalCanCollide = true
+
+-- 🔽 INISIALISASI AWAL KARAKTER DAN NILAI DEFAULT 🔽
+local function initializeCharacterProperties(char)
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local rootPart = char:FindFirstChild("HumanoidRootPart")
+
+    if humanoid and originalJumpPower == 50 then
+         originalJumpPower = humanoid.JumpPower -- Ambil nilai jump default game
+    end
+    if rootPart and originalCanCollide == true then
+         originalCanCollide = rootPart.CanCollide -- Ambil nilai CanCollide default
+    end
+    
+    -- Terapkan kembali status fitur saat karakter baru muncul
+    if isDestroyerActive then
+        activatePartDestroyer(featureScrollFrame:FindFirstChild("DestroyerButton"))
+    end
+    
+    if isPhantomTouchActive then
+        enablePhantomTouch(featureScrollFrame:FindFirstChild("PhantomTouchButton"))
+    end
+    
+    if isSuperJumpActive and humanoid then
+        humanoid.JumpPower = 150
+    elseif humanoid then
+        humanoid.JumpPower = originalJumpPower
+    end
+
+    if isNoclipActive and rootPart then
+        rootPart.CanCollide = false
+    elseif rootPart then
+        rootPart.CanCollide = originalCanCollide
+    end
+
+    -- Pastikan status tombol GUI ter-update
+    local destroyerButton = featureScrollFrame:FindFirstChild("DestroyerButton")
+    if destroyerButton then updateButtonStatus(destroyerButton, isDestroyerActive) end
+    local noclipButton = featureScrollFrame:FindFirstChild("NoclipButton")
+    if noclipButton then updateButtonStatus(noclipButton, isNoclipActive) end
+    local jumpButton = featureScrollFrame:FindFirstChild("SuperJumpButton")
+    if jumpButton then updateButtonStatus(jumpButton, isSuperJumpActive) end
+    local phantomButton = featureScrollFrame:FindFirstChild("PhantomTouchButton")
+    if phantomButton then updateButtonStatus(phantomButton, isPhantomTouchActive) end
+end
+
+-- Listener Karakter: PENTING untuk me-restart koneksi fitur
+player.CharacterAdded:Connect(initializeCharacterProperties)
+-- Panggil juga saat pertama kali, jika karakter sudah ada sebelum script berjalan
+if player.Character then
+    initializeCharacterProperties(player.Character)
+end
+
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -208,6 +261,9 @@ switchTab("Main")
 -- 🔽 FUNGSI FITUR UTAMA 🔽
 
 local function updateButtonStatus(button, isActive)
+    -- Cek jika tombol sudah di-destroy karena reload karakter
+    if not button or not button.Parent then return end 
+
     local featureName = button.Name:gsub("Button", ""):gsub("_", " "):upper()
     if isActive then
         button.Text = featureName .. ": ON"
@@ -234,30 +290,30 @@ local function destroyerTouch(otherPart)
             hitHumanoid.Health = 0 -- Pembunuhan LOKAL
         end
         
-        otherPart:Destroy() -- Penghancuran Bagian LOKAL
+        -- Tambahkan pcall untuk menghindari crash jika part sudah di-destroy oleh script lain
+        pcall(function() otherPart:Destroy() end)
     end
 end
 
 local function activatePartDestroyer(button)
     if isDestroyerActive then return end
-    isDestroyerActive = true
     
     local character = player.Character
     local rootPart = character and character:FindFirstChild("HumanoidRootPart")
     
     if not rootPart then 
-        warn("HumanoidRootPart tidak ditemukan.")
-        isDestroyerActive = false
+        warn("HumanoidRootPart tidak ditemukan, tunggu karakter dimuat.")
+        -- Jangan set isDestroyerActive = true di sini karena akan diaktifkan ulang di CharacterAdded
         updateButtonStatus(button, false)
         return 
     end
 
+    isDestroyerActive = true
     updateButtonStatus(button, true)
     
-    -- Gunakan Touched event yang sudah ada, atau buat jika perlu
-    if not destroyerTouchConnection then
-        destroyerTouchConnection = rootPart.Touched:Connect(destroyerTouch)
-    end
+    -- Pastikan koneksi lama terputus sebelum membuat koneksi baru
+    if destroyerTouchConnection then destroyerTouchConnection:Disconnect() end
+    destroyerTouchConnection = rootPart.Touched:Connect(destroyerTouch)
     
     print("Aggressive Local Destroyer AKTIF.")
 end
@@ -286,6 +342,7 @@ local function toggleSuperJump(button)
     if isSuperJumpActive then
         humanoid.JumpPower = 150 
     else
+        -- Pastikan menggunakan nilai original yang benar
         humanoid.JumpPower = originalJumpPower 
     end
     updateButtonStatus(button, isSuperJumpActive)
@@ -302,6 +359,7 @@ local function toggleNoclip(button)
     if isNoclipActive then
         rootPart.CanCollide = false
     else
+        -- Pastikan menggunakan nilai original yang benar
         rootPart.CanCollide = originalCanCollide
     end
     updateButtonStatus(button, isNoclipActive)
@@ -310,10 +368,8 @@ end
 -- 4. Phantom Touch
 local function onPartTouched(otherPart)
     if not isPhantomTouchActive or not otherPart or not otherPart:IsA("BasePart") then return end
-    -- Cek jika part adalah bagian dari karakter sendiri atau aksesori
     if otherPart:IsDescendantOf(player.Character) or otherPart.Parent:IsA("Accessory") or partsTouched[otherPart] then return end
 
-    -- Efek Lokal: Menghilangkan tabrakan dan visual
     otherPart.Transparency = 1
     otherPart.CanCollide = false
     
@@ -331,7 +387,7 @@ local function enablePhantomTouch(button)
     if touchConnection then touchConnection:Disconnect() end
     touchConnection = root.Touched:Connect(onPartTouched)
     print("Phantom Touch Dinyalakan.")
-}
+end -- DIBENARKAN: Hapus kurung kurawal '}' yang tidak perlu
 
 local function disablePhantomTouch(button)
     isPhantomTouchActive = false
@@ -342,9 +398,9 @@ local function disablePhantomTouch(button)
         touchConnection = nil
     end
     
-    -- Kembalikan transparansi dan CanCollide part yang telah disentuh (optional, tapi disarankan)
+    -- Kembalikan transparansi dan CanCollide part yang telah disentuh (secara lokal)
     for part, _ in pairs(partsTouched) do
-        if part and part.Parent then -- Cek apakah part masih ada
+        if part and part.Parent then 
              part.Transparency = 0 
              part.CanCollide = true
         end
@@ -357,7 +413,7 @@ end
 
 local function makeFeatureButton(container, name, color, callback)
     local featButton = Instance.new("TextButton")
-    featButton.Name = name:gsub(" ", ""):gsub(":", "") .. "Button" -- Menghilangkan spasi dan kolon untuk nama
+    featButton.Name = name:gsub(" ", ""):gsub(":", "") .. "Button" 
     featButton.Size = UDim2.new(0, 180, 0, 40)
     featButton.BackgroundColor3 = color
     featButton.Text = name
@@ -435,9 +491,14 @@ local function makePlayerButton(targetPlayer)
         if not playerHumanoid or not targetHumanoid then warn("Humanoid tidak ditemukan!") return end
 
         -- CLONING KOSTUM/AKSESORIS
+        -- Gunakan :ClearAllChildren() pada aksesoris lama jika ada, atau pastikan destroy bekerja
         for _, obj in ipairs(char:GetChildren()) do
-            if obj:IsA("Accessory") or obj:IsA("Shirt") or obj:IsA("Pants") then obj:Destroy() end
+            if obj:IsA("Accessory") or obj:IsA("Shirt") or obj:IsA("Pants") then 
+                pcall(function() obj:Destroy() end)
+            end
         end
+        
+        -- Kloning aksesoris baru
         for _, obj in ipairs(targetChar:GetChildren()) do
             if obj:IsA("Accessory") or obj:IsA("Shirt") or obj:IsA("Pants") then
                 local clone = obj:Clone()
@@ -456,53 +517,9 @@ local function makePlayerButton(targetPlayer)
         end
         
         if targetRoot and playerRoot then
-            playerRoot.CFrame = targetRoot.CFrame
+            -- Gunakan SetPrimaryPartCFrame atau CFrame langsung
+            playerRoot.CFrame = targetRoot.CFrame 
         end
         print("Meniru properti dari: " .. targetPlayer.Name)
     end)
 end
-
-
--- 🔽 Penanganan Karakter Reset (CharacterAdded) 🔽
-player.CharacterAdded:Connect(function(char)
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    local rootPart = char:FindFirstChild("HumanoidRootPart")
-
-    -- Ambil kembali nilai asli jika belum diset (hanya di awal)
-    if humanoid and originalJumpPower == 50 then
-         originalJumpPower = humanoid.JumpPower
-    end
-
-    -- Pertahankan status fitur
-    if isDestroyerActive and rootPart then
-        activatePartDestroyer(destroyerButton)
-    end
-    
-    if isPhantomTouchActive and rootPart then
-        enablePhantomTouch(phantomButton)
-    end
-    
-    if isSuperJumpActive and humanoid then
-        humanoid.JumpPower = 150
-    elseif humanoid then
-        humanoid.JumpPower = originalJumpPower -- Pastikan kembali ke nilai normal setelah reset jika nonaktif
-    end
-
-    if isNoclipActive and rootPart then
-        rootPart.CanCollide = false
-    elseif rootPart then
-        rootPart.CanCollide = originalCanCollide -- Pastikan kembali ke nilai normal setelah reset jika nonaktif
-    end
-    
-    -- Update status tombol setelah CharacterAdded
-    updateButtonStatus(destroyerButton, isDestroyerActive)
-    updateButtonStatus(noclipButton, isNoclipActive)
-    updateButtonStatus(jumpButton, isSuperJumpActive)
-    updateButtonStatus(phantomButton, isPhantomTouchActive)
-end)
-
--- Atur status awal tombol
-updateButtonStatus(destroyerButton, isDestroyerActive)
-updateButtonStatus(noclipButton, isNoclipActive)
-updateButtonStatus(jumpButton, isSuperJumpActive)
-updateButtonStatus(phantomButton, isPhantomTouchActive)
