@@ -3,10 +3,14 @@
     
     Fitur Utama:
     - POSSESSION BOND: Pilih pemain dari daftar untuk mengikat karakter Anda ke karakter mereka dan mengendalikan pergerakan mereka.
-    - Player List Interaktif: Daftar pemain selalu terlihat. Klik nama pemain untuk mengikat (attach) atau melepaskan ikatan (release).
+    - Player List Interaktif: Daftar pemain selalu terlihat. KLIK NAMA PEMAIN (kini terlihat seperti teks biasa) untuk mengikat (attach) atau melepaskan ikatan (release).
     
     credit: Xraxor1 (Original GUI/Intro structure)
     Modification for Standalone Trolling: [AI Assistant]
+    
+    CATATAN: Fungsi 'createPlayerButton' telah dimodifikasi agar entry pemain
+             hanya menampilkan nama dan tidak memiliki efek hover, sehingga
+             terlihat seperti Teks Biasa (TextLabel) meskipun berfungsi sebagai tombol (TextButton).
 --]]
 
 local TweenService = game:GetService("TweenService")
@@ -102,7 +106,7 @@ playerListTitle.BackgroundTransparency = 1
 playerListTitle.TextColor3 = Color3.new(1, 1, 1)
 playerListTitle.TextSize = 14
 playerListTitle.Font = Enum.Font.GothamBold
-playerListTitle.Text = "KLIK UNTUK POSSESS / LEPAS"
+playerListTitle.Text = "KLIK NAMA UNTUK POSSESS / LEPAS"
 playerListTitle.Parent = playerListFrame
 
 local playerListLayout = Instance.new("UIListLayout")
@@ -181,7 +185,7 @@ local function createPlayerButton(targetPlayer)
     local playerButton = Instance.new("TextButton")
     playerButton.Name = playerName .. "Entry"
     playerButton.Size = UDim2.new(1, 0, 0, 25)
-    playerButton.BackgroundTransparency = 1
+    playerButton.BackgroundTransparency = 1 -- Selalu transparan
     
     -- Warna teks disesuaikan
     if currentBondTarget == targetPlayer then
@@ -189,6 +193,7 @@ local function createPlayerButton(targetPlayer)
         playerButton.Text = "[POSSESSED] " .. playerName
     else
         playerButton.TextColor3 = Color3.new(1, 1, 1) -- Putih default
+        playerButton.Text = playerName -- Hanya nama pemain
     end
     
     playerButton.TextSize = 14
@@ -196,9 +201,7 @@ local function createPlayerButton(targetPlayer)
     playerButton.TextXAlignment = Enum.TextXAlignment.Left
     playerButton.Parent = playerListFrame
     
-    -- Efek hover (menjadi latar belakang abu-abu)
-    playerButton.MouseEnter:Connect(function() playerButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50) end)
-    playerButton.MouseLeave:Connect(function() playerButton.BackgroundTransparency = 1 end)
+    -- Hapus Efek hover agar terlihat seperti teks biasa
     
     playerButton.MouseButton1Click:Connect(function()
         -- Logika klik: jika sudah terikat pada target ini, lepaskan. Jika belum, ikat.
@@ -222,7 +225,7 @@ local function refreshPlayerList()
 
     -- Tambahkan entri baru
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= player then -- Jangan masukkan diri sendiri ke dalam list
+        if p ~= player then
             createPlayerButton(p)
         end
     end
