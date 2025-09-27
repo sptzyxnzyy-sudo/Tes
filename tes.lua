@@ -62,12 +62,13 @@ listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
 end)
 
--- 🔽 Logika Tombol Teleport (Murni) 🔽
+-- 🔽 Logika Tombol Teleport (Teleport Target Ke Pemain) 🔽
 
 local function makePlayerButton(targetPlayer)
     local tpButton = Instance.new("TextButton")
     tpButton.Size = UDim2.new(0, 140, 0, 35)
-    tpButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    -- Warna tombol akan sedikit berbeda jika itu adalah tombol Anda sendiri
+    tpButton.BackgroundColor3 = targetPlayer == player and Color3.fromRGB(50, 100, 50) or Color3.fromRGB(40, 40, 40)
     tpButton.Text = targetPlayer.Name .. (targetPlayer == player and " (You)" or "")
     tpButton.TextColor3 = Color3.new(1, 1, 1)
     tpButton.Font = Enum.Font.SourceSansBold
@@ -81,12 +82,15 @@ local function makePlayerButton(targetPlayer)
     tpButton.MouseButton1Click:Connect(function()
         
         -- Jangan teleport diri sendiri
-        if targetPlayer == player then return end
+        if targetPlayer == player then 
+            print("Tidak dapat meneleport diri sendiri!")
+            return 
+        end
 
         local char = player.Character
         local targetChar = targetPlayer.Character
 
-        if not char or not targetChar then warn("Karakter target tidak ditemukan!") return end
+        if not char or not targetChar then warn("Karakter target tidak ditemukan atau belum dimuat!") return end
 
         local playerRoot = char:FindFirstChild("HumanoidRootPart")
         local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
@@ -95,7 +99,9 @@ local function makePlayerButton(targetPlayer)
         -- Dapatkan lokasi CFrame Anda saat ini
         local playerCFrame = playerRoot.CFrame 
 
-        -- 🌟 Aksi Tunggal: Teleport Pemain Target ke lokasi Anda 🌟
+        -- *******************************************
+        -- LOGIKA TELEPORT: TargetRoot pindah ke PlayerCFrame
+        -- *******************************************
         targetRoot.CFrame = playerCFrame
         print(targetPlayer.Name .. " telah diteleport ke lokasi Anda.")
 
@@ -123,4 +129,12 @@ flagButton.MouseButton1Click:Connect(function()
     if sideFrame.Visible then
         populatePlayerList()
     end
+end)
+
+-- Pastikan daftar di-refresh saat pemain baru bergabung/keluar
+Players.PlayerAdded:Connect(function() 
+    if sideFrame.Visible then populatePlayerList() end 
+end)
+Players.PlayerRemoving:Connect(function() 
+    if sideFrame.Visible then populatePlayerList() end 
 end)
