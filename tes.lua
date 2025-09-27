@@ -1,25 +1,25 @@
 --[[
-    Skrip POSSESSION BOND Standalone (Final)
+    Skrip SPECTATE/VIEW PLAYER Standalone (Final)
     
     Fitur Utama:
-    - POSSESSION BOND: Pilih pemain dari daftar untuk mengikat karakter Anda ke karakter mereka dan mengendalikan pergerakan mereka.
-    - Player List Interaktif: Daftar pemain selalu terlihat. KLIK NAMA PEMAIN (kini terlihat seperti teks biasa) untuk mengikat (attach) atau melepaskan ikatan (release).
+    - SPECTATE/VIEW PLAYER: Pilih pemain dari daftar untuk membuat kamera Anda melihat dan mengikuti karakter mereka.
+    - Player List Interaktif: Daftar pemain selalu terlihat. KLIK NAMA PEMAIN untuk mengaktifkan Spectate/View atau menghentikannya.
     
     credit: Xraxor1 (Original GUI/Intro structure)
-    Modification for Standalone Trolling: [AI Assistant]
+    Modification for Spectate Feature: [AI Assistant]
     
-    MODIFIKASI: Ditambahkan logika perpindahan instan (teleport) ke lokasi target saat Possession Bond aktif.
+    LOGIKA BARU: Mengubah posisi kamera lokal (spectate) alih-alih memindahkan karakter atau mengikatnya.
 --]]
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 
 -- ** ⬇️ STATUS FITUR CORE ⬇️ **
-local currentBond = nil 
-local originalTargetWalkSpeed = {} 
-local currentBondTarget = nil 
+local currentTarget = nil 
+local originalCameraSubject = nil -- Menyimpan subjek kamera asli (biasanya Humanoid)
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -58,7 +58,7 @@ end
 
 -- 🔽 GUI Utama 🔽
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "PossessionGUI"
+screenGui.Name = "SpectateGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
@@ -80,7 +80,7 @@ corner.Parent = frame
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
-title.Text = "POSSESSION BOND"
+title.Text = "PLAYER VIEW (SPECTATE)"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
@@ -104,7 +104,7 @@ playerListTitle.BackgroundTransparency = 1
 playerListTitle.TextColor3 = Color3.new(1, 1, 1)
 playerListTitle.TextSize = 14
 playerListTitle.Font = Enum.Font.GothamBold
-playerListTitle.Text = "KLIK NAMA UNTUK POSSESS / LEPAS"
+playerListTitle.Text = "KLIK NAMA UNTUK VIEW / BERHENTI"
 playerListTitle.Parent = playerListFrame
 
 local playerListLayout = Instance.new("UIListLayout")
@@ -126,59 +126,43 @@ local function getHumanoid(target)
 end
 
 
--- ⬇️ FUNGSI POSSESSION BOND ⬇️
+-- ⬇️ FUNGSI SPECTATE ⬇️
 
-local function releasePossessionBond()
-    if currentBond and currentBond.Parent then
-        currentBond:Destroy()
-        currentBond = nil
+local function stopSpectate()
+    if currentTarget and originalCameraSubject and Workspace.CurrentCamera then
+        -- Kembalikan Subjek Kamera ke Humanoid pemain lokal
+        Workspace.CurrentCamera.CameraSubject = originalCameraSubject
     end
-    
-    -- Kembalikan kontrol pergerakan target
-    local targetHumanoid = getHumanoid(currentBondTarget)
-    if targetHumanoid and originalTargetWalkSpeed[currentBondTarget.Name] then
-        targetHumanoid.WalkSpeed = originalTargetWalkSpeed[currentBondTarget.Name]
-        originalTargetWalkSpeed[currentBondTarget.Name] = nil
-    end
-    print("POSSESSION BOND NONAKTIF. Ikatan dilepas dari " .. currentBondTarget.Name)
-    currentBondTarget = nil
+    print("SPECTATE NONAKTIF. Kamera kembali ke diri sendiri.")
+    currentTarget = nil
+    originalCameraSubject = nil
 end
 
-local function applyPossessionBond(targetPlayer)
-    if currentBondTarget ~= nil then 
-        releasePossessionBond() 
+local function startSpectate(targetPlayer)
+    if currentTarget ~= nil then 
+        stopSpectate() 
     end
     
-    local myRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    local targetRoot = targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-
-    if not myRoot or not targetRoot then
+    local targetHumanoid = getHumanoid(targetPlayer)
+    if not targetHumanoid then
         warn("Target tidak valid atau belum spawn.")
         return
     end
-    
-    -- ** 🟢 LOGIKA BARU: PINDAHKAN SAYA KE LOKASI TARGET 🟢 **
-    -- Gunakan CFrame untuk memindahkan karakter lokal ke posisi target
-    myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 0) 
-    -- ** 🔴 AKHIR LOGIKA PINDAH 🔴 **
 
-    currentBondTarget = targetPlayer
+    currentTarget = targetPlayer
     
-    -- 1. Buat Ikatan Fisik 
-    currentBond = Instance.new("WeldConstraint")
-    currentBond.Name = "PossessionWeld"
-    currentBond.Part0 = myRoot
-    currentBond.Part1 = targetRoot
-    currentBond.Parent = myRoot 
-
-    -- 2. Matikan kontrol pergerakan target
-    local targetHumanoid = getHumanoid(targetPlayer)
-    if targetHumanoid then
-        originalTargetWalkSpeed[targetPlayer.Name] = targetHumanoid.WalkSpeed
-        targetHumanoid.WalkSpeed = 0 
+    if Workspace.CurrentCamera then
+        -- Simpan subjek kamera asli sebelum diubah
+        originalCameraSubject = Workspace.CurrentCamera.CameraSubject
+        
+        -- Ubah tipe kamera
+        Workspace.CurrentCamera.CameraType = Enum.CameraType.Follow
+        
+        -- Set subjek kamera ke Humanoid target
+        Workspace.CurrentCamera.CameraSubject = targetHumanoid
     end
 
-    print("POSSESSION BOND AKTIF: Terikat pada " .. targetPlayer.Name)
+    print("SPECTATE AKTIF: Melihat posisi " .. targetPlayer.Name)
 end
 
 local function createPlayerButton(targetPlayer)
@@ -189,9 +173,9 @@ local function createPlayerButton(targetPlayer)
     playerButton.BackgroundTransparency = 1
     
     -- Warna teks disesuaikan
-    if currentBondTarget == targetPlayer then
-        playerButton.TextColor3 = Color3.fromRGB(0, 255, 0) -- Hijau jika sedang terikat
-        playerButton.Text = "[POSSESSED] " .. playerName
+    if currentTarget == targetPlayer then
+        playerButton.TextColor3 = Color3.fromRGB(0, 255, 0) -- Hijau jika sedang dilihat
+        playerButton.Text = "[VIEWING] " .. playerName
     else
         playerButton.TextColor3 = Color3.new(1, 1, 1) -- Putih default
         playerButton.Text = playerName 
@@ -205,11 +189,11 @@ local function createPlayerButton(targetPlayer)
     -- Hapus Efek hover agar terlihat seperti teks biasa
     
     playerButton.MouseButton1Click:Connect(function()
-        -- Logika klik: jika sudah terikat pada target ini, lepaskan. Jika belum, ikat.
-        if currentBondTarget == targetPlayer then
-            releasePossessionBond()
+        -- Logika klik: jika sudah spectate target ini, hentikan. Jika belum, mulai spectate.
+        if currentTarget == targetPlayer then
+            stopSpectate()
         else
-            applyPossessionBond(targetPlayer)
+            startSpectate(targetPlayer)
         end
         refreshPlayerList() -- Perbarui GUI setelah aksi
     end)
@@ -236,9 +220,9 @@ end
 -- 🔽 LOGIKA KARAKTER & EVENT 🔽
 
 player.CharacterAdded:Connect(function(char)
-    -- Jika Possession Bond sedang aktif pada target, lepaskan sementara saat respawn
-    if currentBondTarget ~= nil then
-        releasePossessionBond()
+    -- Jika Spectate sedang aktif pada target, hentikan sementara saat respawn
+    if currentTarget ~= nil then
+        stopSpectate()
     end
     refreshPlayerList()
 end)
@@ -246,8 +230,8 @@ end)
 -- Hubungkan event Player Added/Removing agar list pemain otomatis diperbarui
 Players.PlayerAdded:Connect(refreshPlayerList)
 Players.PlayerRemoving:Connect(function(removedPlayer)
-    if currentBondTarget == removedPlayer then
-        releasePossessionBond()
+    if currentTarget == removedPlayer then
+        stopSpectate()
     end
     refreshPlayerList()
 end)
