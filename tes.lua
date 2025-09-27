@@ -1,38 +1,23 @@
 --[[
-    Skrip Trolling Penuh (Final Version - 5 Tombol + List Pemain)
+    Skrip POSSESSION BOND Standalone (Final)
     
-    Perubahan Utama:
-    1. POSSESSION BOND diubah menjadi sistem seleksi target.
-    2. Frame GUI diperbesar dan ditambahkan PlayerList Frame.
+    Fitur Utama:
+    - POSSESSION BOND: Pilih pemain dari daftar untuk mengikat karakter Anda ke karakter mereka dan mengendalikan pergerakan mereka.
+    - Player List Interaktif: Daftar pemain selalu terlihat. Klik nama pemain untuk mengikat (attach) atau melepaskan ikatan (release).
     
     credit: Xraxor1 (Original GUI/Intro structure)
-    Modification for Advanced TROLLING: [AI Assistant]
+    Modification for Standalone Trolling: [AI Assistant]
 --]]
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local StarterGui = game:GetService("StarterGui") 
-local UserInputService = game:GetService("UserInputService") 
 
 local player = Players.LocalPlayer
 
 -- ** ⬇️ STATUS FITUR CORE ⬇️ **
-local isSpeedBoostActive = false 
-local isPossessionActive = false 
-local isGravityForceActive = false
-local isTargetFreezeActive = false 
-local isAutoChatActive = false
-local isPlayerListVisible = false -- Status list pemain
-
--- Nilai Konstan
-local DEFAULT_WALKSPEED = 16
-local BOOST_WALKSPEED = 40
-local GRAVITY_FORCE_MAGNITUDE = 50000 
 local currentBond = nil 
-local originalTargetWalkSpeed = {} -- Menggunakan tabel untuk menyimpan status multiple target
-local currentBondTarget = nil -- Pemain yang sedang terikat
+local originalTargetWalkSpeed = {} 
+local currentBondTarget = nil 
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -68,25 +53,17 @@ do
     end)
 end
 
--- 🔽 Status AutoFarm (Dipertahankan) 🔽
-local statusValue = ReplicatedStorage:FindFirstChild("AutoFarmStatus")
-if not statusValue then
-    statusValue = Instance.new("BoolValue")
-    statusValue.Name = "AutoFarmStatus"
-    statusValue.Value = false
-    statusValue.Parent = ReplicatedStorage
-end
 
 -- 🔽 GUI Utama 🔽
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "CoreFeaturesGUI"
+screenGui.Name = "PossessionGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Frame utama (ukuran disesuaikan untuk 5 tombol DAN Player List)
+-- Frame utama (ukuran ringkas, hanya untuk daftar pemain)
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 400, 0, 280) -- Ukuran diperbesar (Lebar 400)
-frame.Position = UDim2.new(0.5, -200, 0.5, -140)
+frame.Size = UDim2.new(0, 200, 0, 280) 
+frame.Position = UDim2.new(0.5, -100, 0.5, -140)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -101,43 +78,32 @@ corner.Parent = frame
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
-title.Text = "ADVANCED TROLLING & LOCAL"
+title.Text = "POSSESSION BOND"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
--- ScrollingFrame untuk Daftar Pilihan Fitur (Kiri)
-local featureScrollFrame = Instance.new("ScrollingFrame")
-featureScrollFrame.Name = "FeatureList"
-featureScrollFrame.Size = UDim2.new(0.45, 0, 1, -40) -- Ambil 45% lebar
-featureScrollFrame.Position = UDim2.new(0, 10, 0, 35)
-featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-featureScrollFrame.ScrollBarThickness = 6
-featureScrollFrame.BackgroundTransparency = 1
-featureScrollFrame.Parent = frame
 
-local featureListLayout = Instance.new("UIListLayout")
-featureListLayout.Padding = UDim.new(0, 5)
-featureListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-featureListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-featureListLayout.Parent = featureScrollFrame
-
-featureListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, featureListLayout.AbsoluteContentSize.Y + 10)
-end)
-
--- ScrollingFrame untuk Daftar Pemain (Kanan)
+-- ScrollingFrame untuk Daftar Pemain
 local playerListFrame = Instance.new("ScrollingFrame")
 playerListFrame.Name = "PlayerList"
-playerListFrame.Size = UDim2.new(0.5, 0, 1, -40) -- Ambil 50% lebar
-playerListFrame.Position = UDim2.new(0.5, 10, 0, 35)
+playerListFrame.Size = UDim2.new(1, -20, 1, -40) 
+playerListFrame.Position = UDim2.new(0.5, -90, 0, 35)
 playerListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 playerListFrame.ScrollBarThickness = 6
 playerListFrame.BackgroundTransparency = 1
 playerListFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-playerListFrame.Visible = false -- Sembunyikan secara default
 playerListFrame.Parent = frame
+
+local playerListTitle = Instance.new("TextLabel")
+playerListTitle.Size = UDim2.new(1, 0, 0, 20)
+playerListTitle.BackgroundTransparency = 1
+playerListTitle.TextColor3 = Color3.new(1, 1, 1)
+playerListTitle.TextSize = 14
+playerListTitle.Font = Enum.Font.GothamBold
+playerListTitle.Text = "KLIK UNTUK POSSESS / LEPAS"
+playerListTitle.Parent = playerListFrame
 
 local playerListLayout = Instance.new("UIListLayout")
 playerListLayout.Padding = UDim.new(0, 2)
@@ -152,99 +118,13 @@ end)
 
 -- 🔽 FUNGSI UTILITY GLOBAL 🔽
 
-local function updateButtonStatus(button, isActive, featureName, isTrolling)
-    if not button or not button.Parent then return end
-    local name = featureName or button.Name:gsub("Button", ""):gsub("_", " "):upper()
-    
-    local onColor = isTrolling and Color3.fromRGB(200, 50, 0) or Color3.fromRGB(0, 180, 0) 
-    local offColor = Color3.fromRGB(150, 0, 0)
-    
-    if isActive then
-        button.Text = name .. ": ON"
-        button.BackgroundColor3 = onColor
-    else
-        button.Text = name .. ": OFF"
-        button.BackgroundColor3 = offColor
-    end
-end
-
 local function getHumanoid(target)
     local char = target.Character
     return char and char:FindFirstChildOfClass("Humanoid")
 end
 
--- ⬇️ FUNGSI PLAYER LIST ⬇️
 
-local function createPlayerButton(targetPlayer)
-    local playerName = targetPlayer.Name
-    local playerButton = Instance.new("TextButton")
-    playerButton.Name = playerName .. "Entry"
-    playerButton.Size = UDim2.new(1, 0, 0, 25)
-    playerButton.BackgroundTransparency = 1
-    playerButton.Text = playerName
-    playerButton.TextColor3 = Color3.new(1, 1, 1)
-    playerButton.TextSize = 14
-    playerButton.Font = Enum.Font.SourceSans
-    playerButton.TextXAlignment = Enum.TextXAlignment.Left
-    playerButton.Parent = playerListFrame
-    
-    playerButton.MouseEnter:Connect(function() playerButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50) end)
-    playerButton.MouseLeave:Connect(function() playerButton.BackgroundTransparency = 1 end)
-    
-    playerButton.MouseButton1Click:Connect(function()
-        -- Panggil fungsi Possess pada pemain yang dipilih
-        if isPossessionActive and currentBondTarget == nil then
-            applyPossessionBond(targetPlayer)
-        elseif currentBondTarget == targetPlayer then
-            releasePossessionBond()
-        end
-    end)
-    return playerButton
-end
-
-local function refreshPlayerList()
-    -- Hapus entri lama
-    for _, child in ipairs(playerListFrame:GetChildren()) do
-        if child:IsA("TextButton") then
-            child:Destroy()
-        end
-    end
-
-    -- Tambahkan entri baru
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= player then
-            createPlayerButton(p)
-        end
-    end
-end
-
-local function togglePlayerList(isVisible)
-    isPlayerListVisible = isVisible
-    playerListFrame.Visible = isVisible
-    
-    if isVisible then
-        refreshPlayerList()
-    end
-end
-
-
--- --- FUNGSI LOKAL (Klien) ---
-
--- 🔽 1. SPEED BOOST 🔽
-local function toggleSpeedBoost(button)
-    isSpeedBoostActive = not isSpeedBoostActive
-    updateButtonStatus(button, isSpeedBoostActive, "SPEED BOOST", false)
-    
-    local humanoid = getHumanoid(player)
-    if humanoid then
-        humanoid.WalkSpeed = isSpeedBoostActive and BOOST_WALKSPEED or DEFAULT_WALKSPEED
-    end
-end
-
-
--- --- FUNGSI JAHIL (Trolling) ---
-
--- 🔽 2. POSSESSION BOND (IKATAN KEPEMILIKAN) - Logika Baru 🔽
+-- ⬇️ FUNGSI POSSESSION BOND ⬇️
 
 local function releasePossessionBond()
     if currentBond and currentBond.Parent then
@@ -265,8 +145,7 @@ end
 local function applyPossessionBond(targetPlayer)
     if currentBondTarget ~= nil then 
         releasePossessionBond() 
-        return 
-    end -- Lepas ikatan jika sudah ada
+    end
     
     if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
         warn("Target tidak valid atau belum spawn.")
@@ -297,183 +176,77 @@ local function applyPossessionBond(targetPlayer)
     print("POSSESSION BOND AKTIF: Terikat pada " .. targetPlayer.Name)
 end
 
-local function togglePossessionButton(button)
-    isPossessionActive = not isPossessionActive
-    updateButtonStatus(button, isPossessionActive, "POSSESSION BOND", true) 
-
-    if isPossessionActive then
-        togglePlayerList(true)
-        if currentBondTarget ~= nil then
-             releasePossessionBond() -- Pastikan tidak ada ikatan lama
-        end
+local function createPlayerButton(targetPlayer)
+    local playerName = targetPlayer.Name
+    local playerButton = Instance.new("TextButton")
+    playerButton.Name = playerName .. "Entry"
+    playerButton.Size = UDim2.new(1, 0, 0, 25)
+    playerButton.BackgroundTransparency = 1
+    
+    -- Warna teks disesuaikan
+    if currentBondTarget == targetPlayer then
+        playerButton.TextColor3 = Color3.fromRGB(0, 255, 0) -- Hijau jika sedang terikat
+        playerButton.Text = "[POSSESSED] " .. playerName
     else
-        togglePlayerList(false)
-        if currentBondTarget ~= nil then
+        playerButton.TextColor3 = Color3.new(1, 1, 1) -- Putih default
+    end
+    
+    playerButton.TextSize = 14
+    playerButton.Font = Enum.Font.SourceSans
+    playerButton.TextXAlignment = Enum.TextXAlignment.Left
+    playerButton.Parent = playerListFrame
+    
+    -- Efek hover
+    playerButton.MouseEnter:Connect(function() playerButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50) end)
+    playerButton.MouseLeave:Connect(function() playerButton.BackgroundTransparency = 1 end)
+    
+    playerButton.MouseButton1Click:Connect(function()
+        -- Logika klik: jika sudah terikat pada target ini, lepaskan. Jika belum, ikat.
+        if currentBondTarget == targetPlayer then
             releasePossessionBond()
+        else
+            applyPossessionBond(targetPlayer)
+        end
+        refreshPlayerList() -- Perbarui GUI setelah aksi
+    end)
+    return playerButton
+end
+
+local function refreshPlayerList()
+    -- Hapus entri lama (kecuali judul)
+    for _, child in ipairs(playerListFrame:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+
+    -- Tambahkan entri baru
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player then
+            createPlayerButton(p)
         end
     end
 end
 
--- 🔽 3. GRAVITASI PAKSA (FORCED GRAVITY) 🔽
-local function toggleForcedGravity(button)
-    isGravityForceActive = not isGravityForceActive
-    updateButtonStatus(button, isGravityForceActive, "GRAVITASI PAKSA", true)
-    
-    if isGravityForceActive then
-        togglePlayerList(false)
-        task.spawn(function()
-            while isGravityForceActive do
-                for _, targetP in ipairs(Players:GetPlayers()) do
-                    if targetP ~= player and targetP.Character then
-                        applyForcedGravity(targetP)
-                    end
-                end
-                task.wait(math.random(5, 15)) 
-            end
-        end)
-    else
-        togglePlayerList(false)
-    end
-end
 
+-- 🔽 LOGIKA KARAKTER & EVENT 🔽
 
--- 🔽 4. PEMBEKUAN TARGET (TARGET FREEZE) 🔽
-local function freezeTarget(targetPlayer)
-    if not targetPlayer or targetPlayer == player then return end
-
-    local targetHumanoid = getHumanoid(targetPlayer)
-    if targetHumanoid then
-        local originalWalkSpeed = targetHumanoid.WalkSpeed 
-        targetHumanoid.WalkSpeed = 0 
-        
-        task.wait(3) 
-
-        targetHumanoid.WalkSpeed = originalWalkSpeed
-    end
-end
-
-local function toggleTargetFreeze(button)
-    isTargetFreezeActive = not isTargetFreezeActive
-    updateButtonStatus(button, isTargetFreezeActive, "TARGET FREEZE", true)
-
-    if isTargetFreezeActive then
-        togglePlayerList(false)
-        task.spawn(function()
-            while isTargetFreezeActive do
-                local playerList = Players:GetPlayers()
-                local targetIndex = math.random(1, #playerList)
-                local targetP = playerList[targetIndex]
-                
-                if targetP ~= player and targetP.Character then
-                    freezeTarget(targetP)
-                end
-
-                task.wait(math.random(10, 25)) 
-            end
-        end)
-    else
-        togglePlayerList(false)
-    end
-end
-
-
--- 🔽 5. Pesan Otomatis yang Menggiring (Subtle Auto Chat) 🔽
-local chatMessages = {
-    "Aku merasa sedikit aneh hari ini...",
-    "Apakah ada yang baru saja melihat sesuatu?",
-    "Game ini mulai agak lag ya, padahal pingku bagus.",
-    "Bisa tolong teleport aku? Aku tersesat.",
-    "Aku rasa aku tidak sendirian di sini.",
-}
-
-local function autoChatLoop()
-    while isAutoChatActive do
-        local message = chatMessages[math.random(1, #chatMessages)]
-        
-        StarterGui:SetCore("ChatMakeSystemMessage", {
-            Text = "[AKU]: " .. message, 
-            Color = Color3.fromRGB(255, 255, 255), 
-            Font = Enum.Font.SourceSansBold,
-            FontSize = Enum.FontSize.Size14,
-        })
-        
-        task.wait(math.random(120, 300)) 
-    end
-end
-
-local function toggleAutoChat(button)
-    isAutoChatActive = not isAutoChatActive
-    updateButtonStatus(button, isAutoChatActive, "AUTO CHAT", true)
-    
-    if isAutoChatActive then
-        togglePlayerList(false)
-        task.spawn(autoChatLoop)
-    else
-        togglePlayerList(false)
-    end
-end
-
-
--- 🔽 FUNGSI PEMBUAT TOMBOL FITUR 🔽
-
-local function makeFeatureButton(name, color, callback, isTrolling, currentStatus)
-    local featButton = Instance.new("TextButton")
-    featButton.Name = name:gsub(" ", "") .. "Button"
-    featButton.Size = UDim2.new(0, 160, 0, 40) -- Ukuran lebih kecil agar pas
-    featButton.BackgroundColor3 = color
-    featButton.Text = name
-    featButton.TextColor3 = Color3.new(1, 1, 1)
-    featButton.Font = Enum.Font.GothamBold
-    featButton.TextSize = 12
-    featButton.Parent = featureScrollFrame
-
-    Instance.new("UICorner", featButton).CornerRadius = UDim.new(0, 10)
-    updateButtonStatus(featButton, currentStatus, name, isTrolling)
-
-    featButton.MouseButton1Click:Connect(function()
-        callback(featButton)
-    end)
-    return featButton
-end
-
--- 🔽 PENAMBAHAN TOMBOL KE FEATURE LIST 🔽
-
--- LOCAL FEATURE (Slot 1)
-local speedButton = makeFeatureButton("SPEED BOOST", Color3.fromRGB(150, 0, 0), toggleSpeedBoost, false, isSpeedBoostActive)
-
--- TROLLING FEATURE: POSSESSION BOND (Slot 2)
-local bondButton = makeFeatureButton("POSSESSION BOND", Color3.fromRGB(150, 0, 0), togglePossessionButton, true, isPossessionActive)
-
--- TROLLING FEATURE: GRAVITASI PAKSA (Slot 3)
-local gravityButton = makeFeatureButton("GRAVITASI PAKSA", Color3.fromRGB(150, 0, 0), toggleForcedGravity, true, isGravityForceActive)
-
--- TROLLING FEATURE: TARGET FREEZE (Slot 4)
-local freezeButton = makeFeatureButton("TARGET FREEZE", Color3.fromRGB(150, 0, 0), toggleTargetFreeze, true, isTargetFreezeActive)
-
--- TROLLING FEATURE: AUTO CHAT (Slot 5)
-local autoChatButton = makeFeatureButton("AUTO CHAT", Color3.fromRGB(150, 0, 0), toggleAutoChat, true, isAutoChatActive)
-
-
--- 🔽 LOGIKA CHARACTER ADDED (PENTING UNTUK MEMPERTAHANKAN STATUS) 🔽
 player.CharacterAdded:Connect(function(char)
-    local humanoid = char:WaitForChild("Humanoid")
-    
-    -- Pertahankan Speed Boost
-    humanoid.WalkSpeed = isSpeedBoostActive and BOOST_WALKSPEED or DEFAULT_WALKSPEED
-    
-    -- Update GUI status setelah respawn
-    updateButtonStatus(speedButton, isSpeedBoostActive, "SPEED BOOST", false)
-    updateButtonStatus(bondButton, isPossessionActive, "POSSESSION BOND", true)
-    updateButtonStatus(gravityButton, isGravityForceActive, "GRAVITASI PAKSA", true)
-    updateButtonStatus(freezeButton, isTargetFreezeActive, "TARGET FREEZE", true)
-    updateButtonStatus(autoChatButton, isAutoChatActive, "AUTO CHAT", true)
-    
-    -- Jika Possession aktif, coba ikat ulang ke pemain terdekat setelah respawn
-    if isPossessionActive then
-        -- Tidak otomatis bind; hanya tampilkan list lagi
-        togglePlayerList(true) 
+    -- Jika Possession Bond sedang aktif pada target, lepaskan sementara saat respawn
+    if currentBondTarget ~= nil then
+        releasePossessionBond()
     end
+    refreshPlayerList()
 end)
 
+-- Hubungkan event Player Added/Removing agar list pemain otomatis diperbarui
 Players.PlayerAdded:Connect(refreshPlayerList)
-Players.PlayerRemoving:Connect(refreshPlayerList)
+Players.PlayerRemoving:Connect(function(removedPlayer)
+    if currentBondTarget == removedPlayer then
+        releasePossessionBond()
+    end
+    refreshPlayerList()
+end)
+
+-- Panggil refresh list saat skrip pertama kali dimuat
+refreshPlayerList()
