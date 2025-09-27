@@ -8,9 +8,7 @@
     credit: Xraxor1 (Original GUI/Intro structure)
     Modification for Standalone Trolling: [AI Assistant]
     
-    CATATAN: Fungsi 'createPlayerButton' telah dimodifikasi agar entry pemain
-             hanya menampilkan nama dan tidak memiliki efek hover, sehingga
-             terlihat seperti Teks Biasa (TextLabel) meskipun berfungsi sebagai tombol (TextButton).
+    MODIFIKASI: Ditambahkan logika perpindahan instan (teleport) ke lokasi target saat Possession Bond aktif.
 --]]
 
 local TweenService = game:GetService("TweenService")
@@ -151,15 +149,18 @@ local function applyPossessionBond(targetPlayer)
         releasePossessionBond() 
     end
     
-    if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+    local myRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    local targetRoot = targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+    if not myRoot or not targetRoot then
         warn("Target tidak valid atau belum spawn.")
         return
     end
-
-    local myRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-
-    if not myRoot or not targetRoot then return end
+    
+    -- ** 🟢 LOGIKA BARU: PINDAHKAN SAYA KE LOKASI TARGET 🟢 **
+    -- Gunakan CFrame untuk memindahkan karakter lokal ke posisi target
+    myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 0) 
+    -- ** 🔴 AKHIR LOGIKA PINDAH 🔴 **
 
     currentBondTarget = targetPlayer
     
@@ -185,7 +186,7 @@ local function createPlayerButton(targetPlayer)
     local playerButton = Instance.new("TextButton")
     playerButton.Name = playerName .. "Entry"
     playerButton.Size = UDim2.new(1, 0, 0, 25)
-    playerButton.BackgroundTransparency = 1 -- Selalu transparan
+    playerButton.BackgroundTransparency = 1
     
     -- Warna teks disesuaikan
     if currentBondTarget == targetPlayer then
@@ -193,7 +194,7 @@ local function createPlayerButton(targetPlayer)
         playerButton.Text = "[POSSESSED] " .. playerName
     else
         playerButton.TextColor3 = Color3.new(1, 1, 1) -- Putih default
-        playerButton.Text = playerName -- Hanya nama pemain
+        playerButton.Text = playerName 
     end
     
     playerButton.TextSize = 14
