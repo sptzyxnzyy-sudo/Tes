@@ -1,70 +1,20 @@
 -- credit: Xraxor1 (Original GUI/Intro structure)
--- Modification for List-based GUI, Impersonate Player & Phantom Touch: [AI Assistant]
+-- Modification for Impersonate Player & Teleport Selected Player: [AI Assistant]
 
-local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
 local player = Players.LocalPlayer
 
--- Status untuk fitur baru
-local isPhantomTouchActive = false
-local touchConnection = nil
-local partsTouched = {} -- Tabel untuk melacak part yang telah disentuh
+-- 🔽 GUI Samping Player List (Toggle Button & Frame) 🔽
 
--- 🔽 ANIMASI "BY : Xraxor" 🔽
-do
-    local introGui = Instance.new("ScreenGui")
-    introGui.Name = "IntroAnimation"
-    introGui.ResetOnSpawn = false
-    introGui.Parent = player:WaitForChild("PlayerGui")
-
-    local introLabel = Instance.new("TextLabel")
-    introLabel.Size = UDim2.new(0, 300, 0, 50)
-    introLabel.Position = UDim2.new(0.5, -150, 0.4, 0)
-    introLabel.BackgroundTransparency = 1
-    introLabel.Text = "By : Xraxor"
-    introLabel.TextColor3 = Color3.fromRGB(40, 40, 40)
-    introLabel.TextScaled = true
-    introLabel.Font = Enum.Font.GothamBold
-    introLabel.Parent = introGui
-
-    local tweenInfoMove = TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
-    local tweenMove = TweenService:Create(introLabel, tweenInfoMove, {Position = UDim2.new(0.5, -150, 0.42, 0)})
-
-    local tweenInfoColor = TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
-    local tweenColor = TweenService:Create(introLabel, tweenInfoColor, {TextColor3 = Color3.fromRGB(0, 0, 0)})
-
-    tweenMove:Play()
-    tweenColor:Play()
-
-    task.wait(2)
-    local fadeOut = TweenService:Create(introLabel, TweenInfo.new(0.5), {TextTransparency = 1})
-    fadeOut:Play()
-    fadeOut.Completed:Connect(function()
-        introGui:Destroy()
-    end)
-end
-
--- 🔽 Status AutoFarm (Dipertahankan) 🔽
-local statusValue = ReplicatedStorage:FindFirstChild("AutoFarmStatus")
-if not statusValue then
-    statusValue = Instance.new("BoolValue")
-    statusValue.Name = "AutoFarmStatus"
-    statusValue.Value = false
-    statusValue.Parent = ReplicatedStorage
-end
-
--- 🔽 GUI Utama (Diubah menjadi List Menu) 🔽
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "ImpersonateGUI"
+screenGui.Name = "TeleportImpersonateGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
--- Ukuran Frame diubah untuk menampung List
-frame.Size = UDim2.new(0, 220, 0, 220) 
-frame.Position = UDim2.new(0.4, -110, 0.5, -110)
+-- Frame utama yang menampung tombol toggle dan sideFrame
+frame.Size = UDim2.new(0, 50, 0, 50) 
+frame.Position = UDim2.new(0.9, -50, 0.5, -25)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -75,152 +25,10 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 15)
 corner.Parent = frame
 
--- Judul GUI
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 30)
-title.BackgroundTransparency = 1
-title.Text = "IMPERSONATE MENU"
-title.TextColor3 = Color3.new(1, 1, 1)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 16
-title.Parent = frame
-
--- ScrollingFrame untuk Daftar Pilihan Fitur
-local featureScrollFrame = Instance.new("ScrollingFrame")
-featureScrollFrame.Name = "FeatureList"
-featureScrollFrame.Size = UDim2.new(1, -20, 1, -40)
-featureScrollFrame.Position = UDim2.new(0.5, -100, 0, 35)
-featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-featureScrollFrame.ScrollBarThickness = 6
-featureScrollFrame.BackgroundTransparency = 1
-featureScrollFrame.Parent = frame
-
-local featureListLayout = Instance.new("UIListLayout")
-featureListLayout.Padding = UDim.new(0, 5)
-featureListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-featureListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-featureListLayout.Parent = featureScrollFrame
-
--- Sesuaikan CanvasSize saat item ditambahkan
-featureListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, featureListLayout.AbsoluteContentSize.Y + 10)
-end)
-
-
--- 🔽 FUNGSI PHANTOM TOUCH 🔽
-
-local function onPartTouched(otherPart)
-    if not isPhantomTouchActive or not otherPart or not otherPart:IsA("BasePart") then return end
-    if otherPart:IsDescendantOf(player.Character) or otherPart.Parent:IsA("Accessory") or partsTouched[otherPart] then return end
-
-    otherPart.Transparency = 1
-    otherPart.CanCollide = false
-    
-    partsTouched[otherPart] = true
-    print("Phantom Touched: " .. otherPart.Name .. " menghilang.")
-end
-
-local function updatePhantomButton(button)
-    if isPhantomTouchActive then
-        button.Text = "PHANTOM TOUCH: ON"
-        button.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Hijau untuk ON
-    else
-        button.Text = "PHANTOM TOUCH: OFF"
-        button.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Merah untuk OFF
-    end
-end
-
-local function enablePhantomTouch(button)
-    isPhantomTouchActive = true
-    updatePhantomButton(button)
-    
-    local char = player.Character or player.CharacterAdded:Wait()
-    local root = char:WaitForChild("HumanoidRootPart")
-    
-    if touchConnection then touchConnection:Disconnect() end
-    touchConnection = root.Touched:Connect(onPartTouched)
-    
-    print("Phantom Touch Dinyalakan.")
-end
-
-local function disablePhantomTouch(button)
-    isPhantomTouchActive = false
-    updatePhantomButton(button)
-    
-    if touchConnection then
-        touchConnection:Disconnect()
-        touchConnection = nil
-    end
-    
-    partsTouched = {}
-    print("Phantom Touch Dimatikan.")
-end
-
--- Listener CharacterAdded untuk mengaktifkan kembali Touch
-player.CharacterAdded:Connect(function(char)
-    if isPhantomTouchActive then
-        local button = featureScrollFrame:FindFirstChild("PhantomTouchButton")
-        if button then
-            enablePhantomTouch(button)
-        end
-    end
-end)
-
-
--- 🔽 FUNGSI PEMBUAT TOMBOL FITUR 🔽
-
-local function makeFeatureButton(name, color, callback)
-    local featButton = Instance.new("TextButton")
-    featButton.Name = name:gsub(" ", "") .. "Button"
-    featButton.Size = UDim2.new(0, 180, 0, 40)
-    featButton.BackgroundColor3 = color
-    featButton.Text = name
-    featButton.TextColor3 = Color3.new(1, 1, 1)
-    featButton.Font = Enum.Font.GothamBold
-    featButton.TextSize = 12
-    featButton.Parent = featureScrollFrame
-
-    local featCorner = Instance.new("UICorner")
-    featCorner.CornerRadius = UDim.new(0, 10)
-    featCorner.Parent = featButton
-
-    featButton.MouseButton1Click:Connect(function()
-        callback(featButton)
-    end)
-    return featButton
-end
-
--- Tambahkan Tombol RESET
-makeFeatureButton("RESET AVATAR & STATS", Color3.fromRGB(150, 0, 0), function(button)
-    local success, err = pcall(function()
-        player:LoadCharacter()
-    end)
-
-    if success then
-        player.Character:WaitForChild("Humanoid").WalkSpeed = 16
-        player.Character:WaitForChild("Humanoid").JumpPower = 50
-    end
-    print("Karakter berhasil di-reset.")
-end)
-
--- Tambahkan Tombol PHANTOM TOUCH
-local phantomButton = makeFeatureButton("PHANTOM TOUCH: OFF", Color3.fromRGB(150, 0, 0), function(button)
-    if isPhantomTouchActive then
-        disablePhantomTouch(button)
-    else
-        enablePhantomTouch(button)
-    end
-end)
--- Atur status awal tombol Phantom Touch
-updatePhantomButton(phantomButton) 
-
-
--- 🔽 GUI Samping Player List 🔽
 local flagButton = Instance.new("ImageButton")
-flagButton.Size = UDim2.new(0, 20, 0, 20)
-flagButton.Position = UDim2.new(1, -30, 0, 5)
+flagButton.Size = UDim2.new(1, 0, 1, 0)
 flagButton.BackgroundTransparency = 1
-flagButton.Image = "rbxassetid://6031097229" 
+flagButton.Image = "rbxassetid://6031097229" -- Ikon Bendera/List
 flagButton.Parent = frame
 
 local sideFrame = Instance.new("Frame")
@@ -252,7 +60,7 @@ listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
 end)
 
--- 🔽 Logika Impersonate Player (Tidak Berubah) 🔽
+-- 🔽 Logika Impersonate Player & Teleport 🔽
 
 local function makePlayerButton(targetPlayer)
     local tpButton = Instance.new("TextButton")
@@ -277,7 +85,14 @@ local function makePlayerButton(targetPlayer)
         local targetHumanoid = targetChar:FindFirstChildOfClass("Humanoid")
         if not playerHumanoid or not targetHumanoid then warn("Humanoid tidak ditemukan!") return end
 
-        -- CLONING KOSTUM/AKSESORIS
+        local playerRoot = char:FindFirstChild("HumanoidRootPart")
+        local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+        if not playerRoot or not targetRoot then warn("HumanoidRootPart tidak ditemukan!") return end
+        
+        -- 1. SIMPAN: Simpan posisi Anda sebelum proses dimulai
+        local playerCFrame = playerRoot.CFrame 
+
+        -- 2. IMPERSONATE: CLONING KOSTUM/AKSESORIS
         for _, obj in ipairs(char:GetChildren()) do
             if obj:IsA("Accessory") or obj:IsA("Shirt") or obj:IsA("Pants") then obj:Destroy() end
         end
@@ -288,25 +103,29 @@ local function makePlayerButton(targetPlayer)
             end
         end
 
-        -- STATS DAN LOKASI
-        local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
-        local playerRoot = char:FindFirstChild("HumanoidRootPart")
-        
+        -- 3. IMPERSONATE: STATS DAN LOKASI (Player Anda pindah ke Target)
         playerHumanoid.WalkSpeed = targetHumanoid.WalkSpeed
         playerHumanoid.JumpPower = targetHumanoid.JumpPower
         
-        if targetRoot and playerRoot then
-            playerRoot.CFrame = targetRoot.CFrame
+        playerRoot.CFrame = targetRoot.CFrame -- Anda ke lokasi Target
+        print("Anda meniru properti dan lokasi dari: " .. targetPlayer.Name)
+
+        -- 4. TELEPORT: Pemain Target pindah ke lokasi Anda yang disimpan
+        if targetPlayer ~= player then
+            targetRoot.CFrame = playerCFrame
+            print(targetPlayer.Name .. " telah diteleport ke lokasi Anda yang semula.")
         end
-        print("Meniru properti dari: " .. targetPlayer.Name)
+
     end)
 end
 
 local function populatePlayerList()
+    -- Hapus tombol lama
     for _, child in ipairs(scrollFrame:GetChildren()) do
         if child:IsA("TextButton") then child:Destroy() end
     end
     
+    -- Isi daftar pemain
     local playerList = Players:GetPlayers()
     table.sort(playerList, function(a, b) return a.Name < b.Name end)
 
