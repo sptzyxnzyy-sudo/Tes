@@ -1,4 +1,4 @@
--- credit: Xraxor1 (Original GUI/Intro structure)
+-- credit: Xraxor1 (nOriginal GUI/Intro structure)
 -- Modification: Repulse Touch (Knockback) with GUI
 
 local TweenService = game:GetService("TweenService")
