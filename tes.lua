@@ -1,240 +1,160 @@
 --[[
-    Skrip SPECTATE/VIEW PLAYER Standalone (Final)
+    Skrip ANTI-ADMIN / ANTI-GRIEF dengan Tombol ON/OFF
     
     Fitur Utama:
-    - SPECTATE/VIEW PLAYER: Pilih pemain dari daftar untuk membuat kamera Anda melihat dan mengikuti karakter mereka.
-    - Player List Interaktif: Daftar pemain selalu terlihat. KLIK NAMA PEMAIN untuk mengaktifkan Spectate/View atau menghentikannya.
+    - Kontrol Toggle: Tombol visual ON/OFF.
+    - Perlindungan: ANTI-KILL, ANTI-FREEZE, ANTI-TELEPORT/FLING.
+    - Logika Respawn: Mempertahankan status ON/OFF setelah mati.
     
-    credit: Xraxor1 (Original GUI/Intro structure)
-    Modification for Spectate Feature: [AI Assistant]
-    
-    LOGIKA BARU: Mengubah posisi kamera lokal (spectate) alih-alih memindahkan karakter atau mengikatnya.
+    Credit: [AI Assistant]
 --]]
 
-local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-
+local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
 -- ** ⬇️ STATUS FITUR CORE ⬇️ **
-local currentTarget = nil 
-local originalCameraSubject = nil -- Menyimpan subjek kamera asli (biasanya Humanoid)
-
--- 🔽 ANIMASI "BY : Xraxor" 🔽
-do
-    local introGui = Instance.new("ScreenGui")
-    introGui.Name = "IntroAnimation"
-    introGui.ResetOnSpawn = false
-    introGui.Parent = player:WaitForChild("PlayerGui")
-
-    local introLabel = Instance.new("TextLabel")
-    introLabel.Size = UDim2.new(0, 300, 0, 50)
-    introLabel.Position = UDim2.new(0.5, -150, 0.4, 0)
-    introLabel.BackgroundTransparency = 1
-    introLabel.Text = "By : Xraxor"
-    introLabel.TextColor3 = Color3.fromRGB(40, 40, 40)
-    introLabel.TextScaled = true
-    introLabel.Font = Enum.Font.GothamBold
-    introLabel.Parent = introGui
-
-    local tweenInfoMove = TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
-    local tweenMove = TweenService:Create(introLabel, tweenInfoMove, {Position = UDim2.new(0.5, -150, 0.42, 0)})
-
-    local tweenInfoColor = TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
-    local tweenColor = TweenService:Create(introLabel, tweenInfoColor, {TextColor3 = Color3.fromRGB(0, 0, 0)})
-
-    tweenMove:Play()
-    tweenColor:Play()
-
-    task.wait(2)
-    local fadeOut = TweenService:Create(introLabel, TweenInfo.new(0.5), {TextTransparency = 1})
-    fadeOut:Play()
-    fadeOut.Completed:Connect(function()
-        introGui:Destroy()
-    end)
-end
+local ConnectionTable = {} -- Untuk menyimpan koneksi event
+local GodModeActive = false -- Status ON/OFF global
 
 
--- 🔽 GUI Utama 🔽
+-- 🔽 GUI Sederhana (Tombol ON/OFF) 🔽
+
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "SpectateGUI"
+screenGui.Name = "AntiAdminToggleGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Frame utama (ukuran ringkas, hanya untuk daftar pemain)
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 200, 0, 280) 
-frame.Position = UDim2.new(0.5, -100, 0.5, -140)
-frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
-frame.Parent = screenGui
-
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 15)
-corner.Parent = frame
-
--- Judul GUI
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 30)
-title.BackgroundTransparency = 1
-title.Text = "PLAYER VIEW (SPECTATE)"
-title.TextColor3 = Color3.new(1, 1, 1)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 16
-title.Parent = frame
+local godModeToggle = Instance.new("TextButton")
+godModeToggle.Size = UDim2.new(0, 200, 0, 40) 
+godModeToggle.Position = UDim2.new(0.5, -100, 1, -60) -- Posisi di bawah tengah
+godModeToggle.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Merah (OFF)
+godModeToggle.TextColor3 = Color3.new(1, 1, 1)
+godModeToggle.Text = "ANTI-ADMIN: NONAKTIF"
+godModeToggle.Font = Enum.Font.GothamBold
+godModeToggle.TextSize = 18
+godModeToggle.BorderSizePixel = 0
+godModeToggle.Parent = screenGui
 
 
--- ScrollingFrame untuk Daftar Pemain
-local playerListFrame = Instance.new("ScrollingFrame")
-playerListFrame.Name = "PlayerList"
-playerListFrame.Size = UDim2.new(1, -20, 1, -40) 
-playerListFrame.Position = UDim2.new(0.5, -90, 0, 35)
-playerListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-playerListFrame.ScrollBarThickness = 6
-playerListFrame.BackgroundTransparency = 1
-playerListFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-playerListFrame.Parent = frame
+-- ⬇️ FUNGSI PERLINDUNGAN ⬇️
 
-local playerListTitle = Instance.new("TextLabel")
-playerListTitle.Size = UDim2.new(1, 0, 0, 20)
-playerListTitle.BackgroundTransparency = 1
-playerListTitle.TextColor3 = Color3.new(1, 1, 1)
-playerListTitle.TextSize = 14
-playerListTitle.Font = Enum.Font.GothamBold
-playerListTitle.Text = "KLIK NAMA UNTUK VIEW / BERHENTI"
-playerListTitle.Parent = playerListFrame
-
-local playerListLayout = Instance.new("UIListLayout")
-playerListLayout.Padding = UDim.new(0, 2)
-playerListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-playerListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-playerListLayout.Parent = playerListFrame
-
-playerListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    playerListFrame.CanvasSize = UDim2.new(0, 0, 0, playerListLayout.AbsoluteContentSize.Y + 10)
-end)
-
-
--- 🔽 FUNGSI UTILITY GLOBAL 🔽
-
-local function getHumanoid(target)
-    local char = target.Character
-    return char and char:FindFirstChildOfClass("Humanoid")
-end
-
-
--- ⬇️ FUNGSI SPECTATE ⬇️
-
-local function stopSpectate()
-    if currentTarget and originalCameraSubject and Workspace.CurrentCamera then
-        -- Kembalikan Subjek Kamera ke Humanoid pemain lokal
-        Workspace.CurrentCamera.CameraSubject = originalCameraSubject
+local function ApplyAdminProtection()
+    -- Putuskan semua koneksi lama sebelum membuat yang baru
+    for _, conn in pairs(ConnectionTable) do
+        conn:Disconnect()
     end
-    print("SPECTATE NONAKTIF. Kamera kembali ke diri sendiri.")
-    currentTarget = nil
-    originalCameraSubject = nil
-end
-
-local function startSpectate(targetPlayer)
-    if currentTarget ~= nil then 
-        stopSpectate() 
-    end
+    ConnectionTable = {}
     
-    local targetHumanoid = getHumanoid(targetPlayer)
-    if not targetHumanoid then
-        warn("Target tidak valid atau belum spawn.")
+    local char = player.Character
+    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+    local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+    
+    if not humanoid or not rootPart then
+        warn("Karakter belum valid. Tidak dapat menerapkan perlindungan.")
         return
     end
 
-    currentTarget = targetPlayer
+    -- 1. ANTI-KILL (Kekebalan dari Kerusakan)
+    humanoid.MaxHealth = math.huge
+    humanoid.Health = humanoid.MaxHealth
     
-    if Workspace.CurrentCamera then
-        -- Simpan subjek kamera asli sebelum diubah
-        originalCameraSubject = Workspace.CurrentCamera.CameraSubject
-        
-        -- Ubah tipe kamera
-        Workspace.CurrentCamera.CameraType = Enum.CameraType.Follow
-        
-        -- Set subjek kamera ke Humanoid target
-        Workspace.CurrentCamera.CameraSubject = targetHumanoid
-    end
-
-    print("SPECTATE AKTIF: Melihat posisi " .. targetPlayer.Name)
-end
-
-local function createPlayerButton(targetPlayer)
-    local playerName = targetPlayer.Name
-    local playerButton = Instance.new("TextButton")
-    playerButton.Name = playerName .. "Entry"
-    playerButton.Size = UDim2.new(1, 0, 0, 25)
-    playerButton.BackgroundTransparency = 1
-    
-    -- Warna teks disesuaikan
-    if currentTarget == targetPlayer then
-        playerButton.TextColor3 = Color3.fromRGB(0, 255, 0) -- Hijau jika sedang dilihat
-        playerButton.Text = "[VIEWING] " .. playerName
-    else
-        playerButton.TextColor3 = Color3.new(1, 1, 1) -- Putih default
-        playerButton.Text = playerName 
-    end
-    
-    playerButton.TextSize = 14
-    playerButton.Font = Enum.Font.SourceSans
-    playerButton.TextXAlignment = Enum.TextXAlignment.Left
-    playerButton.Parent = playerListFrame
-    
-    -- Hapus Efek hover agar terlihat seperti teks biasa
-    
-    playerButton.MouseButton1Click:Connect(function()
-        -- Logika klik: jika sudah spectate target ini, hentikan. Jika belum, mulai spectate.
-        if currentTarget == targetPlayer then
-            stopSpectate()
-        else
-            startSpectate(targetPlayer)
+    -- Memastikan kesehatan tidak berkurang
+    ConnectionTable["HealthChanged"] = humanoid.HealthChanged:Connect(function(newHealth)
+        if newHealth < humanoid.MaxHealth then
+            humanoid.Health = humanoid.MaxHealth
         end
-        refreshPlayerList() -- Perbarui GUI setelah aksi
     end)
-    return playerButton
+    
+    -- 2. ANTI-FREEZE / ANTI-DEATH (Mencegah perintah Humanoid:ChangeState)
+    ConnectionTable["StateChanged"] = humanoid.Seated:Connect(function(isSitting)
+        if humanoid:GetState() == Enum.HumanoidStateType.Dead or humanoid:GetState() == Enum.HumanoidStateType.FallingDown then
+            humanoid:ChangeState(Enum.HumanoidStateType.Running) -- Paksa kembali berlari
+        end
+    end)
+    
+    -- 3. ANTI-TELEPORT / ANTI-FREEZE PERMANEN
+    ConnectionTable["Heartbeat"] = RunService.Heartbeat:Connect(function()
+        -- a) ANTI-FREEZE / ANTI-SPEED CHANGE
+        if humanoid.WalkSpeed < 10 or humanoid.WalkSpeed > 30 then
+            humanoid.WalkSpeed = 16 -- Kembalikan ke normal
+        end
+        
+        -- b) ANTI-FLING (Mencegah dorongan fisik)
+        if rootPart.CanCollide == true then
+             rootPart.CanCollide = false
+        end
+        
+        -- c) ANTI-DESTROY (Mencegah penghapusan bagian tubuh penting)
+        if not rootPart.Parent then
+            player:LoadCharacter() 
+        end
+    end)
+    
+    -- Perbarui status visual
+    GodModeActive = true
+    godModeToggle.BackgroundColor3 = Color3.fromRGB(0, 150, 0) -- Hijau
+    godModeToggle.Text = "ANTI-ADMIN: AKTIF"
+    print("Perlindungan Anti-Admin AKTIF.")
 end
 
-local function refreshPlayerList()
-    -- Hapus entri lama (kecuali judul)
-    for _, child in ipairs(playerListFrame:GetChildren()) do
-        if child:IsA("TextButton") then
-            child:Destroy()
-        end
-    end
 
-    -- Tambahkan entri baru
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= player then
-            createPlayerButton(p)
-        end
+local function RemoveAdminProtection()
+    -- Putuskan semua koneksi
+    for _, conn in pairs(ConnectionTable) do
+        conn:Disconnect()
     end
+    ConnectionTable = {}
+
+    local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    local rootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    
+    if humanoid then
+        humanoid.MaxHealth = 100
+        humanoid.Health = math.min(humanoid.Health, 100)
+        humanoid.WalkSpeed = 16
+    end
+    
+    if rootPart then
+        rootPart.CanCollide = true
+    end
+    
+    -- Perbarui status visual
+    GodModeActive = false
+    godModeToggle.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Merah
+    godModeToggle.Text = "ANTI-ADMIN: NONAKTIF"
+    print("Perlindungan Anti-Admin DINONAKTIFKAN.")
 end
 
 
--- 🔽 LOGIKA KARAKTER & EVENT 🔽
+-- 🔽 LOGIKA TOMBOL & RESPAWN 🔽
 
-player.CharacterAdded:Connect(function(char)
-    -- Jika Spectate sedang aktif pada target, hentikan sementara saat respawn
-    if currentTarget ~= nil then
-        stopSpectate()
+-- Logika Tombol Toggle
+godModeToggle.MouseButton1Click:Connect(function()
+    if GodModeActive then
+        RemoveAdminProtection()
+    else
+        ApplyAdminProtection()
     end
-    refreshPlayerList()
 end)
 
--- Hubungkan event Player Added/Removing agar list pemain otomatis diperbarui
-Players.PlayerAdded:Connect(refreshPlayerList)
-Players.PlayerRemoving:Connect(function(removedPlayer)
-    if currentTarget == removedPlayer then
-        stopSpectate()
-    end
-    refreshPlayerList()
-end)
 
--- Panggil refresh list saat skrip pertama kali dimuat
-refreshPlayerList()
+-- Logika Respawn (Mempertahankan status ON/OFF)
+local function handleCharacterAdded(char)
+    if GodModeActive then
+        -- Jika perlindungan AKTIF sebelum mati, aktifkan lagi
+        char:WaitForChild("HumanoidRootPart", 5) 
+        -- Panggil ApplyAdminProtection untuk membangun kembali semua koneksi
+        ApplyAdminProtection() 
+    end
+end
+
+-- Hubungkan fungsi ke event CharacterAdded
+player.CharacterAdded:Connect(handleCharacterAdded)
+
+-- Jika karakter sudah ada saat skrip pertama kali dijalankan
+if player.Character then
+    -- Hanya aktifkan jika tombol sudah ON (tapi default-nya OFF)
+    -- Kita hanya perlu memastikan handleCharacterAdded dipasang dan tombol siap.
+    -- Tidak perlu memanggil ApplyAdminProtection di sini karena default-nya OFF.
+end
