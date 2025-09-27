@@ -1,18 +1,18 @@
 -- credit: Xraxor1 (Original GUI/Intro structure)
--- Modification for Impersonate Player & Teleport Selected Player: [AI Assistant]
+-- Modification for Teleport Target TO YOU (All other features removed): [AI Assistant]
 
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
--- 🔽 GUI Samping Player List (Toggle Button & Frame) 🔽
+-- 🔽 GUI UTAMA (Frame untuk menampung Tombol Toggle List) 🔽
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "TeleportImpersonateGUI"
+screenGui.Name = "TeleportGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
--- Frame utama yang menampung tombol toggle dan sideFrame
+-- Frame kecil di sisi layar untuk menampung tombol toggle
 frame.Size = UDim2.new(0, 50, 0, 50) 
 frame.Position = UDim2.new(0.9, -50, 0.5, -25)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
@@ -25,15 +25,17 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 15)
 corner.Parent = frame
 
+
+-- 🔽 GUI Samping Player List 🔽
 local flagButton = Instance.new("ImageButton")
 flagButton.Size = UDim2.new(1, 0, 1, 0)
 flagButton.BackgroundTransparency = 1
-flagButton.Image = "rbxassetid://6031097229" -- Ikon Bendera/List
+flagButton.Image = "rbxassetid://6031097229" -- Ikon untuk toggle
 flagButton.Parent = frame
 
 local sideFrame = Instance.new("Frame")
 sideFrame.Size = UDim2.new(0, 170, 0, 250)
-sideFrame.Position = UDim2.new(1, 10, 0, 0)
+sideFrame.Position = UDim2.new(1, 10, 0, 0) -- Posisi di samping frame utama
 sideFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 sideFrame.Visible = false
 sideFrame.Parent = frame
@@ -60,7 +62,7 @@ listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
 end)
 
--- 🔽 Logika Impersonate Player & Teleport 🔽
+-- 🔽 Logika Tombol Teleport (Murni) 🔽
 
 local function makePlayerButton(targetPlayer)
     local tpButton = Instance.new("TextButton")
@@ -77,44 +79,25 @@ local function makePlayerButton(targetPlayer)
     tpCorner.Parent = tpButton
 
     tpButton.MouseButton1Click:Connect(function()
+        
+        -- Jangan teleport diri sendiri
+        if targetPlayer == player then return end
+
         local char = player.Character
         local targetChar = targetPlayer.Character
 
-        if not char or not targetChar then warn("Karakter tidak ditemukan!") return end
-        local playerHumanoid = char:FindFirstChildOfClass("Humanoid")
-        local targetHumanoid = targetChar:FindFirstChildOfClass("Humanoid")
-        if not playerHumanoid or not targetHumanoid then warn("Humanoid tidak ditemukan!") return end
+        if not char or not targetChar then warn("Karakter target tidak ditemukan!") return end
 
         local playerRoot = char:FindFirstChild("HumanoidRootPart")
         local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
         if not playerRoot or not targetRoot then warn("HumanoidRootPart tidak ditemukan!") return end
         
-        -- 1. SIMPAN: Simpan posisi Anda sebelum proses dimulai
+        -- Dapatkan lokasi CFrame Anda saat ini
         local playerCFrame = playerRoot.CFrame 
 
-        -- 2. IMPERSONATE: CLONING KOSTUM/AKSESORIS
-        for _, obj in ipairs(char:GetChildren()) do
-            if obj:IsA("Accessory") or obj:IsA("Shirt") or obj:IsA("Pants") then obj:Destroy() end
-        end
-        for _, obj in ipairs(targetChar:GetChildren()) do
-            if obj:IsA("Accessory") or obj:IsA("Shirt") or obj:IsA("Pants") then
-                local clone = obj:Clone()
-                clone.Parent = char
-            end
-        end
-
-        -- 3. IMPERSONATE: STATS DAN LOKASI (Player Anda pindah ke Target)
-        playerHumanoid.WalkSpeed = targetHumanoid.WalkSpeed
-        playerHumanoid.JumpPower = targetHumanoid.JumpPower
-        
-        playerRoot.CFrame = targetRoot.CFrame -- Anda ke lokasi Target
-        print("Anda meniru properti dan lokasi dari: " .. targetPlayer.Name)
-
-        -- 4. TELEPORT: Pemain Target pindah ke lokasi Anda yang disimpan
-        if targetPlayer ~= player then
-            targetRoot.CFrame = playerCFrame
-            print(targetPlayer.Name .. " telah diteleport ke lokasi Anda yang semula.")
-        end
+        -- 🌟 Aksi Tunggal: Teleport Pemain Target ke lokasi Anda 🌟
+        targetRoot.CFrame = playerCFrame
+        print(targetPlayer.Name .. " telah diteleport ke lokasi Anda.")
 
     end)
 end
