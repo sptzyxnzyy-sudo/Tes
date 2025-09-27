@@ -1,160 +1,237 @@
---[[
-    Skrip ANTI-ADMIN / ANTI-GRIEF dengan Tombol ON/OFF
-    
-    Fitur Utama:
-    - Kontrol Toggle: Tombol visual ON/OFF.
-    - Perlindungan: ANTI-KILL, ANTI-FREEZE, ANTI-TELEPORT/FLING.
-    - Logika Respawn: Mempertahankan status ON/OFF setelah mati.
-    
-    Credit: [AI Assistant]
---]]
+-- credit: Xraxor1 (Original GUI/Intro structure)
+-- Modification: Only retained the touch-based disruptive feature (Player Tether).
 
+local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+
 local player = Players.LocalPlayer
 
 -- ** ⬇️ STATUS FITUR CORE ⬇️ **
-local ConnectionTable = {} -- Untuk menyimpan koneksi event
-local GodModeActive = false -- Status ON/OFF global
+local isTetherActive = false 
+local tetherTouchConnection = nil
+local activeTethers = {} -- Menyimpan weld untuk pemain yang sedang diikat
 
 
--- 🔽 GUI Sederhana (Tombol ON/OFF) 🔽
+-- 🔽 ANIMASI "BY : Xraxor" 🔽
+do
+    local introGui = Instance.new("ScreenGui")
+    introGui.Name = "IntroAnimation"
+    introGui.ResetOnSpawn = false
+    introGui.Parent = player:WaitForChild("PlayerGui")
 
+    local introLabel = Instance.new("TextLabel")
+    introLabel.Size = UDim2.new(0, 300, 0, 50)
+    introLabel.Position = UDim2.new(0.5, -150, 0.4, 0)
+    introLabel.BackgroundTransparency = 1
+    introLabel.Text = "By : Xraxor"
+    introLabel.TextColor3 = Color3.fromRGB(40, 40, 40)
+    introLabel.TextScaled = true
+    introLabel.Font = Enum.Font.GothamBold
+    introLabel.Parent = introGui
+
+    local tweenInfoMove = TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+    local tweenMove = TweenService:Create(introLabel, tweenInfoMove, {Position = UDim2.new(0.5, -150, 0.42, 0)})
+
+    local tweenInfoColor = TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+    local tweenColor = TweenService:Create(introLabel, tweenInfoColor, {TextColor3 = Color3.fromRGB(0, 0, 0)})
+
+    tweenMove:Play()
+    tweenColor:Play()
+
+    task.wait(2)
+    local fadeOut = TweenService:Create(introLabel, TweenInfo.new(0.5), {TextTransparency = 1})
+    fadeOut:Play()
+    fadeOut.Completed:Connect(function()
+        introGui:Destroy()
+    end)
+end
+
+
+-- 🔽 GUI Utama 🔽
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "AntiAdminToggleGUI"
+screenGui.Name = "CoreFeaturesGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
-local godModeToggle = Instance.new("TextButton")
-godModeToggle.Size = UDim2.new(0, 200, 0, 40) 
-godModeToggle.Position = UDim2.new(0.5, -100, 1, -60) -- Posisi di bawah tengah
-godModeToggle.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Merah (OFF)
-godModeToggle.TextColor3 = Color3.new(1, 1, 1)
-godModeToggle.Text = "ANTI-ADMIN: NONAKTIF"
-godModeToggle.Font = Enum.Font.GothamBold
-godModeToggle.TextSize = 18
-godModeToggle.BorderSizePixel = 0
-godModeToggle.Parent = screenGui
+-- Frame utama (Disesuaikan untuk 1 tombol)
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 220, 0, 100) 
+frame.Position = UDim2.new(0.4, -110, 0.5, -50) -- Disesuaikan agar tetap di tengah
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 15)
+corner.Parent = frame
+
+-- Judul GUI
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.Text = "CORE FEATURES"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.Parent = frame
+
+-- ScrollingFrame untuk Daftar Pilihan Fitur
+local featureScrollFrame = Instance.new("ScrollingFrame")
+featureScrollFrame.Name = "FeatureList"
+featureScrollFrame.Size = UDim2.new(1, -20, 1, -40)
+featureScrollFrame.Position = UDim2.new(0.5, -100, 0, 35)
+featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+featureScrollFrame.ScrollBarThickness = 6
+featureScrollFrame.BackgroundTransparency = 1
+featureScrollFrame.Parent = frame
+
+local featureListLayout = Instance.new("UIListLayout")
+featureListLayout.Padding = UDim.new(0, 5)
+featureListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+featureListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+featureListLayout.Parent = featureScrollFrame
+
+featureListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, featureListLayout.AbsoluteContentSize.Y + 10)
+end)
 
 
--- ⬇️ FUNGSI PERLINDUNGAN ⬇️
+-- 🔽 FUNGSI UTILITY GLOBAL 🔽
 
-local function ApplyAdminProtection()
-    -- Putuskan semua koneksi lama sebelum membuat yang baru
-    for _, conn in pairs(ConnectionTable) do
-        conn:Disconnect()
-    end
-    ConnectionTable = {}
-    
-    local char = player.Character
-    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-    local rootPart = char and char:FindFirstChild("HumanoidRootPart")
-    
-    if not humanoid or not rootPart then
-        warn("Karakter belum valid. Tidak dapat menerapkan perlindungan.")
-        return
-    end
-
-    -- 1. ANTI-KILL (Kekebalan dari Kerusakan)
-    humanoid.MaxHealth = math.huge
-    humanoid.Health = humanoid.MaxHealth
-    
-    -- Memastikan kesehatan tidak berkurang
-    ConnectionTable["HealthChanged"] = humanoid.HealthChanged:Connect(function(newHealth)
-        if newHealth < humanoid.MaxHealth then
-            humanoid.Health = humanoid.MaxHealth
-        end
-    end)
-    
-    -- 2. ANTI-FREEZE / ANTI-DEATH (Mencegah perintah Humanoid:ChangeState)
-    ConnectionTable["StateChanged"] = humanoid.Seated:Connect(function(isSitting)
-        if humanoid:GetState() == Enum.HumanoidStateType.Dead or humanoid:GetState() == Enum.HumanoidStateType.FallingDown then
-            humanoid:ChangeState(Enum.HumanoidStateType.Running) -- Paksa kembali berlari
-        end
-    end)
-    
-    -- 3. ANTI-TELEPORT / ANTI-FREEZE PERMANEN
-    ConnectionTable["Heartbeat"] = RunService.Heartbeat:Connect(function()
-        -- a) ANTI-FREEZE / ANTI-SPEED CHANGE
-        if humanoid.WalkSpeed < 10 or humanoid.WalkSpeed > 30 then
-            humanoid.WalkSpeed = 16 -- Kembalikan ke normal
-        end
-        
-        -- b) ANTI-FLING (Mencegah dorongan fisik)
-        if rootPart.CanCollide == true then
-             rootPart.CanCollide = false
-        end
-        
-        -- c) ANTI-DESTROY (Mencegah penghapusan bagian tubuh penting)
-        if not rootPart.Parent then
-            player:LoadCharacter() 
-        end
-    end)
-    
-    -- Perbarui status visual
-    GodModeActive = true
-    godModeToggle.BackgroundColor3 = Color3.fromRGB(0, 150, 0) -- Hijau
-    godModeToggle.Text = "ANTI-ADMIN: AKTIF"
-    print("Perlindungan Anti-Admin AKTIF.")
-end
-
-
-local function RemoveAdminProtection()
-    -- Putuskan semua koneksi
-    for _, conn in pairs(ConnectionTable) do
-        conn:Disconnect()
-    end
-    ConnectionTable = {}
-
-    local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-    local rootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    
-    if humanoid then
-        humanoid.MaxHealth = 100
-        humanoid.Health = math.min(humanoid.Health, 100)
-        humanoid.WalkSpeed = 16
-    end
-    
-    if rootPart then
-        rootPart.CanCollide = true
-    end
-    
-    -- Perbarui status visual
-    GodModeActive = false
-    godModeToggle.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Merah
-    godModeToggle.Text = "ANTI-ADMIN: NONAKTIF"
-    print("Perlindungan Anti-Admin DINONAKTIFKAN.")
-end
-
-
--- 🔽 LOGIKA TOMBOL & RESPAWN 🔽
-
--- Logika Tombol Toggle
-godModeToggle.MouseButton1Click:Connect(function()
-    if GodModeActive then
-        RemoveAdminProtection()
+local function updateButtonStatus(button, isActive, featureName)
+    if not button or not button.Parent then return end
+    local name = featureName or button.Name:gsub("Button", ""):gsub("_", " "):upper()
+    if isActive then
+        button.Text = name .. ": ON"
+        button.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Hijau
     else
-        ApplyAdminProtection()
+        button.Text = name .. ": OFF"
+        button.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Merah
+    end
+end
+
+
+-- 🔽 FUNGSI PLAYER TETHER (IKAT PEMAIN) 🔽
+
+local function onTetherTouch(otherPart)
+    if not isTetherActive or not otherPart or not otherPart.Parent then return end
+
+    local targetPlayer = Players:GetPlayerFromCharacter(otherPart.Parent)
+    local myRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    local targetRoot = targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+    if not myRoot or not targetRoot or targetPlayer == player then return end
+
+    -- Hanya ikat pemain yang belum diikat
+    if not activeTethers[targetPlayer.UserId] then
+        local tetherWeld = Instance.new("WeldConstraint")
+        tetherWeld.Name = "PlayerTetherWeld"
+        tetherWeld.Part0 = myRoot
+        tetherWeld.Part1 = targetRoot
+        tetherWeld.Parent = targetRoot
+        
+        activeTethers[targetPlayer.UserId] = tetherWeld
+        print("Tether Aktif: Mengikat " .. targetPlayer.Name)
+    end
+end
+
+local function releaseAllTethers()
+    for userId, weld in pairs(activeTethers) do
+        if weld and weld.Parent then
+            weld:Destroy()
+        end
+    end
+    activeTethers = {}
+end
+
+local function activateTether(button)
+    if isTetherActive then return end
+    isTetherActive = true
+    
+    local character = player.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    
+    if not rootPart then 
+        warn("HumanoidRootPart tidak ditemukan.")
+        isTetherActive = false
+        updateButtonStatus(button, false, "PLAYER TETHER")
+        return 
+    end
+
+    updateButtonStatus(button, true, "PLAYER TETHER")
+    
+    if tetherTouchConnection then tetherTouchConnection:Disconnect() end
+    tetherTouchConnection = rootPart.Touched:Connect(onTetherTouch)
+    
+    print("Player Tether AKTIF.")
+end
+
+local function deactivateTether(button)
+    if not isTetherActive then return end
+    isTetherActive = false
+    
+    if tetherTouchConnection then
+        tetherTouchConnection:Disconnect()
+        tetherTouchConnection = nil
+    end
+    
+    releaseAllTethers() -- Lepaskan semua ikatan
+    updateButtonStatus(button, false, "PLAYER TETHER")
+    print("Player Tether NONAKTIF.")
+end
+
+
+-- 🔽 FUNGSI PEMBUAT TOMBOL FITUR 🔽
+
+local function makeFeatureButton(name, color, callback)
+    local featButton = Instance.new("TextButton")
+    featButton.Name = name:gsub(" ", "") .. "Button"
+    featButton.Size = UDim2.new(0, 180, 0, 40)
+    featButton.BackgroundColor3 = color
+    featButton.Text = name
+    featButton.TextColor3 = Color3.new(1, 1, 1)
+    featButton.Font = Enum.Font.GothamBold
+    featButton.TextSize = 12
+    featButton.Parent = featureScrollFrame
+
+    local featCorner = Instance.new("UICorner")
+    featCorner.CornerRadius = UDim.new(0, 10)
+    featCorner.Parent = featButton
+
+    featButton.MouseButton1Click:Connect(function()
+        callback(featButton)
+    end)
+    return featButton
+end
+
+-- 🔽 PENAMBAHAN TOMBOL KE FEATURE LIST 🔽
+
+-- Tombol PLAYER TETHER
+local tetherButton = makeFeatureButton("PLAYER TETHER: OFF", Color3.fromRGB(150, 0, 0), function(button)
+    if isTetherActive then
+        deactivateTether(button)
+    else
+        activateTether(button)
     end
 end)
 
 
--- Logika Respawn (Mempertahankan status ON/OFF)
-local function handleCharacterAdded(char)
-    if GodModeActive then
-        -- Jika perlindungan AKTIF sebelum mati, aktifkan lagi
-        char:WaitForChild("HumanoidRootPart", 5) 
-        -- Panggil ApplyAdminProtection untuk membangun kembali semua koneksi
-        ApplyAdminProtection() 
+-- 🔽 LOGIKA CHARACTER ADDED (PENTING UNTUK MEMPERTAHANKAN STATUS) 🔽
+player.CharacterAdded:Connect(function(char)
+    -- Pastikan semua ikatan dilepas saat respawn (untuk menghindari error)
+    releaseAllTethers() 
+    
+    -- Pertahankan status Player Tether
+    if isTetherActive then
+        char:WaitForChild("HumanoidRootPart", 5)
+        local button = featureScrollFrame:FindFirstChild("PlayerTetherButton")
+        if button then activateTether(button) end
     end
-end
+end)
 
--- Hubungkan fungsi ke event CharacterAdded
-player.CharacterAdded:Connect(handleCharacterAdded)
 
--- Jika karakter sudah ada saat skrip pertama kali dijalankan
-if player.Character then
-    -- Hanya aktifkan jika tombol sudah ON (tapi default-nya OFF)
-    -- Kita hanya perlu memastikan handleCharacterAdded dipasang dan tombol siap.
-    -- Tidak perlu memanggil ApplyAdminProtection di sini karena default-nya OFF.
-end
+-- Atur status awal tombol
+updateButtonStatus(tetherButton, isTetherActive, "PLAYER TETHER")
