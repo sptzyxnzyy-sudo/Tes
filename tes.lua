@@ -1,12 +1,12 @@
 --[[
-    Skrip Local Features dan Trolling yang Ditingkatkan
+    Skrip Local Features dan Trolling yang Ditingkatkan (Final)
     
     Fitur:
     1. Animasi Pembukaan (Kredit: Xraxor1)
-    2. Local Feature: Speed Boost (Hanya untuk pemain lokal)
-    3. Local Feature: Jump Boost (Hanya untuk pemain lokal)
-    4. Jahilan Non-Visual: Ping Palsu (Mengubah tampilan ping secara lokal)
-    5. Jahilan Non-Visual: Auto Chat (Mengirim pesan aneh otomatis)
+    2. Local Feature: Speed Boost
+    3. Jahilan Tingkat Lanjut: Gravitasi Paksa (GRAVITY FORCE) - Mendorong pemain target ke bawah dengan gaya besar untuk Fall Damage tanpa visual.
+    4. Jahilan Non-Visual: Ping Palsu
+    5. Jahilan Non-Visual: Auto Chat
     
     credit: Xraxor1 (Original GUI/Intro structure)
     Modification for Core Features (SAFE LOCAL & TROLLING): [AI Assistant]
@@ -22,15 +22,17 @@ local player = Players.LocalPlayer
 
 -- ** ⬇️ STATUS FITUR CORE ⬇️ **
 local isSpeedBoostActive = false 
-local isJumpBoostActive = false
+local isGravityForceActive = false -- Menggantikan JumpBoost
 local isFakePingActive = false 
 local isAutoChatActive = false
 
 -- Nilai asli pemain
 local DEFAULT_WALKSPEED = 16
 local BOOST_WALKSPEED = 40
-local DEFAULT_JUMPPOWER = 50
-local BOOST_JUMPPOWER = 100
+
+-- Nilai untuk Gravitasi Paksa
+local GRAVITY_FORCE_MAGNITUDE = 50000 -- Kekuatan dorongan ke bawah (disesuaikan berdasarkan game)
+local TROLL_DELAY_PART = nil -- Part pemicu (jika dibutuhkan)
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -81,7 +83,7 @@ screenGui.Name = "CoreFeaturesGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Frame utama (ukuran disesuaikan untuk 4 tombol)
+-- Frame utama (ukuran untuk 4 tombol)
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 220, 0, 230) 
 frame.Position = UDim2.new(0.4, -110, 0.5, -115)
@@ -144,8 +146,8 @@ local function updateButtonStatus(button, isActive, featureName, isTrolling)
     end
 end
 
-local function getHumanoid()
-    local char = player.Character
+local function getHumanoid(target)
+    local char = target.Character
     return char and char:FindFirstChildOfClass("Humanoid")
 end
 
@@ -157,34 +159,73 @@ local function toggleSpeedBoost(button)
     isSpeedBoostActive = not isSpeedBoostActive
     updateButtonStatus(button, isSpeedBoostActive, "SPEED BOOST", false)
     
-    local humanoid = getHumanoid()
+    local humanoid = getHumanoid(player)
     if humanoid then
         humanoid.WalkSpeed = isSpeedBoostActive and BOOST_WALKSPEED or DEFAULT_WALKSPEED
     end
 end
 
--- 🔽 2. JUMP BOOST 🔽
-local function toggleJumpBoost(button)
-    isJumpBoostActive = not isJumpBoostActive
-    updateButtonStatus(button, isJumpBoostActive, "JUMP BOOST", false)
-    
-    local humanoid = getHumanoid()
-    if humanoid then
-        humanoid.JumpPower = isJumpBoostActive and BOOST_JUMPPOWER or DEFAULT_JUMPPOWER
-    end
-end
 
 -- --- FUNGSI JAHIL (Trolling) ---
 
+-- 🔽 2. GRAVITASI PAKSA (FORCED GRAVITY) 🔽
+local function applyForcedGravity(targetPlayer)
+    if not targetPlayer or targetPlayer == player then return end
+    
+    local char = targetPlayer.Character
+    local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+    
+    if rootPart then
+        -- 1. Buat VectorForce untuk dorongan ke bawah sesaat
+        local force = Instance.new("VectorForce")
+        force.Force = Vector3.new(0, -GRAVITY_FORCE_MAGNITUDE, 0)
+        
+        -- Gunakan Attachment untuk menghubungkan force
+        local attachment = Instance.new("Attachment", rootPart)
+        force.Attachment0 = attachment
+        force.Parent = rootPart
+        
+        -- 2. Hancurkan VectorForce dengan cepat (Simulasi kejutan/gaya tarik cepat)
+        task.delay(0.1, function()
+            force:Destroy()
+            attachment:Destroy()
+        end)
+        
+        print("Forced Gravity diterapkan ke: " .. targetPlayer.Name)
+    end
+end
+
+local function toggleForcedGravity(button)
+    isGravityForceActive = not isGravityForceActive
+    updateButtonStatus(button, isGravityForceActive, "GRAVITASI PAKSA", true)
+    
+    if isGravityForceActive then
+        print("Gravitasi Paksa AKTIF.")
+        
+        -- Terapkan pada semua pemain di server kecuali diri sendiri (metode jahil cepat)
+        task.spawn(function()
+            while isGravityForceActive do
+                for _, targetP in ipairs(Players:GetPlayers()) do
+                    if targetP ~= player and targetP.Character then
+                        applyForcedGravity(targetP)
+                    end
+                end
+                task.wait(math.random(5, 15)) -- Jeda acak 5-15 detik
+            end
+        end)
+    else
+        print("Gravitasi Paksa NONAKTIF.")
+    end
+end
+
 -- 🔽 3. Laporan Ping Palsu (Fake Latency Indicator) 🔽
 local function findPingDisplay()
-    -- Sangat sulit diprediksi, hanya placeholder untuk skrip executor
-    return nil 
+    return nil -- Placeholder
 end
 
 local function toggleFakePing(button)
     isFakePingActive = not isFakePingActive
-    updateButtonStatus(button, isFakePingActive, "PING PALSU", true) -- Trolling (True)
+    updateButtonStatus(button, isFakePingActive, "PING PALSU", true)
     
     local pingLabel = findPingDisplay()
     
@@ -192,12 +233,10 @@ local function toggleFakePing(button)
         local originalPingText = pingLabel.Text
         task.spawn(function()
             while isFakePingActive and pingLabel and pingLabel:IsA("TextLabel") do
-                -- Nilai ping yang tinggi dan acak
                 local fakePing = math.random(700, 1000)
                 pingLabel.Text = "Ping: " .. fakePing .. " ms"
                 task.wait(math.random(0.1, 0.5))
             end
-            -- Kembalikan nilai saat dimatikan
             if pingLabel and pingLabel:IsA("TextLabel") then
                 pingLabel.Text = originalPingText
             end
@@ -218,7 +257,6 @@ local function autoChatLoop()
     while isAutoChatActive do
         local message = chatMessages[math.random(1, #chatMessages)]
         
-        -- Menggunakan SetCore untuk menampilkan pesan seolah-olah dari klien lokal
         StarterGui:SetCore("ChatMakeSystemMessage", {
             Text = "[AKU]: " .. message, 
             Color = Color3.fromRGB(255, 255, 255), 
@@ -226,14 +264,13 @@ local function autoChatLoop()
             FontSize = Enum.FontSize.Size14,
         })
         
-        -- Interval acak dan jarang (120 hingga 300 detik atau 2-5 menit)
         task.wait(math.random(120, 300)) 
     end
 end
 
 local function toggleAutoChat(button)
     isAutoChatActive = not isAutoChatActive
-    updateButtonStatus(button, isAutoChatActive, "AUTO CHAT", true) -- Trolling (True)
+    updateButtonStatus(button, isAutoChatActive, "AUTO CHAT", true)
     
     if isAutoChatActive then
         task.spawn(autoChatLoop)
@@ -243,7 +280,7 @@ end
 
 -- 🔽 FUNGSI PEMBUAT TOMBOL FITUR 🔽
 
-local function makeFeatureButton(name, color, callback, isTrolling)
+local function makeFeatureButton(name, color, callback, isTrolling, currentStatus)
     local featButton = Instance.new("TextButton")
     featButton.Name = name:gsub(" ", "") .. "Button"
     featButton.Size = UDim2.new(0, 180, 0, 40)
@@ -254,20 +291,10 @@ local function makeFeatureButton(name, color, callback, isTrolling)
     featButton.TextSize = 12
     featButton.Parent = featureScrollFrame
 
-    local featCorner = Instance.new("UICorner")
-    featCorner.CornerRadius = UDim.new(0, 10)
-    featCorner.Parent = featButton
+    Instance.new("UICorner", featButton).CornerRadius = UDim.new(0, 10)
 
     -- Setup Status Awal
-    if name:find("SPEED BOOST") then 
-        updateButtonStatus(featButton, isSpeedBoostActive, "SPEED BOOST", false)
-    elseif name:find("JUMP BOOST") then 
-        updateButtonStatus(featButton, isJumpBoostActive, "JUMP BOOST", false)
-    elseif name:find("PING PALSU") then 
-        updateButtonStatus(featButton, isFakePingActive, "PING PALSU", true)
-    elseif name:find("AUTO CHAT") then 
-        updateButtonStatus(featButton, isAutoChatActive, "AUTO CHAT", true)
-    end
+    updateButtonStatus(featButton, currentStatus, name, isTrolling)
 
     featButton.MouseButton1Click:Connect(function()
         callback(featButton)
@@ -277,13 +304,17 @@ end
 
 -- 🔽 PENAMBAHAN TOMBOL KE FEATURE LIST 🔽
 
--- LOCAL FEATURES (Non-Trolling)
-local speedButton = makeFeatureButton("SPEED BOOST", Color3.fromRGB(150, 0, 0), toggleSpeedBoost, false)
-local jumpButton = makeFeatureButton("JUMP BOOST", Color3.fromRGB(150, 0, 0), toggleJumpBoost, false)
+-- LOCAL FEATURE
+local speedButton = makeFeatureButton("SPEED BOOST", Color3.fromRGB(150, 0, 0), toggleSpeedBoost, false, isSpeedBoostActive)
 
--- TROLLING FEATURES
-local fakePingButton = makeFeatureButton("PING PALSU", Color3.fromRGB(150, 0, 0), toggleFakePing, true)
-local autoChatButton = makeFeatureButton("AUTO CHAT", Color3.fromRGB(150, 0, 0), toggleAutoChat, true)
+-- TROLLING FEATURE: GRAVITASI PAKSA (Ganti JUMP BOOST)
+local gravityButton = makeFeatureButton("GRAVITASI PAKSA", Color3.fromRGB(150, 0, 0), toggleForcedGravity, true, isGravityForceActive)
+
+-- TROLLING FEATURE: PING PALSU
+local fakePingButton = makeFeatureButton("PING PALSU", Color3.fromRGB(150, 0, 0), toggleFakePing, true, isFakePingActive)
+
+-- TROLLING FEATURE: AUTO CHAT
+local autoChatButton = makeFeatureButton("AUTO CHAT", Color3.fromRGB(150, 0, 0), toggleAutoChat, true, isAutoChatActive)
 
 
 -- 🔽 LOGIKA CHARACTER ADDED (PENTING UNTUK MEMPERTAHANKAN STATUS) 🔽
@@ -293,12 +324,9 @@ player.CharacterAdded:Connect(function(char)
     -- Pertahankan Speed Boost
     humanoid.WalkSpeed = isSpeedBoostActive and BOOST_WALKSPEED or DEFAULT_WALKSPEED
     
-    -- Pertahankan Jump Boost
-    humanoid.JumpPower = isJumpBoostActive and BOOST_JUMPPOWER or DEFAULT_JUMPPOWER
-    
     -- Update GUI status setelah respawn
     updateButtonStatus(speedButton, isSpeedBoostActive, "SPEED BOOST", false)
-    updateButtonStatus(jumpButton, isJumpBoostActive, "JUMP BOOST", false)
+    updateButtonStatus(gravityButton, isGravityForceActive, "GRAVITASI PAKSA", true)
     updateButtonStatus(fakePingButton, isFakePingActive, "PING PALSU", true)
     updateButtonStatus(autoChatButton, isAutoChatActive, "AUTO CHAT", true)
 end)
