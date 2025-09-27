@@ -196,7 +196,7 @@ local function createPlayerButton(targetPlayer)
     playerButton.TextXAlignment = Enum.TextXAlignment.Left
     playerButton.Parent = playerListFrame
     
-    -- Efek hover
+    -- Efek hover (menjadi latar belakang abu-abu)
     playerButton.MouseEnter:Connect(function() playerButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50) end)
     playerButton.MouseLeave:Connect(function() playerButton.BackgroundTransparency = 1 end)
     
@@ -222,7 +222,7 @@ local function refreshPlayerList()
 
     -- Tambahkan entri baru
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= player then
+        if p ~= player then -- Jangan masukkan diri sendiri ke dalam list
             createPlayerButton(p)
         end
     end
