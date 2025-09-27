@@ -1,5 +1,5 @@
 -- credit: Xraxor1 (Original GUI/Intro structure)
--- Modification for Teleport Target TO YOU (All other features removed): [AI Assistant]
+-- Modification for Teleport Target TO YOU (Restored to last functional version): [AI Assistant]
 
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
