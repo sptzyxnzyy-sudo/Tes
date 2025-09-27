@@ -4,9 +4,9 @@
     Fitur:
     1. Animasi Pembukaan (Kredit: Xraxor1)
     2. Local Feature: Speed Boost
-    3. Jahilan Tingkat Lanjut: Gravitasi Paksa (GRAVITY FORCE) - Mendorong pemain target ke bawah dengan gaya besar untuk Fall Damage tanpa visual.
-    4. Jahilan Non-Visual: Ping Palsu
-    5. Jahilan Non-Visual: Auto Chat
+    3. Jahilan: Gravitasi Paksa (FORCED GRAVITY) - Mendorong pemain target ke bawah untuk Fall Damage tanpa visual.
+    4. Jahilan: Pembekuan Target (TARGET FREEZE) - Membekukan kontrol pemain target sesaat.
+    5. Jahilan: Auto Chat
     
     credit: Xraxor1 (Original GUI/Intro structure)
     Modification for Core Features (SAFE LOCAL & TROLLING): [AI Assistant]
@@ -16,23 +16,21 @@ local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local StarterGui = game:GetService("StarterGui") -- Untuk Jahilan Chat
+local StarterGui = game:GetService("StarterGui") 
+local UserInputService = game:GetService("UserInputService") -- Untuk Freeze
 
 local player = Players.LocalPlayer
 
 -- ** ⬇️ STATUS FITUR CORE ⬇️ **
 local isSpeedBoostActive = false 
-local isGravityForceActive = false -- Menggantikan JumpBoost
-local isFakePingActive = false 
+local isGravityForceActive = false
+local isTargetFreezeActive = false 
 local isAutoChatActive = false
 
--- Nilai asli pemain
+-- Nilai Konstan
 local DEFAULT_WALKSPEED = 16
 local BOOST_WALKSPEED = 40
-
--- Nilai untuk Gravitasi Paksa
-local GRAVITY_FORCE_MAGNITUDE = 50000 -- Kekuatan dorongan ke bawah (disesuaikan berdasarkan game)
-local TROLL_DELAY_PART = nil -- Part pemicu (jika dibutuhkan)
+local GRAVITY_FORCE_MAGNITUDE = 50000 
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -176,16 +174,13 @@ local function applyForcedGravity(targetPlayer)
     local rootPart = char and char:FindFirstChild("HumanoidRootPart")
     
     if rootPart then
-        -- 1. Buat VectorForce untuk dorongan ke bawah sesaat
         local force = Instance.new("VectorForce")
         force.Force = Vector3.new(0, -GRAVITY_FORCE_MAGNITUDE, 0)
         
-        -- Gunakan Attachment untuk menghubungkan force
         local attachment = Instance.new("Attachment", rootPart)
         force.Attachment0 = attachment
         force.Parent = rootPart
         
-        -- 2. Hancurkan VectorForce dengan cepat (Simulasi kejutan/gaya tarik cepat)
         task.delay(0.1, function()
             force:Destroy()
             attachment:Destroy()
@@ -200,9 +195,8 @@ local function toggleForcedGravity(button)
     updateButtonStatus(button, isGravityForceActive, "GRAVITASI PAKSA", true)
     
     if isGravityForceActive then
-        print("Gravitasi Paksa AKTIF.")
+        print("Gravitasi Paksa AKTIF. Menerapkan ke semua pemain.")
         
-        -- Terapkan pada semua pemain di server kecuali diri sendiri (metode jahil cepat)
         task.spawn(function()
             while isGravityForceActive do
                 for _, targetP in ipairs(Players:GetPlayers()) do
@@ -210,7 +204,7 @@ local function toggleForcedGravity(button)
                         applyForcedGravity(targetP)
                     end
                 end
-                task.wait(math.random(5, 15)) -- Jeda acak 5-15 detik
+                task.wait(math.random(5, 15)) 
             end
         end)
     else
@@ -218,31 +212,55 @@ local function toggleForcedGravity(button)
     end
 end
 
--- 🔽 3. Laporan Ping Palsu (Fake Latency Indicator) 🔽
-local function findPingDisplay()
-    return nil -- Placeholder
-end
 
-local function toggleFakePing(button)
-    isFakePingActive = not isFakePingActive
-    updateButtonStatus(button, isFakePingActive, "PING PALSU", true)
-    
-    local pingLabel = findPingDisplay()
-    
-    if isFakePingActive and pingLabel and pingLabel:IsA("TextLabel") then
-        local originalPingText = pingLabel.Text
-        task.spawn(function()
-            while isFakePingActive and pingLabel and pingLabel:IsA("TextLabel") do
-                local fakePing = math.random(700, 1000)
-                pingLabel.Text = "Ping: " .. fakePing .. " ms"
-                task.wait(math.random(0.1, 0.5))
-            end
-            if pingLabel and pingLabel:IsA("TextLabel") then
-                pingLabel.Text = originalPingText
-            end
-        end)
+-- 🔽 3. PEMBEKUAN TARGET (TARGET FREEZE) 🔽
+local function freezeTarget(targetPlayer)
+    if not targetPlayer or targetPlayer == player then return end
+
+    -- Trik: Secara lokal mematikan pemrosesan input untuk pemain target
+    local targetHumanoid = getHumanoid(targetPlayer)
+    if targetHumanoid then
+        -- Simpan kecepatan asli
+        local originalWalkSpeed = targetHumanoid.WalkSpeed 
+
+        -- Set kecepatan ke 0 (membekukan pergerakan)
+        targetHumanoid.WalkSpeed = 0 
+        
+        -- Bekukan selama 3 detik
+        task.wait(3) 
+
+        -- Kembalikan kecepatan
+        targetHumanoid.WalkSpeed = originalWalkSpeed
+        
+        print("Target Freeze (Local) pada: " .. targetPlayer.Name .. " selesai.")
     end
 end
+
+local function toggleTargetFreeze(button)
+    isTargetFreezeActive = not isTargetFreezeActive
+    updateButtonStatus(button, isTargetFreezeActive, "TARGET FREEZE", true)
+
+    if isTargetFreezeActive then
+        print("Target Freeze AKTIF. Membekukan pemain acak sesaat.")
+        task.spawn(function()
+            while isTargetFreezeActive do
+                local playerList = Players:GetPlayers()
+                -- Pilih pemain acak (selain diri sendiri)
+                local targetIndex = math.random(1, #playerList)
+                local targetP = playerList[targetIndex]
+                
+                if targetP ~= player and targetP.Character then
+                    freezeTarget(targetP)
+                end
+
+                task.wait(math.random(10, 25)) -- Jeda 10-25 detik
+            end
+        end)
+    else
+        print("Target Freeze NONAKTIF.")
+    end
+end
+
 
 -- 🔽 4. Pesan Otomatis yang Menggiring (Subtle Auto Chat) 🔽
 local chatMessages = {
@@ -292,8 +310,6 @@ local function makeFeatureButton(name, color, callback, isTrolling, currentStatu
     featButton.Parent = featureScrollFrame
 
     Instance.new("UICorner", featButton).CornerRadius = UDim.new(0, 10)
-
-    -- Setup Status Awal
     updateButtonStatus(featButton, currentStatus, name, isTrolling)
 
     featButton.MouseButton1Click:Connect(function()
@@ -307,11 +323,11 @@ end
 -- LOCAL FEATURE
 local speedButton = makeFeatureButton("SPEED BOOST", Color3.fromRGB(150, 0, 0), toggleSpeedBoost, false, isSpeedBoostActive)
 
--- TROLLING FEATURE: GRAVITASI PAKSA (Ganti JUMP BOOST)
+-- TROLLING FEATURE: GRAVITASI PAKSA
 local gravityButton = makeFeatureButton("GRAVITASI PAKSA", Color3.fromRGB(150, 0, 0), toggleForcedGravity, true, isGravityForceActive)
 
--- TROLLING FEATURE: PING PALSU
-local fakePingButton = makeFeatureButton("PING PALSU", Color3.fromRGB(150, 0, 0), toggleFakePing, true, isFakePingActive)
+-- TROLLING FEATURE: TARGET FREEZE (Ganti PING PALSU)
+local freezeButton = makeFeatureButton("TARGET FREEZE", Color3.fromRGB(150, 0, 0), toggleTargetFreeze, true, isTargetFreezeActive)
 
 -- TROLLING FEATURE: AUTO CHAT
 local autoChatButton = makeFeatureButton("AUTO CHAT", Color3.fromRGB(150, 0, 0), toggleAutoChat, true, isAutoChatActive)
@@ -327,6 +343,6 @@ player.CharacterAdded:Connect(function(char)
     -- Update GUI status setelah respawn
     updateButtonStatus(speedButton, isSpeedBoostActive, "SPEED BOOST", false)
     updateButtonStatus(gravityButton, isGravityForceActive, "GRAVITASI PAKSA", true)
-    updateButtonStatus(fakePingButton, isFakePingActive, "PING PALSU", true)
+    updateButtonStatus(freezeButton, isTargetFreezeActive, "TARGET FREEZE", true)
     updateButtonStatus(autoChatButton, isAutoChatActive, "AUTO CHAT", true)
 end)
