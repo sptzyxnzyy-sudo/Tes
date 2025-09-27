@@ -1,4 +1,4 @@
--- credit: Xraxor1 (Original GUI/Intro structure)
+-- Fungsi fitur -- credit: Xraxor1 (Original GUI/Intro structure)
 -- Modification: ONLY Repulse Touch (Knockback) Feature [AI Assistant]
 
 local TweenService = game:GetService("TweenService")
@@ -49,7 +49,7 @@ do
     end)
 end
 
--- 🔽 Status AutoFarm (Dipertahankan) 🔽
+-- 🔽 Status AutoFarm (Dipertahankan, walau tidak digunakan) 🔽
 local statusValue = ReplicatedStorage:FindFirstChild("AutoFarmStatus")
 if not statusValue then
     statusValue = Instance.new("BoolValue")
@@ -222,7 +222,11 @@ player.CharacterAdded:Connect(function(char)
     -- Pertahankan status Repulse Touch saat respawn
     if isRepulseActive then
         local button = featureScrollFrame:FindFirstChild("RepulseTouchButton")
-        if button then enableRepulseTouch(button) end
+        -- Memastikan tombol ada sebelum mencoba mengaktifkan
+        if button then 
+            -- Panggil enableRepulseTouch secara eksplisit untuk membuat koneksi baru
+            enableRepulseTouch(button) 
+        end
     end
 end)
 
