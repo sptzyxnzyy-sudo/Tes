@@ -1,5 +1,5 @@
 -- credit: Xraxor1 (Original GUI/Intro structure)
--- Modification: Repulse Touch (Knockback) added [AI Assistant]
+-- Modification: ONLY Repulse Touch (Knockback) Feature [AI Assistant]
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
@@ -8,18 +8,12 @@ local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 
--- ** ⬇️ STATUS FITUR CORE ⬇️ **
-local isDestroyerActive = false 
-local destroyerTouchConnection = nil 
-local isPhantomTouchActive = false
-local touchConnection = nil
-local partsTouched = {} 
--- ⬇️ Repulse Touch Variables Added ⬇️
-local isRepulseActive = false 
+-- ** ⬇️ STATUS FITUR CORE (Hanya Repulse) ⬇️ **
+local isRepulseActive = false -- Status awal: OFF
 local repulseTouchConnection = nil 
 local lastRepulse = 0
-local KNOCKBACK_POWER = 1500 
-local DEBOUNCE_TIME = 0.5 
+local KNOCKBACK_POWER = 1500 -- Kekuatan dorongan.
+local DEBOUNCE_TIME = 0.5 -- Debounce agar tidak mendorong terus menerus
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -70,10 +64,10 @@ screenGui.Name = "CoreFeaturesGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Frame utama (ukuran DISESUAIKAN untuk 3 tombol: 140 -> 185)
+-- Frame utama (ukuran disesuaikan untuk 1 fitur)
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 185) 
-frame.Position = UDim2.new(0.4, -110, 0.5, -92) -- Posisi disesuaikan agar tetap di tengah
+frame.Size = UDim2.new(0, 220, 0, 100) 
+frame.Position = UDim2.new(0.4, -110, 0.5, -50)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -88,7 +82,7 @@ corner.Parent = frame
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
-title.Text = "CORE FEATURES"
+title.Text = "CORE FEATURE"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
@@ -130,8 +124,8 @@ local function updateButtonStatus(button, isActive, featureName)
     end
 end
 
----
-## 🛠️ FUNGSI REPULSE TOUCH (KNOCKBACK) BARU
+
+-- 🔽 FUNGSI REPULSE TOUCH (KNOCKBACK) 🔽
 
 local function repulseTouch(otherPart)
     if not isRepulseActive or (tick() - lastRepulse < DEBOUNCE_TIME) then return end
@@ -187,120 +181,6 @@ local function disableRepulseTouch(button)
     print("Repulse Touch NONAKTIF.")
 end
 
----
-## 🛠️ FUNGSI DESTROYER ASLI
-
--- 🔽 1. FUNGSI AGGRESSIVE GLOBAL DESTROYER 🔽
-
-local function destroyerTouch(otherPart)
-    if not isDestroyerActive or not otherPart or not otherPart.Parent then return end
-    
-    local parentModel = otherPart.Parent
-    local hitHumanoid = parentModel:FindFirstChildOfClass("Humanoid")
-    
-    if parentModel == player.Character then return end
-    
-    if otherPart:IsA("BasePart") or otherPart:IsA("MeshPart") or otherPart:IsA("UnionOperation") then
-        
-        -- MENGHANCURKAN: Berharap Server menerima ini dan mereplikasi ke pemain lain.
-        pcall(function() otherPart:Destroy() end)
-        
-        if hitHumanoid and parentModel:FindFirstChild("HumanoidRootPart") then
-             -- MEMBUNUH: Berharap Server menerima perubahan Health dan mereplikasi ke pemain lain.
-            hitHumanoid.Health = 0 
-        end
-    end
-end
-
-local function activatePartDestroyer(button)
-    if isDestroyerActive then return end
-    isDestroyerActive = true
-    
-    local character = player.Character or player.CharacterAdded:Wait() -- Perbaikan agar mendapatkan karakter terbaru
-    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-    
-    if not rootPart then 
-        warn("HumanoidRootPart tidak ditemukan.")
-        isDestroyerActive = false
-        updateButtonStatus(button, false, "DESTROYER")
-        return 
-    end
-
-    updateButtonStatus(button, true, "DESTROYER")
-    
-    if destroyerTouchConnection then destroyerTouchConnection:Disconnect() end
-    destroyerTouchConnection = rootPart.Touched:Connect(destroyerTouch)
-    
-    print("Aggressive Destroyer AKTIF (Berharap perubahan terkirim ke Server).")
-end
-
-local function deactivatePartDestroyer(button)
-    if not isDestroyerActive then return end
-    isDestroyerActive = false
-    updateButtonStatus(button, false, "DESTROYER")
-    
-    if destroyerTouchConnection then
-        destroyerTouchConnection:Disconnect()
-        destroyerTouchConnection = nil
-    end
-    print("Aggressive Destroyer NONAKTIF.")
-end
-
-
--- 🔽 2. FUNGSI PHANTOM TOUCH (GLOBAL) ASLI 🔽
-
-local function onPartTouched(otherPart)
-    if not isPhantomTouchActive or not otherPart or not otherPart:IsA("BasePart") then return end
-    if otherPart:IsDescendantOf(player.Character) or otherPart.Parent:IsA("Accessory") or partsTouched[otherPart] then return end
-
-    -- MENGUBAH PROPERTI: Berharap Server menerima ini dan mereplikasi ke pemain lain.
-    otherPart.Transparency = 1
-    otherPart.CanCollide = false
-    
-    partsTouched[otherPart] = true
-    print("Phantom Touched: " .. otherPart.Name .. " menghilang (Berharap perubahan terkirim ke Server).")
-end
-
-local function updatePhantomButton(button)
-    if not button or not button.Parent then return end
-    updateButtonStatus(button, isPhantomTouchActive, "PHANTOM TOUCH")
-end
-
-local function enablePhantomTouch(button)
-    if isPhantomTouchActive then return end -- Perbaikan: Tambahkan cek agar tidak mengulang
-    isPhantomTouchActive = true
-    updatePhantomButton(button)
-    
-    local char = player.Character or player.CharacterAdded:Wait()
-    local root = char:WaitForChild("HumanoidRootPart")
-    
-    if touchConnection then touchConnection:Disconnect() end
-    touchConnection = root.Touched:Connect(onPartTouched)
-    
-    print("Phantom Touch Dinyalakan (Berharap perubahan terkirim ke Server).")
-end
-
-local function disablePhantomTouch(button)
-    if not isPhantomTouchActive then return end
-    isPhantomTouchActive = false
-    updatePhantomButton(button)
-    
-    if touchConnection then
-        touchConnection:Disconnect()
-        touchConnection = nil
-    end
-    
-    -- Mengembalikan properti ke nilai normal
-    for part, _ in pairs(partsTouched) do
-        if part and part.Parent then 
-             -- MENGEMBALIKAN PROPERTI: Berharap Server menerima ini dan mereplikasi ke pemain lain.
-             part.Transparency = 0 
-             part.CanCollide = true
-        end
-    end
-    partsTouched = {}
-    print("Phantom Touch Dimatikan.")
-end
 
 -- 🔽 FUNGSI PEMBUAT TOMBOL FITUR 🔽
 
@@ -327,25 +207,7 @@ end
 
 -- 🔽 PENAMBAHAN TOMBOL KE FEATURE LIST 🔽
 
--- 1. Tombol DESTROYER
-local destroyerButton = makeFeatureButton("DESTROYER: OFF", Color3.fromRGB(150, 0, 0), function(button)
-    if isDestroyerActive then
-        deactivatePartDestroyer(button)
-    else
-        activatePartDestroyer(button)
-    end
-end)
-
--- 2. Tombol PHANTOM TOUCH
-local phantomButton = makeFeatureButton("PHANTOM TOUCH: OFF", Color3.fromRGB(150, 0, 0), function(button)
-    if isPhantomTouchActive then
-        disablePhantomTouch(button)
-    else
-        enablePhantomTouch(button)
-    end
-end)
-
--- 3. Tombol REPULSE TOUCH (BARU)
+-- 1. Tombol REPULSE TOUCH (Knockback)
 local repulseButton = makeFeatureButton("REPULSE TOUCH: OFF", Color3.fromRGB(150, 0, 0), function(button)
     if isRepulseActive then
         disableRepulseTouch(button)
@@ -357,29 +219,13 @@ end)
 
 -- 🔽 LOGIKA CHARACTER ADDED (PENTING UNTUK MEMPERTAHANKAN STATUS) 🔽
 player.CharacterAdded:Connect(function(char)
-    local button
-    
-    -- Pertahankan status Destroyer
-    if isDestroyerActive then
-        button = featureScrollFrame:FindFirstChild("DestroyerButton")
-        if button then activatePartDestroyer(button) end
-    end
-    
-    -- Pertahankan status Phantom Touch
-    if isPhantomTouchActive then
-        button = featureScrollFrame:FindFirstChild("PhantomTouchButton")
-        if button then enablePhantomTouch(button) end
-    end
-    
-    -- Pertahankan status Repulse Touch (BARU)
+    -- Pertahankan status Repulse Touch saat respawn
     if isRepulseActive then
-        button = featureScrollFrame:FindFirstChild("RepulseTouchButton")
+        local button = featureScrollFrame:FindFirstChild("RepulseTouchButton")
         if button then enableRepulseTouch(button) end
     end
 end)
 
 
 -- Atur status awal tombol
-updateButtonStatus(destroyerButton, isDestroyerActive, "DESTROYER")
-updatePhantomButton(phantomButton)
 updateButtonStatus(repulseButton, isRepulseActive, "REPULSE TOUCH")
