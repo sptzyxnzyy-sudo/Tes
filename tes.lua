@@ -2,7 +2,7 @@ local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local Debris = game:GetService("Debris") -- Tambahkan Service Debris untuk pembersihan
+local Debris = game:GetService("Debris")
 
 local player = Players.LocalPlayer
 
@@ -10,14 +10,15 @@ local player = Players.LocalPlayer
 local isRepulseActive = false 
 local repulseTouchConnection = nil 
 local lastRepulse = 0
-local KNOCKBACK_POWER = 10000 -- Kekuatan dorongan maksimal
-local DEBOUNCE_TIME = 0 -- Tanpa jeda waktu
+local KNOCKBACK_POWER = 10000 
+local DEBOUNCE_TIME = 0 
 
-local isOwnerTitleActive = false -- Status fitur Owner Title baru
+local isOwnerTitleActive = false 
 
-local selectedTarget = nil -- 🔽 Variabel baru untuk Pemain Target yang Dipilih 🔽
-local isCagingActive = false -- 🔽 VARIABEL BARU UNTUK CAGE PLAYER 🔽
-local currentCageParts = {} -- 🔽 Tabel untuk menyimpan bagian-bagian sangkar 🔽
+local selectedTarget = nil 
+local isCagingActive = false 
+local currentCageParts = {} 
+local cageUpdateConnection = nil 
 
 -- 🔽 ANIMASI "BY : Xraxor" (Kode lama, dipertahankan) 🔽
 do
@@ -70,8 +71,8 @@ screenGui.Parent = player:WaitForChild("PlayerGui")
 
 -- Frame utama (ukuran disesuaikan agar cukup untuk fitur tambahan)
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 365) -- UKURAN DIPERBESAR
-frame.Position = UDim2.new(0.4, -110, 0.5, -182) -- POSISI DISESUAIKAN
+frame.Size = UDim2.new(0, 220, 0, 410) 
+frame.Position = UDim2.new(0.4, -110, 0.5, -205) 
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -95,7 +96,7 @@ title.Parent = frame
 -- ScrollingFrame untuk Daftar Pilihan Fitur
 local featureScrollFrame = Instance.new("ScrollingFrame")
 featureScrollFrame.Name = "FeatureList"
-featureScrollFrame.Size = UDim2.new(1, -20, 0, 145) -- RUANG UNTUK FITUR TAMBAHAN
+featureScrollFrame.Size = UDim2.new(1, -20, 0, 190) 
 featureScrollFrame.Position = UDim2.new(0.5, -100, 0, 35)
 featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 featureScrollFrame.ScrollBarThickness = 6
@@ -115,9 +116,9 @@ end)
 -- 🔽 Bagian Pemilihan Target Pemain 🔽
 local targetTitle = Instance.new("TextLabel")
 targetTitle.Size = UDim2.new(1, 0, 0, 25)
-targetTitle.Position = UDim2.new(0, 0, 0, 185) -- POSISI DISESUAIKAN
+targetTitle.Position = UDim2.new(0, 0, 0, 230) 
 targetTitle.BackgroundTransparency = 1
-targetTitle.Text = "TARGET: NONE" -- Akan diupdate
+targetTitle.Text = "TARGET: NONE" 
 targetTitle.TextColor3 = Color3.fromRGB(255, 255, 0)
 targetTitle.Font = Enum.Font.GothamBold
 targetTitle.TextSize = 14
@@ -126,7 +127,7 @@ targetTitle.Parent = frame
 local playerScrollFrame = Instance.new("ScrollingFrame")
 playerScrollFrame.Name = "PlayerList"
 playerScrollFrame.Size = UDim2.new(1, -20, 0, 150)
-playerScrollFrame.Position = UDim2.new(0.5, -100, 0, 215) -- POSISI DISESUAIKAN
+playerScrollFrame.Position = UDim2.new(0.5, -100, 0, 260) 
 playerScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 playerScrollFrame.ScrollBarThickness = 6
 playerScrollFrame.BackgroundTransparency = 1
@@ -167,8 +168,8 @@ local function updateTargetTitle()
     end
 end
 
--- 🔽 FUNGSI REPULSE TOUCH (KNOCKBACK) - Diubah untuk Target 🔽
--- ... (Fungsi repulseTouch, enableRepulseTouch, disableRepulseTouch tidak diubah dari kode Anda)
+-- 🔽 FUNGSI REPULSE TOUCH (KNOCKBACK) 🔽
+
 local function repulseTouch(otherPart)
     if not isRepulseActive or (tick() - lastRepulse < DEBOUNCE_TIME) then return end
     
@@ -177,12 +178,10 @@ local function repulseTouch(otherPart)
     
     local otherPlayer = Players:GetPlayerFromCharacter(otherCharacter)
     
-    -- ** 💡 LOGIKA BARU: Hanya Dorong Pemain Target atau Semua Pemain jika Belum Ada Target 💡 **
     if otherPlayer == player then return end
     
     local isTarget = (selectedTarget and otherPlayer == selectedTarget)
     
-    -- Jika Target telah dipilih, hanya dorong Target. Jika tidak ada target, dorong siapa pun.
     if selectedTarget and not isTarget then return end
     
     local otherRoot = otherCharacter:FindFirstChild("HumanoidRootPart")
@@ -199,7 +198,6 @@ local function repulseTouch(otherPart)
     end)
     
     lastRepulse = tick()
-    print("Player Repulsed: " .. otherPlayer.Name)
 end
 
 local function enableRepulseTouch(button)
@@ -213,8 +211,6 @@ local function enableRepulseTouch(button)
     
     if repulseTouchConnection then repulseTouchConnection:Disconnect() end
     repulseTouchConnection = rootPart.Touched:Connect(repulseTouch)
-    
-    print("Repulse Touch AKTIF.")
 end
 
 local function disableRepulseTouch(button)
@@ -226,15 +222,11 @@ local function disableRepulseTouch(button)
         repulseTouchConnection:Disconnect()
         repulseTouchConnection = nil
     end
-    print("Repulse Touch NONAKTIF.")
 end
 
--- 🔽 FUNGSI OWNER TITLE (Dipertahankan) 🔽
--- ... (Fungsi createOwnerTitle, destroyOwnerTitle, toggleOwnerTitle tidak diubah dari kode Anda)
-local function createOwnerTitle()
-    local nameDisplay = player.Character:FindFirstChild("Head"):FindFirstChild("NameDisplay")
-    if not nameDisplay then return end
+-- 🔽 FUNGSI OWNER TITLE 🔽
 
+local function createOwnerTitle()
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "OwnerTitleGUI"
     billboard.Size = UDim2.new(0, 150, 0, 50)
@@ -272,30 +264,44 @@ local function toggleOwnerTitle(button)
     updateButtonStatus(button, isOwnerTitleActive, "OWNER TITLE")
     
     if isOwnerTitleActive then
-        createOwnerTitle()
-        print("Owner Title AKTIF.")
+        if player.Character then
+            createOwnerTitle()
+        end
     else
         destroyOwnerTitle()
-        print("Owner Title NONAKTIF.")
     end
 end
 
 
--- 🔽 FUNGSI CAGE PLAYER BARU 🔽
+-- 🔽 FUNGSI CAGE PLAYER 🔽
 
-local function makeCagePart(cframe, size, transparency, color)
+local function makeCagePart(cframe, size, transparency, color, name)
     local part = Instance.new("Part")
     part.CFrame = cframe
     part.Size = size
     part.Transparency = transparency
     part.Color = color or Color3.fromRGB(0, 150, 255)
-    part.Material = Enum.Material.ForceField -- Biar kelihatan keren dan tembus pandang
+    part.Material = Enum.Material.ForceField
     part.Anchored = true
     part.CanCollide = true
-    part.Name = "CageWall"
-    part.Parent = workspace.TemporaryCages or Instance.new("Folder", workspace) -- Simpan di folder sementara
+    part.Name = name or "CageWall"
+    part.Parent = workspace.TemporaryCages or Instance.new("Folder", workspace)
     part.Parent.Name = "TemporaryCages"
     return part
+end
+
+local function destroyCage()
+    if cageUpdateConnection then
+        cageUpdateConnection:Disconnect()
+        cageUpdateConnection = nil
+    end
+    
+    for _, part in ipairs(currentCageParts) do
+        if part:IsA("Part") then
+            Debris:AddItem(part, 0.1) 
+        end
+    end
+    currentCageParts = {}
 end
 
 local function createCageForTarget()
@@ -311,108 +317,49 @@ local function createCageForTarget()
         warn("Target tidak memiliki HumanoidRootPart.")
         return false
     end
-
-    local cageSize = 8 -- Ukuran sisi sangkar (misalnya, 8x8x8)
-    local wallThickness = 0.5
-    local wallHeight = 10 -- Tinggi dinding
-
-    local centerPosition = targetRoot.CFrame.p + Vector3.new(0, wallHeight/2 - targetRoot.Size.Y/2, 0) -- Posisikan di sekitar karakter
-
-    currentCageParts = {}
-
-    -- 1. Dinding Depan
-    local frontWall = makeCagePart(
-        CFrame.new(centerPosition) * CFrame.new(0, 0, -cageSize/2 + wallThickness/2), 
-        Vector3.new(cageSize, wallHeight, wallThickness), 
-        0.5
-    )
-    table.insert(currentCageParts, frontWall)
-
-    -- 2. Dinding Belakang
-    local backWall = makeCagePart(
-        CFrame.new(centerPosition) * CFrame.new(0, 0, cageSize/2 - wallThickness/2), 
-        Vector3.new(cageSize, wallHeight, wallThickness), 
-        0.5
-    )
-    table.insert(currentCageParts, backWall)
-
-    -- 3. Dinding Kanan
-    local rightWall = makeCagePart(
-        CFrame.new(centerPosition) * CFrame.new(cageSize/2 - wallThickness/2, 0, 0), 
-        Vector3.new(wallThickness, wallHeight, cageSize), 
-        0.5
-    )
-    table.insert(currentCageParts, rightWall)
-
-    -- 4. Dinding Kiri
-    local leftWall = makeCagePart(
-        CFrame.new(centerPosition) * CFrame.new(-cageSize/2 + wallThickness/2, 0, 0), 
-        Vector3.new(wallThickness, wallHeight, cageSize), 
-        0.5
-    )
-    table.insert(currentCageParts, leftWall)
-
-    -- 5. Atap (opsional, tapi bagus untuk mencegah keluar lewat atas)
-    local roof = makeCagePart(
-        CFrame.new(centerPosition) * CFrame.new(0, wallHeight/2 - wallThickness/2, 0), 
-        Vector3.new(cageSize, wallThickness, cageSize), 
-        0.7
-    )
-    table.insert(currentCageParts, roof)
     
-    -- 6. Lantai (opsional, agar tidak ada yang bisa "clip" ke bawah tanah)
-    local floor = makeCagePart(
-        CFrame.new(centerPosition) * CFrame.new(0, -wallHeight/2 + wallThickness/2, 0), 
-        Vector3.new(cageSize, wallThickness, cageSize), 
-        0.7
-    )
-    table.insert(currentCageParts, floor)
+    destroyCage() -- Hancurkan sangkar lama
 
-    -- Tambahkan Loop untuk menjaga agar sangkar tetap di posisi target
-    local loopConnection = RunService.Heartbeat:Connect(function()
-        if selectedTarget and selectedTarget.Character and selectedTarget.Character:FindFirstChild("HumanoidRootPart") then
-            local newCenter = selectedTarget.Character.HumanoidRootPart.CFrame.p + Vector3.new(0, wallHeight/2 - selectedTarget.Character.HumanoidRootPart.Size.Y/2, 0)
-            -- Kita tidak perlu mengatur setiap bagian, cukup pindahkan target ke tengah, tapi ini berbahaya.
-            -- Lebih aman untuk mengunci sangkar pada posisi target setiap frame.
-            
-            -- Pindahkan sangkar agar target selalu di tengah (posisi target tidak berubah)
-            local targetPos = selectedTarget.Character.HumanoidRootPart.Position
-            
-            frontWall.CFrame = CFrame.new(targetPos + Vector3.new(0, wallHeight/2, -cageSize/2 + wallThickness/2))
-            backWall.CFrame = CFrame.new(targetPos + Vector3.new(0, wallHeight/2, cageSize/2 - wallThickness/2))
-            rightWall.CFrame = CFrame.new(targetPos + Vector3.new(cageSize/2 - wallThickness/2, wallHeight/2, 0)) * CFrame.Angles(0, math.rad(90), 0) -- Rotasi untuk dinding samping
-            leftWall.CFrame = CFrame.new(targetPos + Vector3.new(-cageSize/2 + wallThickness/2, wallHeight/2, 0)) * CFrame.Angles(0, math.rad(90), 0) -- Rotasi untuk dinding samping
-            roof.CFrame = CFrame.new(targetPos + Vector3.new(0, wallHeight, 0)) -- Atap
-            floor.CFrame = CFrame.new(targetPos) -- Lantai di level kaki
+    local cageSize = 8 
+    local wallThickness = 0.5
+    local wallHeight = 10 
+    
+    local partsData = {
+        {name = "Front", size = Vector3.new(cageSize, wallHeight, wallThickness), offset = Vector3.new(0, 0, -cageSize/2 + wallThickness/2)},
+        {name = "Back", size = Vector3.new(cageSize, wallHeight, wallThickness), offset = Vector3.new(0, 0, cageSize/2 - wallThickness/2)},
+        {name = "Right", size = Vector3.new(wallThickness, wallHeight, cageSize), offset = Vector3.new(cageSize/2 - wallThickness/2, 0, 0)},
+        {name = "Left", size = Vector3.new(wallThickness, wallHeight, cageSize), offset = Vector3.new(-cageSize/2 + wallThickness/2, 0, 0)},
+        {name = "Roof", size = Vector3.new(cageSize, wallThickness, cageSize), offset = Vector3.new(0, wallHeight/2 - wallThickness/2, 0)},
+        {name = "Floor", size = Vector3.new(cageSize, wallThickness, cageSize), offset = Vector3.new(0, -wallHeight/2 + wallThickness/2, 0)},
+    }
+    
+    for _, data in ipairs(partsData) do
+        local part = makeCagePart(CFrame.new(), data.size, 0.5, nil, data.name)
+        part:SetAttribute("Offset", data.offset) 
+        table.insert(currentCageParts, part)
+    end
+    
+    cageUpdateConnection = RunService.Heartbeat:Connect(function()
+        if not selectedTarget or not selectedTarget.Character or not selectedTarget.Character:FindFirstChild("HumanoidRootPart") then
+            isCagingActive = false
+            local cageBtn = featureScrollFrame:FindFirstChild("CagePlayerButton")
+            if cageBtn then updateButtonStatus(cageBtn, false, "CAGE PLAYER") end
+            destroyCage()
+            return
+        end
+        
+        local rootPart = selectedTarget.Character.HumanoidRootPart
+        local centerCFrame = rootPart.CFrame * CFrame.new(0, wallHeight/2, 0)
 
-        else
-            -- Jika target hilang/mati, hentikan loop dan hancurkan sangkar
-            loopConnection:Disconnect()
-            if isCagingActive then
-                 -- Ini akan mencegah error jika toggleCagePlayer dipanggil saat loop masih berjalan
-                 isCagingActive = false 
-                 destroyCage() 
+        for _, part in ipairs(currentCageParts) do
+            local offset = part:GetAttribute("Offset")
+            if offset then
+                part.CFrame = centerCFrame * CFrame.new(offset)
             end
         end
     end)
     
-    table.insert(currentCageParts, loopConnection) -- Simpan koneksi loop untuk dihancurkan nanti
-    
     return true
-end
-
-local function destroyCage()
-    -- Hancurkan semua bagian sangkar dan putuskan koneksi loop
-    for _, item in ipairs(currentCageParts) do
-        if item:IsA("Connection") then
-            item:Disconnect()
-        elseif item:IsA("Part") then
-            -- Gunakan Debris untuk memastikan penghapusan yang bersih
-            Debris:AddItem(item, 0.1) 
-        end
-    end
-    currentCageParts = {}
-    print("Sangkar Dihancurkan.")
 end
 
 local function toggleCagePlayer(button)
@@ -427,17 +374,61 @@ local function toggleCagePlayer(button)
         local success = createCageForTarget()
         if success then
             updateButtonStatus(button, true, "CAGE PLAYER")
-            print("Cage Player AKTIF pada: " .. selectedTarget.Name)
         else
-            isCagingActive = false -- Reset status jika gagal
+            isCagingActive = false
             updateButtonStatus(button, false, "CAGE PLAYER")
         end
     else
         destroyCage()
         updateButtonStatus(button, false, "CAGE PLAYER")
-        print("Cage Player NONAKTIF.")
     end
 end
+
+-- 🔽 FUNGSI PULL AND CAGE BARU 🔽
+
+local function pullAndCageTarget(button)
+    if not selectedTarget then
+        warn("Pilih target terlebih dahulu!")
+        return
+    end
+    
+    local targetCharacter = selectedTarget.Character
+    local targetRoot = targetCharacter and targetCharacter:FindFirstChild("HumanoidRootPart")
+    
+    local localCharacter = player.Character
+    local localRoot = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
+    
+    if not targetRoot or not localRoot then
+        warn("Target atau pemain lokal tidak memiliki HumanoidRootPart.")
+        return
+    end
+    
+    -- 1. Tentukan posisi di depan pemain lokal
+    local distance = 5 -- Jarak di depan pemain lokal
+    -- CFrame.Angles digunakan untuk mempertahankan rotasi target saat teleport
+    local newPositionCFrame = localRoot.CFrame * CFrame.new(0, 0, -distance) 
+    
+    -- 2. Tarik Target ke posisi tersebut
+    pcall(function()
+        targetRoot.CFrame = newPositionCFrame * CFrame.Angles(targetRoot.CFrame:ToOrientation())
+    end)
+    
+    -- 3. Langsung aktifkan fitur CAGE PLAYER
+    if isCagingActive then
+        isCagingActive = false -- Matikan dulu agar toggle menyalakannya kembali
+        destroyCage()
+    end
+    
+    local cageButton = featureScrollFrame:FindFirstChild("CagePlayerButton")
+    if cageButton then
+        -- Toggle akan menjalankan createCageForTarget dan memperbarui status
+        toggleCagePlayer(cageButton) 
+    else
+        isCagingActive = true
+        createCageForTarget()
+    end
+end
+
 
 -- 🔽 FUNGSI PEMBUAT TOMBOL FITUR 🔽
 
@@ -463,7 +454,7 @@ local function makeFeatureButton(name, color, callback)
 end
 
 -- 🔽 FUNGSI PEMBUAT TOMBOL PEMAIN 🔽
--- ... (Fungsi createPlayerButton dan refreshPlayerList tidak diubah dari kode Anda)
+
 local function createPlayerButton(targetPlayer)
     local pButton = Instance.new("TextButton")
     pButton.Name = targetPlayer.Name .. "TargetButton"
@@ -480,23 +471,18 @@ local function createPlayerButton(targetPlayer)
     corner.Parent = pButton
 
     pButton.MouseButton1Click:Connect(function()
-        -- Atur Target yang Dipilih
         selectedTarget = targetPlayer
         
-        -- Reset warna semua tombol
         for _, button in ipairs(playerScrollFrame:GetChildren()) do
             if button:IsA("TextButton") then
                 button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
             end
         end
         
-        -- Set warna tombol yang dipilih
         pButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
         
         updateTargetTitle()
-        print("Target set to: " .. targetPlayer.Name)
         
-        -- Matikan sangkar jika target berubah (PENTING!)
         if isCagingActive then
             local cageBtn = featureScrollFrame:FindFirstChild("CagePlayerButton")
             if cageBtn then toggleCagePlayer(cageBtn) end
@@ -506,32 +492,30 @@ local function createPlayerButton(targetPlayer)
 end
 
 local function refreshPlayerList()
-    -- Hapus tombol lama
     for _, button in ipairs(playerScrollFrame:GetChildren()) do
         if button:IsA("TextButton") then
             button:Destroy()
         end
     end
     
-    -- Buat tombol baru
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= player then -- Jangan masukkan diri sendiri
+        if p ~= player then
             createPlayerButton(p)
         end
     end
 end
 
--- Refresh daftar saat ada pemain masuk/keluar
 Players.PlayerAdded:Connect(refreshPlayerList)
 Players.PlayerRemoving:Connect(function(p)
     if selectedTarget == p then
         selectedTarget = nil
         updateTargetTitle()
         
-        -- Matikan sangkar jika target keluar
         if isCagingActive then
+            isCagingActive = false
+            destroyCage()
             local cageBtn = featureScrollFrame:FindFirstChild("CagePlayerButton")
-            if cageBtn then toggleCagePlayer(cageBtn) end
+            if cageBtn then updateButtonStatus(cageBtn, false, "CAGE PLAYER") end
         end
     end
     refreshPlayerList()
@@ -539,7 +523,6 @@ end)
 
 -- 🔽 PENAMBAHAN TOMBOL KE FEATURE LIST 🔽
 
--- 1. Tombol REPULSE TOUCH (Knockback)
 local repulseButton = makeFeatureButton("REPULSE TOUCH: OFF", Color3.fromRGB(150, 0, 0), function(button)
     if isRepulseActive then
         disableRepulseTouch(button)
@@ -548,33 +531,31 @@ local repulseButton = makeFeatureButton("REPULSE TOUCH: OFF", Color3.fromRGB(150
     end
 end)
 
--- 2. Tombol OWNER TITLE
 local ownerTitleButton = makeFeatureButton("OWNER TITLE: OFF", Color3.fromRGB(150, 0, 0), toggleOwnerTitle)
 
--- 3. Tombol CAGE PLAYER BARU
 local cagePlayerButton = makeFeatureButton("CAGE PLAYER: OFF", Color3.fromRGB(150, 0, 0), toggleCagePlayer)
 
--- 4. Tombol Reset Target
+-- TOMBOL PULL & CAGE BARU
+local pullCageButton = makeFeatureButton("PULL & CAGE", Color3.fromRGB(0, 120, 200), pullAndCageTarget)
+
 local resetButton = makeFeatureButton("RESET TARGET", Color3.fromRGB(200, 200, 0), function(button)
     selectedTarget = nil
     updateTargetTitle()
     refreshPlayerList()
     
-    -- Pastikan sangkar hilang saat reset target
     if isCagingActive then
+        isCagingActive = false
+        destroyCage()
         local cageBtn = featureScrollFrame:FindFirstChild("CagePlayerButton")
-        if cageBtn then toggleCagePlayer(cageBtn) end
+        if cageBtn then updateButtonStatus(cageBtn, false, "CAGE PLAYER") end
     end
-    
-    print("Target Direset.")
 end)
 
 
--- 🔽 LOGIKA CHARACTER ADDED (PENTING UNTUK MEMPERTAHANKAN STATUS) 🔽
+-- 🔽 LOGIKA CHARACTER ADDED (MENJAGA STATUS SETELAH MATI) 🔽
 player.CharacterAdded:Connect(function(char)
     local repulseBtn = featureScrollFrame:FindFirstChild("RepulseTouchButton")
     local titleBtn = featureScrollFrame:FindFirstChild("OwnerTitleButton")
-    local cageBtn = featureScrollFrame:FindFirstChild("CagePlayerButton")
     
     if isRepulseActive and repulseBtn then
         enableRepulseTouch(repulseBtn) 
@@ -584,25 +565,36 @@ player.CharacterAdded:Connect(function(char)
         createOwnerTitle()
         updateButtonStatus(titleBtn, true, "OWNER TITLE")
     end
-    
-    -- Sangkar tidak perlu diaktifkan kembali saat karakter pemain lokal respawn, 
-    -- karena sangkar diposisikan relatif terhadap target. Target akan tetap terkurung.
-    
-    -- Namun, jika target respawn, sangkar harus dibuat ulang.
-    if selectedTarget and isCagingActive and cageBtn then
-        selectedTarget.CharacterAdded:Wait() -- Tunggu sampai karakter target muncul
-        -- Hancurkan sangkar lama dan buat yang baru di posisi baru
-        destroyCage()
-        createCageForTarget()
-        updateButtonStatus(cageBtn, true, "CAGE PLAYER")
+end)
+
+-- LOGIKA KHUSUS: Mengaktifkan kembali sangkar jika target respawn
+local function handleTargetCharacterAdded(char)
+    if isCagingActive then
+        local cageBtn = featureScrollFrame:FindFirstChild("CagePlayerButton")
+        if cageBtn then
+            -- Tunggu sebentar untuk memastikan root part dimuat
+            task.wait(0.5) 
+            createCageForTarget() 
+            updateButtonStatus(cageBtn, true, "CAGE PLAYER")
+        end
+    end
+end
+
+-- Menghubungkan fungsi penanganan respawn ke target saat ini atau yang baru
+Players.PlayerAdded:Connect(function(p)
+    if p == selectedTarget then
+        p.CharacterAdded:Connect(handleTargetCharacterAdded)
     end
 end)
 
+-- Pastikan target yang sudah ada juga dihubungkan
+if selectedTarget then
+    selectedTarget.CharacterAdded:Connect(handleTargetCharacterAdded)
+end
 
--- Atur status awal dan daftar pemain
+-- Inisialisasi awal
 updateButtonStatus(repulseButton, isRepulseActive, "REPULSE TOUCH")
 updateButtonStatus(ownerTitleButton, isOwnerTitleActive, "OWNER TITLE")
 updateButtonStatus(cagePlayerButton, isCagingActive, "CAGE PLAYER")
 updateTargetTitle()
 refreshPlayerList()
-
