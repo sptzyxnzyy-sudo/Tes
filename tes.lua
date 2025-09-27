@@ -1,5 +1,5 @@
 -- Fungsi fitur -- credit: Xraxor1 (Original GUI/Intro structure)
--- Modification: ONLY Repulse Touch (Knockback) Feature [AI Assistant]
+-- Modification: Repulse Touch (Knockback) MAX + Owner Title [AI Assistant]
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
@@ -8,12 +8,14 @@ local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 
--- ** ⬇️ STATUS FITUR CORE (Hanya Repulse) ⬇️ **
-local isRepulseActive = false -- Status awal: OFF
+-- ** ⬇️ STATUS FITUR CORE ⬇️ **
+local isRepulseActive = false 
 local repulseTouchConnection = nil 
 local lastRepulse = 0
-local KNOCKBACK_POWER = 1500 -- Kekuatan dorongan.
-local DEBOUNCE_TIME = 0.5 -- Debounce agar tidak mendorong terus menerus
+local KNOCKBACK_POWER = 10000 -- Kekuatan dorongan maksimal
+local DEBOUNCE_TIME = 0 -- Tanpa jeda waktu
+
+local isOwnerTitleActive = false -- Status fitur Owner Title baru
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -49,7 +51,7 @@ do
     end)
 end
 
--- 🔽 Status AutoFarm (Dipertahankan, walau tidak digunakan) 🔽
+-- 🔽 Status AutoFarm (Dipertahankan) 🔽
 local statusValue = ReplicatedStorage:FindFirstChild("AutoFarmStatus")
 if not statusValue then
     statusValue = Instance.new("BoolValue")
@@ -64,10 +66,10 @@ screenGui.Name = "CoreFeaturesGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Frame utama (ukuran disesuaikan untuk 1 fitur)
+-- Frame utama (ukuran disesuaikan)
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 100) 
-frame.Position = UDim2.new(0.4, -110, 0.5, -50)
+frame.Size = UDim2.new(0, 220, 0, 150) -- Ukuran sedikit diperbesar
+frame.Position = UDim2.new(0.4, -110, 0.5, -75)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -182,6 +184,59 @@ local function disableRepulseTouch(button)
 end
 
 
+-- 🔽 FUNGSI OWNER TITLE 🔽
+
+local function createOwnerTitle()
+    local nameDisplay = player.Character:FindFirstChild("Head"):FindFirstChild("NameDisplay")
+    if not nameDisplay then return end -- Memastikan display nama asli ada
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "OwnerTitleGUI"
+    billboard.Size = UDim2.new(0, 150, 0, 50)
+    billboard.Adornee = player.Character.Head
+    billboard.AlwaysOnTop = true
+    billboard.ExtentsOffset = Vector3.new(0, 1.5, 0) -- Posisikan di atas kepala
+
+    local label = Instance.new("TextLabel")
+    label.Name = "OwnerLabel"
+    label.Size = UDim2.new(1, 0, 0.5, 0)
+    label.Position = UDim2.new(0, 0, 0.5, 0) -- Posisikan di bawah nama asli (atau ganti jadi 0,0,0,0 utk di atas)
+    label.BackgroundTransparency = 1
+    label.Text = "[ OWNER ]"
+    label.TextColor3 = Color3.fromRGB(255, 255, 0) -- Kuning terang
+    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    label.TextStrokeTransparency = 0
+    label.Font = Enum.Font.SourceSansBold
+    label.TextSize = 18
+    label.Parent = billboard
+    
+    -- Sembunyikan Billboard ini dari player lokal agar tidak terlihat diri sendiri
+    billboard.LocalTransparencyModifier = 1 -- Sembunyikan dari player lokal
+
+    billboard.Parent = player.Character.Head
+end
+
+local function destroyOwnerTitle()
+    local title = player.Character and player.Character:FindFirstChild("Head") and player.Character.Head:FindFirstChild("OwnerTitleGUI")
+    if title then
+        title:Destroy()
+    end
+end
+
+local function toggleOwnerTitle(button)
+    isOwnerTitleActive = not isOwnerTitleActive
+    updateButtonStatus(button, isOwnerTitleActive, "OWNER TITLE")
+    
+    if isOwnerTitleActive then
+        createOwnerTitle()
+        print("Owner Title AKTIF.")
+    else
+        destroyOwnerTitle()
+        print("Owner Title NONAKTIF.")
+    end
+end
+
+
 -- 🔽 FUNGSI PEMBUAT TOMBOL FITUR 🔽
 
 local function makeFeatureButton(name, color, callback)
@@ -216,20 +271,29 @@ local repulseButton = makeFeatureButton("REPULSE TOUCH: OFF", Color3.fromRGB(150
     end
 end)
 
+-- 2. Tombol OWNER TITLE
+local ownerTitleButton = makeFeatureButton("OWNER TITLE: OFF", Color3.fromRGB(150, 0, 0), toggleOwnerTitle)
+
 
 -- 🔽 LOGIKA CHARACTER ADDED (PENTING UNTUK MEMPERTAHANKAN STATUS) 🔽
 player.CharacterAdded:Connect(function(char)
+    local repulseBtn = featureScrollFrame:FindFirstChild("RepulseTouchButton")
+    local titleBtn = featureScrollFrame:FindFirstChild("OwnerTitleButton")
+    
     -- Pertahankan status Repulse Touch saat respawn
-    if isRepulseActive then
-        local button = featureScrollFrame:FindFirstChild("RepulseTouchButton")
-        -- Memastikan tombol ada sebelum mencoba mengaktifkan
-        if button then 
-            -- Panggil enableRepulseTouch secara eksplisit untuk membuat koneksi baru
-            enableRepulseTouch(button) 
-        end
+    if isRepulseActive and repulseBtn then
+        enableRepulseTouch(repulseBtn) 
+    end
+    
+    -- Pertahankan status Owner Title saat respawn
+    if isOwnerTitleActive and titleBtn then
+        -- Gunakan createOwnerTitle secara langsung karena toggleOwnerTitle tidak bisa dipanggil dari sini
+        createOwnerTitle()
+        updateButtonStatus(titleBtn, true, "OWNER TITLE")
     end
 end)
 
 
 -- Atur status awal tombol
 updateButtonStatus(repulseButton, isRepulseActive, "REPULSE TOUCH")
+updateButtonStatus(ownerTitleButton, isOwnerTitleActive, "OWNER TITLE")
