@@ -1,12 +1,17 @@
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local Clipboard = game:GetService("ClipboardService") -- Digunakan untuk Copy Lokasi
+local PromptService = game:GetService("PromptService") -- Tambahkan layanan PromptService untuk konfirmasi hapus
+local Clipboard = game:GetService("ClipboardService") -- Tambahkan layanan ClipboardService
 
 local player = Players.LocalPlayer
+
+-- ** ⬇️ STATUS FITUR CORE ⬇️ **
 local localSavedLocations = {} -- { {Name = "Lokasi 1", CFrame = CFrame.new(x, y, z)}, ... }
 local isAutoTeleporting = false
 local autoTeleportTask = nil
+
+local featureScrollFrame -- Dideklarasikan lebih awal untuk akses global dari updateLocationList
 
 -- ** ⬇️ FUNGSI UTILITY GLOBAL ⬇️ **
 
@@ -24,8 +29,6 @@ end
 
 -- 🔽 FUNGSI GUI 🔽
 
-local featureScrollFrame -- Dideklarasikan lebih awal untuk akses global
-
 -- Fungsi untuk mengupdate tampilan list lokasi
 local function updateLocationList()
     -- Hapus semua elemen lama
@@ -35,7 +38,7 @@ local function updateLocationList()
         end
     end
 
-    local listLayout = featureScrollFrame.FeatureListLayout
+    local listLayout = featureScrollFrame:FindFirstChild("FeatureListLayout")
     if not listLayout then return end
 
     -- Tambahkan lokasi baru
@@ -77,6 +80,7 @@ local function updateLocationList()
         tpCorner.CornerRadius = UDim.new(0, 5)
         tpCorner.Parent = tpButton
         
+        -- Karena list akan di-render ulang, gunakan data dari 'data'
         tpButton.MouseButton1Click:Connect(function()
             local character = player.Character
             if character and character:FindFirstChild("HumanoidRootPart") then
@@ -99,14 +103,26 @@ local function updateLocationList()
         delCorner.CornerRadius = UDim.new(0, 5)
         delCorner.Parent = deleteButton
 
+        -- Koneksi untuk Delete
         deleteButton.MouseButton1Click:Connect(function()
             -- Konfirmasi Hapus
             local confirmed = PromptService:PromptDialog("KONFIRMASI HAPUS", "Hapus lokasi '" .. data.Name .. "'?", "DELETE", "CANCEL")
             
             if confirmed == Enum.PromptButton.Button1 then -- DELETE
-                table.remove(localSavedLocations, index)
-                updateLocationList()
-                print("Lokasi dihapus.")
+                -- Cari dan hapus lokasi berdasarkan CFrame untuk keandalan
+                local foundIndex = nil
+                for i, loc in ipairs(localSavedLocations) do
+                    if loc.CFrame == data.CFrame then
+                        foundIndex = i
+                        break
+                    end
+                end
+                
+                if foundIndex then
+                    table.remove(localSavedLocations, foundIndex)
+                    updateLocationList()
+                    print("Lokasi dihapus: " .. data.Name)
+                end
             else -- CANCEL
                 print("Penghapusan dibatalkan.")
             end
@@ -119,7 +135,7 @@ end
 
 -- 🔽 FUNGSI LOKASI & TELEPORT 🔽
 
-local function saveCurrentLocation(button)
+local function saveCurrentLocation()
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     
@@ -176,16 +192,17 @@ local function copyAllLocations()
         return
     end
 
-    local locationString = "Saved Locations:\n"
+    local locationString = "Saved Locations (CFrame):\n"
     for index, data in ipairs(localSavedLocations) do
         local pos = data.CFrame.p
-        locationString = locationString .. string.format("[%d] %s: (%.3f, %.3f, %.3f)\n", index, data.Name, pos.X, pos.Y, pos.Z)
+        -- Format CFrame menjadi string yang mudah dibaca/digunakan
+        locationString = locationString .. string.format("[%d] %s: CFrame.new(%.3f, %.3f, %.3f)\n", index, data.Name, pos.X, pos.Y, pos.Z)
     end
     
     -- Gunakan ClipboardService
     pcall(function()
         Clipboard:Set(locationString)
-        print("Semua lokasi (CFrame) berhasil dicopy ke clipboard.")
+        print("Semua lokasi berhasil dicopy ke clipboard.")
     end)
 end
 
@@ -232,7 +249,7 @@ screenGui.Parent = player:WaitForChild("PlayerGui")
 
 -- Frame utama 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 350) -- Ukuran ditingkatkan untuk menampung banyak tombol
+frame.Size = UDim2.new(0, 220, 0, 350) -- Ukuran ditingkatkan untuk menampung list
 frame.Position = UDim2.new(0.5, -110, 0.5, -175) 
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
@@ -325,7 +342,9 @@ player.CharacterAdded:Connect(function(char)
     -- Pastikan status auto teleport dimatikan saat respawn
     if isAutoTeleporting then
         isAutoTeleporting = false
-        updateButtonStatus(autoTpButton, false, "AUTO TP ALL")
+        if autoTpButton and autoTpButton.Parent then
+            updateButtonStatus(autoTpButton, false, "AUTO TP ALL")
+        end
         if autoTeleportTask then
             task.cancel(autoTeleportTask)
         end
