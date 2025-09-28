@@ -1,17 +1,34 @@
+--You can take the script with your own ideas, friend.
+-- credit: Xraxor1
+
+-- Core Services
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local PromptService = game:GetService("PromptService") -- Tambahkan layanan PromptService untuk konfirmasi hapus
-local Clipboard = game:GetService("ClipboardService") -- Tambahkan layanan ClipboardService
+local PromptService = game:GetService("PromptService") -- Untuk konfirmasi hapus
+local Clipboard = game:GetService("ClipboardService") -- Untuk copy lokasi
 
 local player = Players.LocalPlayer
 
--- ** ⬇️ STATUS FITUR CORE ⬇️ **
-local localSavedLocations = {} -- { {Name = "Lokasi 1", CFrame = CFrame.new(x, y, z)}, ... }
-local isAutoTeleporting = false
-local autoTeleportTask = nil
+-- ** ⬇️ CORE STATUS & DATA ⬇️ **
 
-local featureScrollFrame -- Dideklarasikan lebih awal
+-- Saved Location Feature Data (FITUR BARU)
+local localSavedLocations = {} -- { {Name = "Lokasi 1", CFrame = CFrame.new(x, y, z)}, ... }
+local isAutoTeleportingSaved = false -- Status untuk Auto-Teleporting melalui SAVED locations
+local autoTeleportTask = nil
+local featureScrollFrame -- Reference ke Saved Location List UI
+
+-- Teleport ID Input References
+local teleportIdInput = nil 
+local serverIdInput = nil 
+
+-- Auto Farm Status (Feature 1)
+local position1 = Vector3.new(625.27, 1799.83, 3432.84)
+local position2 = Vector3.new(780.47, 2183.38, 3945.07)
+local teleportingSummit = false 
+local buttonSummit -- Reference ke tombol SUMMIT
 
 -- 🔽 FUNGSI UTILITY GLOBAL 🔽
 
@@ -27,10 +44,11 @@ local function updateButtonStatus(button, isActive, featureName)
     end
 end
 
--- 🔽 FUNGSI GUI LIST LOKASI 🔽
+-- 🔽 FUNGSI SAVE LOKASI & LIST 🔽
 
--- Fungsi untuk mengupdate tampilan list lokasi
 local function updateLocationList()
+    if not featureScrollFrame then return end
+    
     -- Hapus semua elemen lama di ScrollingFrame
     for _, child in ipairs(featureScrollFrame:GetChildren()) do
         if child:IsA("Frame") and child.Name == "LocationEntry" then
@@ -45,7 +63,7 @@ local function updateLocationList()
     for index, data in ipairs(localSavedLocations) do
         local entryFrame = Instance.new("Frame")
         entryFrame.Name = "LocationEntry"
-        entryFrame.Size = UDim2.new(1, 0, 0, 40)
+        entryFrame.Size = UDim2.new(1, 0, 0, 30)
         entryFrame.BackgroundTransparency = 1
         entryFrame.Parent = featureScrollFrame
 
@@ -57,7 +75,7 @@ local function updateLocationList()
         
         -- Text Label (Nama Lokasi)
         local nameLabel = Instance.new("TextLabel")
-        nameLabel.Size = UDim2.new(0.5, 0, 1, 0)
+        nameLabel.Size = UDim2.new(0.45, 0, 1, 0)
         nameLabel.BackgroundTransparency = 1
         nameLabel.Text = data.Name
         nameLabel.TextColor3 = Color3.new(1, 1, 1)
@@ -103,11 +121,9 @@ local function updateLocationList()
         delCorner.Parent = deleteButton
 
         deleteButton.MouseButton1Click:Connect(function()
-            -- Konfirmasi Hapus
-            local confirmed = PromptService:PromptDialog("KONFIRMASI HAPUS", "Hapus lokasi '" .. data.Name .. "'?", "DELETE", "CANCEL")
+            local confirmed = PromptService:PromptDialog and PromptService:PromptDialog("KONFIRMASI HAPUS", "Hapus lokasi '" .. data.Name .. "'?", "DELETE", "CANCEL") or Enum.PromptButton.Button1
             
-            if confirmed == Enum.PromptButton.Button1 then -- DELETE
-                -- Hapus item dari tabel
+            if confirmed == Enum.PromptButton.Button1 then
                 localSavedLocations[index] = nil 
                 table.remove(localSavedLocations, index)
                 updateLocationList()
@@ -117,10 +133,12 @@ local function updateLocationList()
     end
     
     -- Update CanvasSize
-    featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
+    if listLayout and listLayout.AbsoluteContentSize.Y > 0 then
+        featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
+    else
+        featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    end
 end
-
--- 🔽 FUNGSI LOKASI & TELEPORT 🔽
 
 local function saveCurrentLocation()
     local char = player.Character
@@ -138,31 +156,36 @@ local function saveCurrentLocation()
     end
 end
 
-local function toggleAutoTeleport(button)
-    isAutoTeleporting = not isAutoTeleporting
-    updateButtonStatus(button, isAutoTeleporting, "AUTO TP ALL")
+local function toggleAutoTeleportSaved(button)
+    if #localSavedLocations == 0 then
+        warn("Tidak ada lokasi tersimpan untuk Auto-Teleport.")
+        return
+    end
 
-    if isAutoTeleporting then
+    isAutoTeleportingSaved = not isAutoTeleportingSaved
+    updateButtonStatus(button, isAutoTeleportingSaved, "AUTO TP SAVED")
+
+    if isAutoTeleportingSaved then
         autoTeleportTask = task.spawn(function()
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
             if not root then
                 warn("Tidak bisa Auto-Teleport: RootPart tidak ditemukan.")
-                isAutoTeleporting = false
-                updateButtonStatus(button, false, "AUTO TP ALL")
+                isAutoTeleportingSaved = false
+                updateButtonStatus(button, false, "AUTO TP SAVED")
                 return
             end
             
             for _, data in ipairs(localSavedLocations) do
-                if not isAutoTeleporting then break end -- Berhenti jika dinonaktifkan
+                if not isAutoTeleportingSaved then break end 
                 
                 print("Auto-Teleport ke: " .. data.Name)
                 root.CFrame = data.CFrame
-                task.wait(1.5) -- Jeda antar teleport
+                task.wait(1.5) 
             end
             
-            isAutoTeleporting = false
-            updateButtonStatus(button, false, "AUTO TP ALL")
+            isAutoTeleportingSaved = false
+            updateButtonStatus(button, false, "AUTO TP SAVED")
             print("Auto-Teleport Selesai.")
         end)
     else
@@ -191,6 +214,101 @@ local function copyAllLocations()
     end)
 end
 
+-- 🔽 FUNGSI TELEPORT ID/SERVER 🔽
+
+local function teleportToID()
+    local placeIdText = teleportIdInput and teleportIdInput.Text
+    local serverIdText = serverIdInput and serverIdInput.Text
+
+    local placeId = tonumber(placeIdText)
+    
+    if not placeId or placeId <= 0 then
+        warn("ID Tempat (Place ID) tidak valid.")
+        return
+    end
+
+    if serverIdText and serverIdText ~= "" then
+        print("Mencoba Teleport ke Server: " .. serverIdText .. " di Place ID: " .. placeId)
+        local success, result = pcall(function()
+            TeleportService:TeleportToPlaceInstance(placeId, serverIdText, player)
+        end)
+
+        if not success then
+             print("Gagal Teleport ke Server ID. Mencoba Teleport standar...")
+             TeleportService:Teleport(placeId, player)
+        end
+    else
+        print("Mencoba Teleport standar ke Place ID: " .. placeId)
+        TeleportService:Teleport(placeId, player)
+    end
+end
+
+-- 🔽 AUTO FARM SYSTEM (Tombol SUMMIT) - DIHUBUNGKAN KE TELEPORT ID 🔽
+
+local function teleportTo(pos)
+    local char = player.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        char.HumanoidRootPart.CFrame = CFrame.new(pos)
+    end
+end
+
+local function autoFarmLoop()
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then
+        warn("Auto Farm dihentikan: Karakter tidak ditemukan.")
+        teleportingSummit = false
+        if buttonSummit and buttonSummit.Parent then
+            buttonSummit.Text = "SUMMIT"
+            buttonSummit.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        end
+        return
+    end
+
+    teleportTo(position1)
+    task.wait(2)
+    teleportTo(position2)
+    task.wait(1)
+    
+    -- **KONEKSI KE FITUR 3:** Gunakan Place ID dan Server ID dari Input
+    local placeIdText = teleportIdInput and teleportIdInput.Text
+    local serverIdText = serverIdInput and serverIdInput.Text
+    local placeId = tonumber(placeIdText)
+    
+    if placeId and placeId > 0 then
+        print("Auto Farm: Rejoining menggunakan Place ID: " .. placeId)
+        
+        if serverIdText and serverIdText ~= "" then
+            pcall(function()
+                TeleportService:TeleportToPlaceInstance(placeId, serverIdText, player)
+            end)
+        else
+            TeleportService:Teleport(placeId, player)
+        end
+    else
+        -- Fallback
+        print("Auto Farm: Rejoining menggunakan game.PlaceId (Input ID tidak valid)")
+        TeleportService:Teleport(game.PlaceId, player) 
+    end
+end
+
+local function toggleAutoFarm(state)
+    teleportingSummit = state
+    
+    local statusValue = ReplicatedStorage:FindFirstChild("AutoFarmStatus")
+    if statusValue then
+        statusValue.Value = state
+    end
+    
+    if teleportingSummit then
+        buttonSummit.Text = "RUNNING..."
+        buttonSummit.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+        task.spawn(autoFarmLoop)
+    else
+        buttonSummit.Text = "SUMMIT"
+        buttonSummit.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    end
+end
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -226,17 +344,15 @@ do
     end)
 end
 
-
--- 🔽 GUI Utama 🔽
+-- 🔽 GUI UTAMA 🔽
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "CoreFeaturesGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Frame utama (Disesuaikan untuk fitur baru)
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 350) -- Ukuran diperluas untuk List Lokasi
-frame.Position = UDim2.new(0.5, -110, 0.5, -175) 
+frame.Size = UDim2.new(0, 220, 0, 500) 
+frame.Position = UDim2.new(0.4, -110, 0.5, -250)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -251,17 +367,123 @@ corner.Parent = frame
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
-title.Text = "TELEPORT MANAGER" -- Judul diubah
+title.Text = "Mount Atin V2"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
--- ScrollingFrame untuk Daftar Pilihan Fitur (Utilitas: Save, Auto TP, Copy)
+-- Tombol SUMMIT (Feature 1)
+buttonSummit = Instance.new("TextButton")
+buttonSummit.Name = "SummitButton"
+buttonSummit.Size = UDim2.new(0, 160, 0, 40)
+buttonSummit.Position = UDim2.new(0.5, -80, 0, 40) 
+buttonSummit.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+buttonSummit.Text = "SUMMIT"
+buttonSummit.TextColor3 = Color3.new(1, 1, 1)
+buttonSummit.Font = Enum.Font.GothamBold
+buttonSummit.TextSize = 15
+buttonSummit.Parent = frame
+
+local buttonCorner = Instance.new("UICorner")
+buttonCorner.CornerRadius = UDim.new(0, 10)
+buttonCorner.Parent = buttonSummit
+
+buttonSummit.MouseButton1Click:Connect(function()
+    toggleAutoFarm(not teleportingSummit)
+end)
+
+-- 🔽 KELOMPOK TELEPORT ID/SERVER (Feature 3) 🔽
+
+local teleportTitle = Instance.new("TextLabel")
+teleportTitle.Size = UDim2.new(1, -20, 0, 20)
+teleportTitle.Position = UDim2.new(0.5, -100, 0, 95)
+teleportTitle.BackgroundTransparency = 1
+teleportTitle.Text = "Teleport ID/Server"
+teleportTitle.TextColor3 = Color3.new(1, 1, 1)
+teleportTitle.Font = Enum.Font.GothamBold
+teleportTitle.TextSize = 14
+teleportTitle.Parent = frame
+
+-- Input Place ID
+local placeIdLabel = Instance.new("TextLabel")
+placeIdLabel.Size = UDim2.new(0.4, 0, 0, 20)
+placeIdLabel.Position = UDim2.new(0, 10, 0, 120)
+placeIdLabel.BackgroundTransparency = 1
+placeIdLabel.Text = "Place ID:"
+placeIdLabel.TextColor3 = Color3.new(1, 1, 1)
+placeIdLabel.Font = Enum.Font.Gotham
+placeIdLabel.TextSize = 12
+placeIdLabel.TextXAlignment = Enum.TextXAlignment.Left
+placeIdLabel.Parent = frame
+
+teleportIdInput = Instance.new("TextBox")
+teleportIdInput.Size = UDim2.new(0.5, 0, 0, 20)
+teleportIdInput.Position = UDim2.new(0.45, 0, 0, 120)
+teleportIdInput.PlaceholderText = "Masukkan Place ID"
+teleportIdInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+teleportIdInput.TextColor3 = Color3.new(1, 1, 1)
+teleportIdInput.Font = Enum.Font.SourceSans
+teleportIdInput.TextSize = 12
+teleportIdInput.Parent = frame
+
+-- Input Server ID
+local serverIdLabel = Instance.new("TextLabel")
+serverIdLabel.Size = UDim2.new(0.4, 0, 0, 20)
+serverIdLabel.Position = UDim2.new(0, 10, 0, 145)
+serverIdLabel.BackgroundTransparency = 1
+serverIdLabel.Text = "Server ID:"
+serverIdLabel.TextColor3 = Color3.new(1, 1, 1)
+serverIdLabel.Font = Enum.Font.Gotham
+serverIdLabel.TextSize = 12
+serverIdLabel.TextXAlignment = Enum.TextXAlignment.Left
+serverIdLabel.Parent = frame
+
+serverIdInput = Instance.new("TextBox")
+serverIdInput.Size = UDim2.new(0.5, 0, 0, 20)
+serverIdInput.Position = UDim2.new(0.45, 0, 0, 145)
+serverIdInput.PlaceholderText = "Opsional Server ID"
+serverIdInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+serverIdInput.TextColor3 = Color3.new(1, 1, 1)
+serverIdInput.Font = Enum.Font.SourceSans
+serverIdInput.TextSize = 12
+serverIdInput.Parent = frame
+
+-- Tombol Teleport (Execute)
+local tpExecuteButton = Instance.new("TextButton")
+tpExecuteButton.Size = UDim2.new(0, 160, 0, 30)
+tpExecuteButton.Position = UDim2.new(0.5, -80, 0, 175)
+tpExecuteButton.BackgroundColor3 = Color3.fromRGB(0, 100, 200) 
+tpExecuteButton.Text = "TELEPORT"
+tpExecuteButton.TextColor3 = Color3.new(1, 1, 1)
+tpExecuteButton.Font = Enum.Font.GothamBold
+tpExecuteButton.TextSize = 15
+tpExecuteButton.Parent = frame
+
+local tpExecuteCorner = Instance.new("UICorner")
+tpExecuteCorner.CornerRadius = UDim.new(0, 8)
+tpExecuteCorner.Parent = tpExecuteButton
+
+tpExecuteButton.MouseButton1Click:Connect(teleportToID)
+
+
+-- 🔽 KELOMPOK SAVE LOKASI & UTILITY (Fitur Save Lama) 🔽
+
+local saveTitle = Instance.new("TextLabel")
+saveTitle.Size = UDim2.new(1, -20, 0, 20)
+saveTitle.Position = UDim2.new(0.5, -100, 0, 215)
+saveTitle.BackgroundTransparency = 1
+saveTitle.Text = "Saved Location Manager"
+saveTitle.TextColor3 = Color3.new(1, 1, 1)
+saveTitle.Font = Enum.Font.GothamBold
+saveTitle.TextSize = 14
+saveTitle.Parent = frame
+
+-- ScrollingFrame untuk Utility Button (Save, Auto TP, Copy)
 local utilityScrollFrame = Instance.new("ScrollingFrame")
 utilityScrollFrame.Name = "UtilityList"
-utilityScrollFrame.Size = UDim2.new(1, -20, 0, 95) 
-utilityScrollFrame.Position = UDim2.new(0.5, -100, 0, 35)
+utilityScrollFrame.Size = UDim2.new(1, -20, 0, 70) 
+utilityScrollFrame.Position = UDim2.new(0.5, -100, 0, 240)
 utilityScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 utilityScrollFrame.ScrollBarThickness = 6
 utilityScrollFrame.BackgroundTransparency = 1
@@ -281,7 +503,7 @@ end)
 local function makeUtilityButton(name, layoutOrder, color, callback)
     local featButton = Instance.new("TextButton")
     featButton.Name = name:gsub(" ", "") .. "Button"
-    featButton.Size = UDim2.new(0, 180, 0, 25)
+    featButton.Size = UDim2.new(0, 180, 0, 20)
     featButton.BackgroundColor3 = color
     featButton.Text = name
     featButton.TextColor3 = Color3.new(1, 1, 1)
@@ -291,7 +513,7 @@ local function makeUtilityButton(name, layoutOrder, color, callback)
     featButton.Parent = utilityScrollFrame
 
     local featCorner = Instance.new("UICorner")
-    featCorner.CornerRadius = UDim.new(0, 8)
+    featCorner.CornerRadius = UDim.new(0, 6)
     featCorner.Parent = featButton
 
     featButton.MouseButton1Click:Connect(function()
@@ -300,17 +522,17 @@ local function makeUtilityButton(name, layoutOrder, color, callback)
     return featButton
 end
 
--- Tombol Utilitas (LayoutOrder memastikan urutan)
+-- Tombol Utilitas 
 local saveButton = makeUtilityButton("SAVE LOKASI", 1, Color3.fromRGB(0, 150, 0), saveCurrentLocation)
-local autoTpButton = makeUtilityButton("AUTO TP ALL: OFF", 2, Color3.fromRGB(150, 0, 0), toggleAutoTeleport)
+local autoTpSavedButton = makeUtilityButton("AUTO TP SAVED: OFF", 2, Color3.fromRGB(150, 0, 0), toggleAutoTeleportSaved)
 local copyButton = makeUtilityButton("COPY ALL LOCATIONS", 3, Color3.fromRGB(200, 100, 0), copyAllLocations)
 
 
--- ScrollingFrame untuk Daftar Lokasi yang Disimpan (Menggantikan featureScrollFrame lama)
-featureScrollFrame = Instance.new("ScrollingFrame") -- Menimpa definisi featureScrollFrame lama
+-- ScrollingFrame untuk Daftar Lokasi yang Disimpan
+featureScrollFrame = Instance.new("ScrollingFrame")
 featureScrollFrame.Name = "LocationList"
-featureScrollFrame.Size = UDim2.new(1, -20, 1, -150) 
-featureScrollFrame.Position = UDim2.new(0.5, -100, 0, 135)
+featureScrollFrame.Size = UDim2.new(1, -20, 1, -330) 
+featureScrollFrame.Position = UDim2.new(0.5, -100, 0, 320)
 featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 featureScrollFrame.ScrollBarThickness = 6
 featureScrollFrame.BackgroundTransparency = 0.9
@@ -324,14 +546,30 @@ locationListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 locationListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 locationListLayout.Parent = featureScrollFrame
 
+locationListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    if locationListLayout.AbsoluteContentSize.Y > 0 then
+        featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, locationListLayout.AbsoluteContentSize.Y)
+    else
+        featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    end
+end)
 
--- 🔽 LOGIKA CHARACTER ADDED 🔽
+-- 🔽 LOGIKA STATUS AWAL 🔽
+
+local statusValue = ReplicatedStorage:FindFirstChild("AutoFarmStatus")
+if not statusValue then
+    statusValue = Instance.new("BoolValue")
+    statusValue.Name = "AutoFarmStatus"
+    statusValue.Value = false
+    statusValue.Parent = ReplicatedStorage
+end
+
 player.CharacterAdded:Connect(function(char)
-    -- Matikan status auto teleport saat respawn
-    if isAutoTeleporting then
-        isAutoTeleporting = false
-        if autoTpButton and autoTpButton.Parent then
-            updateButtonStatus(autoTpButton, false, "AUTO TP ALL")
+    -- Matikan status auto teleport saved saat respawn
+    if isAutoTeleportingSaved then
+        isAutoTeleportingSaved = false
+        if autoTpSavedButton and autoTpSavedButton.Parent then
+            updateButtonStatus(autoTpSavedButton, false, "AUTO TP SAVED")
         end
         if autoTeleportTask then
             task.cancel(autoTeleportTask)
@@ -339,7 +577,5 @@ player.CharacterAdded:Connect(function(char)
     end
 end)
 
-
--- Atur status awal tombol dan list
-updateButtonStatus(autoTpButton, isAutoTeleporting, "AUTO TP ALL")
+updateButtonStatus(autoTpSavedButton, isAutoTeleportingSaved, "AUTO TP SAVED")
 updateLocationList()
