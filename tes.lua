@@ -1,6 +1,3 @@
--- credit: Xraxor1 (Original GUI/Intro structure)
--- Modification: Only retained the touch-based disruptive feature (Player Tether).
-
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -12,6 +9,9 @@ local isTetherActive = false
 local tetherTouchConnection = nil
 local activeTethers = {} -- Menyimpan weld untuk pemain yang sedang diikat
 
+-- ** ⬇️ STATUS FITUR RESPOND ⬇️ **
+local selectedPlayer = nil -- Menyimpan pemain yang saat ini dipilih
+local playerListButtons = {} -- Menyimpan referensi tombol pemain
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -54,10 +54,10 @@ screenGui.Name = "CoreFeaturesGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Frame utama (Disesuaikan untuk 1 tombol)
+-- Frame utama (Disesuaikan agar lebih besar)
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 100) 
-frame.Position = UDim2.new(0.4, -110, 0.5, -50) -- Disesuaikan agar tetap di tengah
+frame.Size = UDim2.new(0, 220, 0, 300) -- Ukuran diperbesar untuk menampung fitur baru
+frame.Position = UDim2.new(0.4, -110, 0.5, -150) -- Disesuaikan agar tetap di tengah
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -78,10 +78,10 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
--- ScrollingFrame untuk Daftar Pilihan Fitur
+-- ScrollingFrame untuk Daftar Pilihan Fitur (Player Tether)
 local featureScrollFrame = Instance.new("ScrollingFrame")
 featureScrollFrame.Name = "FeatureList"
-featureScrollFrame.Size = UDim2.new(1, -20, 1, -40)
+featureScrollFrame.Size = UDim2.new(1, -20, 0, 60) -- Lebih kecil
 featureScrollFrame.Position = UDim2.new(0.5, -100, 0, 35)
 featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 featureScrollFrame.ScrollBarThickness = 6
@@ -96,6 +96,55 @@ featureListLayout.Parent = featureScrollFrame
 
 featureListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, featureListLayout.AbsoluteContentSize.Y + 10)
+end)
+
+-- *** KONTEN BARU: BAGIAN RESPAWN PEMAIN ***
+
+-- Judul Respawn
+local respawnTitle = Instance.new("TextLabel")
+respawnTitle.Size = UDim2.new(1, 0, 0, 30)
+respawnTitle.Position = UDim2.new(0, 0, 0, 100) -- Posisi di bawah FeatureList
+respawnTitle.BackgroundTransparency = 1
+respawnTitle.Text = "FORCE RESPAWN"
+respawnTitle.TextColor3 = Color3.new(1, 1, 1)
+respawnTitle.Font = Enum.Font.GothamBold
+respawnTitle.TextSize = 16
+respawnTitle.Parent = frame
+
+-- Tombol Respawn
+local killButton = Instance.new("TextButton")
+killButton.Name = "KillPlayerButton"
+killButton.Size = UDim2.new(0, 180, 0, 40)
+killButton.Position = UDim2.new(0.5, -90, 0, 135)
+killButton.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
+killButton.Text = "RESPAWN: BELUM DIPILIH"
+killButton.TextColor3 = Color3.new(1, 1, 1)
+killButton.Font = Enum.Font.GothamBold
+killButton.TextSize = 12
+killButton.Parent = frame
+
+local killCorner = Instance.new("UICorner")
+killCorner.CornerRadius = UDim.new(0, 10)
+killCorner.Parent = killButton
+
+-- ScrollingFrame untuk Daftar Pemain
+local playerScrollFrame = Instance.new("ScrollingFrame")
+playerScrollFrame.Name = "PlayerList"
+playerScrollFrame.Size = UDim2.new(1, -20, 0, 100)
+playerScrollFrame.Position = UDim2.new(0.5, -100, 0, 180) -- Posisi di bawah KillButton
+playerScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+playerScrollFrame.ScrollBarThickness = 6
+playerScrollFrame.BackgroundTransparency = 1
+playerScrollFrame.Parent = frame
+
+local playerListLayout = Instance.new("UIListLayout")
+playerListLayout.Padding = UDim.new(0, 5)
+playerListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+playerListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+playerListLayout.Parent = playerScrollFrame
+
+playerListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    playerScrollFrame.CanvasSize = UDim2.new(0, 0, 0, playerListLayout.AbsoluteContentSize.Y + 10)
 end)
 
 
@@ -183,8 +232,90 @@ local function deactivateTether(button)
     print("Player Tether NONAKTIF.")
 end
 
+-- 🔽 FUNGSI FORCE RESPAWN/KILL PEMAIN LAIN 🔽
 
--- 🔽 FUNGSI PEMBUAT TOMBOL FITUR 🔽
+local function forcePlayerRespawn(targetPlayer)
+    if not targetPlayer then return end
+    
+    local char = targetPlayer.Character
+    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+
+    -- ** Ini adalah fungsi sisi klien yang mencoba memicu respawn.
+    -- ** Di lingkungan Roblox standar, ini HANYA akan bekerja jika server
+    -- ** telah mengekspos RemoteEvent untuk fungsi ini.
+    -- ** Namun, dalam konteks Executor, ini bisa bekerja:
+    if humanoid then
+        humanoid.Health = 0 -- Mematikan pemain
+        print("Mencoba mematikan: " .. targetPlayer.Name)
+        
+        -- Opsi lain (hanya akan berfungsi di lingkungan Executor/Server-side):
+        -- targetPlayer:LoadCharacter() 
+    else
+        warn("Gagal mematikan: Humanoid tidak ditemukan untuk " .. targetPlayer.Name)
+    end
+end
+
+-- 🔽 FUNGSI PEMBUAT TOMBOL PEMAIN 🔽
+
+local function makePlayerButton(targetPlayer)
+    local pButton = Instance.new("TextButton")
+    pButton.Name = targetPlayer.Name .. "Button"
+    pButton.Size = UDim2.new(0, 180, 0, 25)
+    pButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    pButton.Text = targetPlayer.Name
+    pButton.TextColor3 = Color3.new(1, 1, 1)
+    pButton.Font = Enum.Font.GothamBold
+    pButton.TextSize = 12
+    pButton.Parent = playerScrollFrame
+
+    local pCorner = Instance.new("UICorner")
+    pCorner.CornerRadius = UDim.new(0, 5)
+    pCorner.Parent = pButton
+
+    pButton.MouseButton1Click:Connect(function()
+        -- Atur ulang warna tombol yang sebelumnya dipilih
+        if selectedPlayer and playerListButtons[selectedPlayer.UserId] then
+            playerListButtons[selectedPlayer.UserId].BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        end
+
+        -- Pilih pemain baru
+        selectedPlayer = targetPlayer
+        pButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0) -- Warna untuk pemain terpilih
+
+        -- Perbarui teks tombol kill
+        killButton.Text = "RESPAWN: " .. targetPlayer.Name:upper()
+        print("Pemain dipilih: " .. targetPlayer.Name)
+    end)
+
+    playerListButtons[targetPlayer.UserId] = pButton
+    return pButton
+end
+
+-- 🔽 FUNGSI UNTUK MEMPERBARUI DAFTAR PEMAIN 🔽
+
+local function updatePlayerList()
+    -- Hapus tombol lama
+    for _, button in pairs(playerListButtons) do
+        button:Destroy()
+    end
+    playerListButtons = {}
+    selectedPlayer = nil
+    killButton.Text = "RESPAWN: BELUM DIPILIH"
+
+    -- Tambahkan pemain baru
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player then -- Jangan tambahkan diri sendiri
+            makePlayerButton(p)
+        end
+    end
+end
+
+-- Hubungkan event Players.PlayerAdded dan Players.PlayerRemoving
+Players.PlayerAdded:Connect(updatePlayerList)
+Players.PlayerRemoving:Connect(updatePlayerList)
+
+
+-- 🔽 FUNGSI PEMBUAT TOMBOL FITUR (Tether) 🔽
 
 local function makeFeatureButton(name, color, callback)
     local featButton = Instance.new("TextButton")
@@ -218,6 +349,15 @@ local tetherButton = makeFeatureButton("PLAYER TETHER: OFF", Color3.fromRGB(150,
     end
 end)
 
+-- Hubungkan tombol Kill
+killButton.MouseButton1Click:Connect(function()
+    if selectedPlayer then
+        forcePlayerRespawn(selectedPlayer)
+    else
+        print("Pilih pemain terlebih dahulu.")
+    end
+end)
+
 
 -- 🔽 LOGIKA CHARACTER ADDED (PENTING UNTUK MEMPERTAHANKAN STATUS) 🔽
 player.CharacterAdded:Connect(function(char)
@@ -232,6 +372,7 @@ player.CharacterAdded:Connect(function(char)
     end
 end)
 
-
--- Atur status awal tombol
+-- Inisialisasi: Atur status awal tombol dan daftar pemain
 updateButtonStatus(tetherButton, isTetherActive, "PLAYER TETHER")
+task.wait(0.1) -- Beri waktu GUI untuk diinisialisasi
+updatePlayerList() 
