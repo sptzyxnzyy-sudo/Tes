@@ -1,17 +1,193 @@
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local PromptService = game:GetService("PromptService") -- Layanan Roblox untuk Prompt Dialog
+local Clipboard = game:GetService("ClipboardService") -- Digunakan untuk Copy Lokasi
 
 local player = Players.LocalPlayer
+local localSavedLocations = {} -- { {Name = "Lokasi 1", CFrame = CFrame.new(x, y, z)}, ... }
+local isAutoTeleporting = false
+local autoTeleportTask = nil
 
--- ** ⬇️ STATUS FITUR CORE ⬇️ **
-local isTetherActive = false 
-local isPromptDestroyerActive = false 
-local tetherTouchConnection = nil
-local promptDestroyerConnection = nil 
-local activeTethers = {} -- Menyimpan weld untuk pemain yang sedang diikat
+-- ** ⬇️ FUNGSI UTILITY GLOBAL ⬇️ **
 
+local function updateButtonStatus(button, isActive, featureName)
+    if not button or not button.Parent then return end
+    local name = featureName or button.Name:gsub("Button", ""):gsub("_", " "):upper()
+    if isActive then
+        button.Text = name .. ": ON"
+        button.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Hijau
+    else
+        button.Text = name .. ": OFF"
+        button.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Merah
+    end
+end
+
+-- 🔽 FUNGSI GUI 🔽
+
+local featureScrollFrame -- Dideklarasikan lebih awal untuk akses global
+
+-- Fungsi untuk mengupdate tampilan list lokasi
+local function updateLocationList()
+    -- Hapus semua elemen lama
+    for _, child in ipairs(featureScrollFrame:GetChildren()) do
+        if child:IsA("Frame") and child.Name == "LocationEntry" then
+            child:Destroy()
+        end
+    end
+
+    local listLayout = featureScrollFrame.FeatureListLayout
+    if not listLayout then return end
+
+    -- Tambahkan lokasi baru
+    for index, data in ipairs(localSavedLocations) do
+        local entryFrame = Instance.new("Frame")
+        entryFrame.Name = "LocationEntry"
+        entryFrame.Size = UDim2.new(1, 0, 0, 40)
+        entryFrame.BackgroundTransparency = 1
+        entryFrame.Parent = featureScrollFrame
+
+        local entryLayout = Instance.new("UIListLayout")
+        entryLayout.FillDirection = Enum.FillDirection.Horizontal
+        entryLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+        entryLayout.Padding = UDim.new(0, 5)
+        entryLayout.Parent = entryFrame
+        
+        -- Text Label (Nama Lokasi)
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Size = UDim2.new(0.5, 0, 1, 0)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = data.Name
+        nameLabel.TextColor3 = Color3.new(1, 1, 1)
+        nameLabel.Font = Enum.Font.Gotham
+        nameLabel.TextSize = 12
+        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        nameLabel.Parent = entryFrame
+
+        -- Tombol Teleport (Individual)
+        local tpButton = Instance.new("TextButton")
+        tpButton.Size = UDim2.new(0.25, 0, 1, 0)
+        tpButton.BackgroundColor3 = Color3.fromRGB(0, 100, 200) -- Biru
+        tpButton.Text = "TP"
+        tpButton.TextColor3 = Color3.new(1, 1, 1)
+        tpButton.Font = Enum.Font.GothamBold
+        tpButton.TextSize = 12
+        tpButton.Parent = entryFrame
+        
+        local tpCorner = Instance.new("UICorner")
+        tpCorner.CornerRadius = UDim.new(0, 5)
+        tpCorner.Parent = tpButton
+        
+        tpButton.MouseButton1Click:Connect(function()
+            local character = player.Character
+            if character and character:FindFirstChild("HumanoidRootPart") then
+                character.HumanoidRootPart.CFrame = data.CFrame
+                print("Teleport ke: " .. data.Name)
+            end
+        end)
+
+        -- Tombol Delete
+        local deleteButton = Instance.new("TextButton")
+        deleteButton.Size = UDim2.new(0.25, 0, 1, 0)
+        deleteButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Merah
+        deleteButton.Text = "DEL"
+        deleteButton.TextColor3 = Color3.new(1, 1, 1)
+        deleteButton.Font = Enum.Font.GothamBold
+        deleteButton.TextSize = 12
+        deleteButton.Parent = entryFrame
+        
+        local delCorner = Instance.new("UICorner")
+        delCorner.CornerRadius = UDim.new(0, 5)
+        delCorner.Parent = deleteButton
+
+        deleteButton.MouseButton1Click:Connect(function()
+            -- Konfirmasi Hapus
+            local confirmed = PromptService:PromptDialog("KONFIRMASI HAPUS", "Hapus lokasi '" .. data.Name .. "'?", "DELETE", "CANCEL")
+            
+            if confirmed == Enum.PromptButton.Button1 then -- DELETE
+                table.remove(localSavedLocations, index)
+                updateLocationList()
+                print("Lokasi dihapus.")
+            else -- CANCEL
+                print("Penghapusan dibatalkan.")
+            end
+        end)
+    end
+    
+    -- Update CanvasSize setelah semua entry ditambahkan
+    featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
+end
+
+-- 🔽 FUNGSI LOKASI & TELEPORT 🔽
+
+local function saveCurrentLocation(button)
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    
+    if root then
+        local locationName = "Lokasi " .. (#localSavedLocations + 1)
+        local cframe = root.CFrame
+        
+        table.insert(localSavedLocations, {Name = locationName, CFrame = cframe})
+        print("Lokasi baru tersimpan: " .. locationName)
+        updateLocationList()
+    else
+        warn("Karakter/RootPart tidak ditemukan.")
+    end
+end
+
+local function toggleAutoTeleport(button)
+    isAutoTeleporting = not isAutoTeleporting
+    updateButtonStatus(button, isAutoTeleporting, "AUTO TP ALL")
+
+    if isAutoTeleporting then
+        autoTeleportTask = task.spawn(function()
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            if not root then
+                warn("Tidak bisa Auto-Teleport: RootPart tidak ditemukan.")
+                isAutoTeleporting = false
+                updateButtonStatus(button, false, "AUTO TP ALL")
+                return
+            end
+            
+            for _, data in ipairs(localSavedLocations) do
+                if not isAutoTeleporting then break end -- Berhenti jika dinonaktifkan
+                
+                print("Auto-Teleport ke: " .. data.Name)
+                root.CFrame = data.CFrame
+                task.wait(1.5) -- Jeda antar teleport
+            end
+            
+            isAutoTeleporting = false
+            updateButtonStatus(button, false, "AUTO TP ALL")
+            print("Auto-Teleport Selesai.")
+        end)
+    else
+        if autoTeleportTask then
+            task.cancel(autoTeleportTask)
+        end
+        print("Auto-Teleport Dibatalkan.")
+    end
+end
+
+local function copyAllLocations()
+    if #localSavedLocations == 0 then
+        print("Tidak ada lokasi yang tersimpan untuk dicopy.")
+        return
+    end
+
+    local locationString = "Saved Locations:\n"
+    for index, data in ipairs(localSavedLocations) do
+        local pos = data.CFrame.p
+        locationString = locationString .. string.format("[%d] %s: (%.3f, %.3f, %.3f)\n", index, data.Name, pos.X, pos.Y, pos.Z)
+    end
+    
+    -- Gunakan ClipboardService
+    pcall(function()
+        Clipboard:Set(locationString)
+        print("Semua lokasi (CFrame) berhasil dicopy ke clipboard.")
+    end)
+end
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -56,8 +232,8 @@ screenGui.Parent = player:WaitForChild("PlayerGui")
 
 -- Frame utama 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 150) 
-frame.Position = UDim2.new(0.4, -110, 0.5, -75) 
+frame.Size = UDim2.new(0, 220, 0, 350) -- Ukuran ditingkatkan untuk menampung banyak tombol
+frame.Position = UDim2.new(0.5, -110, 0.5, -175) 
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -72,181 +248,47 @@ corner.Parent = frame
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
-title.Text = "CORE FEATURES"
+title.Text = "TELEPORT MANAGER"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
--- ScrollingFrame untuk Daftar Pilihan Fitur
-local featureScrollFrame = Instance.new("ScrollingFrame")
-featureScrollFrame.Name = "FeatureList"
-featureScrollFrame.Size = UDim2.new(1, -20, 1, -40)
-featureScrollFrame.Position = UDim2.new(0.5, -100, 0, 35)
-featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-featureScrollFrame.ScrollBarThickness = 6
-featureScrollFrame.BackgroundTransparency = 1
-featureScrollFrame.Parent = frame
+-- ScrollingFrame untuk Daftar Pilihan Fitur (Tombol Utilitas)
+local utilityScrollFrame = Instance.new("ScrollingFrame")
+utilityScrollFrame.Name = "UtilityList"
+utilityScrollFrame.Size = UDim2.new(1, -20, 0, 95) -- Ukuran tetap untuk tombol utilitas
+utilityScrollFrame.Position = UDim2.new(0.5, -100, 0, 35)
+utilityScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+utilityScrollFrame.ScrollBarThickness = 6
+utilityScrollFrame.BackgroundTransparency = 1
+utilityScrollFrame.Parent = frame
 
-local featureListLayout = Instance.new("UIListLayout")
-featureListLayout.Padding = UDim.new(0, 5)
-featureListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-featureListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-featureListLayout.Parent = featureScrollFrame
+local utilityListLayout = Instance.new("UIListLayout")
+utilityListLayout.Padding = UDim.new(0, 5)
+utilityListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+utilityListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+utilityListLayout.Parent = utilityScrollFrame
 
-featureListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, featureListLayout.AbsoluteContentSize.Y + 10)
+utilityListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    utilityScrollFrame.CanvasSize = UDim2.new(0, 0, 0, utilityListLayout.AbsoluteContentSize.Y + 10)
 end)
 
-
--- 🔽 FUNGSI UTILITY GLOBAL 🔽
-
-local function updateButtonStatus(button, isActive, featureName)
-    if not button or not button.Parent then return end
-    local name = featureName or button.Name:gsub("Button", ""):gsub("_", " "):upper()
-    if isActive then
-        button.Text = name .. ": ON"
-        button.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Hijau
-    else
-        button.Text = name .. ": OFF"
-        button.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Merah
-    end
-end
-
-
--- 🔽 FUNGSI PLAYER TETHER (IKAT PEMAIN) 🔽
-
-local function onTetherTouch(otherPart)
-    if not isTetherActive or not otherPart or not otherPart.Parent then return end
-
-    local targetPlayer = Players:GetPlayerFromCharacter(otherPart.Parent)
-    local myRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    local targetRoot = targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-
-    if not myRoot or not targetRoot or targetPlayer == player then return end
-
-    -- Hanya ikat pemain yang belum diikat
-    if not activeTethers[targetPlayer.UserId] then
-        local tetherWeld = Instance.new("WeldConstraint")
-        tetherWeld.Name = "PlayerTetherWeld"
-        tetherWeld.Part0 = myRoot
-        tetherWeld.Part1 = targetRoot
-        tetherWeld.Parent = targetRoot
-        
-        activeTethers[targetPlayer.UserId] = tetherWeld
-        print("Tether Aktif: Mengikat " .. targetPlayer.Name)
-    end
-end
-
-local function releaseAllTethers()
-    for userId, weld in pairs(activeTethers) do
-        if weld and weld.Parent then
-            weld:Destroy()
-        end
-    end
-    activeTethers = {}
-end
-
-local function activateTether(button)
-    if isTetherActive then return end
-    isTetherActive = true
-    
-    local character = player.Character
-    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-    
-    if not rootPart then 
-        warn("HumanoidRootPart tidak ditemukan.")
-        isTetherActive = false
-        updateButtonStatus(button, false, "PLAYER TETHER")
-        return 
-    end
-
-    updateButtonStatus(button, true, "PLAYER TETHER")
-    
-    -- Disconnect koneksi lama sebelum menghubungkan yang baru
-    if tetherTouchConnection then tetherTouchConnection:Disconnect() end
-    tetherTouchConnection = rootPart.Touched:Connect(onTetherTouch)
-    
-    print("Player Tether AKTIF.")
-end
-
-local function deactivateTether(button)
-    if not isTetherActive then return end
-    isTetherActive = false
-    
-    if tetherTouchConnection then
-        tetherTouchConnection:Disconnect()
-        tetherTouchConnection = nil
-    end
-    
-    releaseAllTethers() -- Lepaskan semua ikatan
-    updateButtonStatus(button, false, "PLAYER TETHER")
-    print("Player Tether NONAKTIF.")
-end
-
-
--- 🔽 FUNGSI PROMPT DESTROYER 🔽
-
--- Fungsi yang dijalankan setiap frame untuk menampilkan dialog "PromptService"
-local function promptDestroyerLoop()
-    -- Pastikan fitur aktif
-    if not isPromptDestroyerActive then return end
-    
-    -- Menggunakan pcall untuk menghindari script error jika PromptService memiliki cooldown
-    local success, result = pcall(function()
-        -- Prompter cepat yang mengganggu:
-        PromptService:PromptDialog("WARNING", "RESTART GAME NOW", "OK", "CLOSE") 
-    end)
-    
-    if not success then
-        -- Pesan ini mungkin muncul jika Roblox membatasi frekuensi panggilan PromptDialog
-        -- warn("PromptService call failed (cooldown?): " .. tostring(result))
-    end
-end
-
-local function activatePromptDestroyer(button)
-    if isPromptDestroyerActive then return end
-    isPromptDestroyerActive = true
-    
-    updateButtonStatus(button, true, "PROMPT DESTROYER")
-    
-    -- Hubungkan ke RenderStepped agar loop berjalan secepat mungkin (paling mengganggu)
-    if promptDestroyerConnection then promptDestroyerConnection:Disconnect() end
-    promptDestroyerConnection = RunService.RenderStepped:Connect(promptDestroyerLoop)
-    
-    print("Prompt Destroyer AKTIF.")
-end
-
-local function deactivatePromptDestroyer(button)
-    if not isPromptDestroyerActive then return end
-    isPromptDestroyerActive = false
-    
-    if promptDestroyerConnection then
-        promptDestroyerConnection:Disconnect()
-        promptDestroyerConnection = nil
-    end
-    
-    updateButtonStatus(button, false, "PROMPT DESTROYER")
-    print("Prompt Destroyer NONAKTIF.")
-end
-
-
--- 🔽 FUNGSI PEMBUAT TOMBOL FITUR 🔽
-
-local function makeFeatureButton(name, layoutOrder, color, callback) -- Tambah parameter layoutOrder
+-- Tombol Utilitas (Save, Auto TP, Copy)
+local function makeUtilityButton(name, layoutOrder, color, callback)
     local featButton = Instance.new("TextButton")
     featButton.Name = name:gsub(" ", "") .. "Button"
-    featButton.Size = UDim2.new(0, 180, 0, 40)
+    featButton.Size = UDim2.new(0, 180, 0, 25)
     featButton.BackgroundColor3 = color
     featButton.Text = name
     featButton.TextColor3 = Color3.new(1, 1, 1)
     featButton.Font = Enum.Font.GothamBold
     featButton.TextSize = 12
-    featButton.LayoutOrder = layoutOrder -- Atur urutan tampilan
-    featButton.Parent = featureScrollFrame
+    featButton.LayoutOrder = layoutOrder
+    featButton.Parent = utilityScrollFrame
 
     local featCorner = Instance.new("UICorner")
-    featCorner.CornerRadius = UDim.new(0, 10)
+    featCorner.CornerRadius = UDim.new(0, 8)
     featCorner.Parent = featButton
 
     featButton.MouseButton1Click:Connect(function()
@@ -255,41 +297,42 @@ local function makeFeatureButton(name, layoutOrder, color, callback) -- Tambah p
     return featButton
 end
 
--- 🔽 PENAMBAHAN TOMBOL KE FEATURE LIST 🔽
-
--- Tombol PROMPT DESTROYER (LayoutOrder 1)
-local promptDestroyerButton = makeFeatureButton("PROMPT DESTROYER: OFF", 1, Color3.fromRGB(150, 0, 0), function(button)
-    if isPromptDestroyerActive then
-        deactivatePromptDestroyer(button)
-    else
-        activatePromptDestroyer(button)
-    end
-end)
-
--- Tombol PLAYER TETHER (LayoutOrder 2)
-local tetherButton = makeFeatureButton("PLAYER TETHER: OFF", 2, Color3.fromRGB(150, 0, 0), function(button)
-    if isTetherActive then
-        deactivateTether(button)
-    else
-        activateTether(button)
-    end
-end)
+local saveButton = makeUtilityButton("SAVE LOKASI", 1, Color3.fromRGB(0, 150, 0), saveCurrentLocation)
+local autoTpButton = makeUtilityButton("AUTO TP ALL: OFF", 2, Color3.fromRGB(150, 0, 0), toggleAutoTeleport)
+local copyButton = makeUtilityButton("COPY ALL LOCATIONS", 3, Color3.fromRGB(200, 100, 0), copyAllLocations)
 
 
--- 🔽 LOGIKA CHARACTER ADDED (PENTING UNTUK MEMPERTAHANKAN STATUS) 🔽
+-- ScrollingFrame untuk Daftar Lokasi yang Disimpan
+featureScrollFrame = Instance.new("ScrollingFrame") -- Gunakan variabel global
+featureScrollFrame.Name = "LocationList"
+featureScrollFrame.Size = UDim2.new(1, -20, 1, -150) -- Menyesuaikan dengan frame utama
+featureScrollFrame.Position = UDim2.new(0.5, -100, 0, 135)
+featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+featureScrollFrame.ScrollBarThickness = 6
+featureScrollFrame.BackgroundTransparency = 0.9
+featureScrollFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+featureScrollFrame.Parent = frame
+
+local locationListLayout = Instance.new("UIListLayout")
+locationListLayout.Name = "FeatureListLayout"
+locationListLayout.Padding = UDim.new(0, 5)
+locationListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+locationListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+locationListLayout.Parent = featureScrollFrame
+
+-- 🔽 LOGIKA CHARACTER ADDED 🔽
 player.CharacterAdded:Connect(function(char)
-    -- Pastikan semua ikatan dilepas saat respawn (untuk menghindari error)
-    releaseAllTethers() 
-    
-    -- Pertahankan status Player Tether
-    if isTetherActive then
-        char:WaitForChild("HumanoidRootPart", 5)
-        -- Pastikan menggunakan variabel 'tetherButton' yang sudah didefinisikan
-        if tetherButton and tetherButton.Parent then activateTether(tetherButton) end
+    -- Pastikan status auto teleport dimatikan saat respawn
+    if isAutoTeleporting then
+        isAutoTeleporting = false
+        updateButtonStatus(autoTpButton, false, "AUTO TP ALL")
+        if autoTeleportTask then
+            task.cancel(autoTeleportTask)
+        end
     end
 end)
 
 
--- Atur status awal tombol
-updateButtonStatus(tetherButton, isTetherActive, "PLAYER TETHER")
-updateButtonStatus(promptDestroyerButton, isPromptDestroyerActive, "PROMPT DESTROYER")
+-- Inisialisasi status awal
+updateButtonStatus(autoTpButton, isAutoTeleporting, "AUTO TP ALL")
+updateLocationList()
