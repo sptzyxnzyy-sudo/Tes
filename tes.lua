@@ -7,8 +7,8 @@ local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local PromptService = game:GetService("PromptService") -- Untuk konfirmasi hapus
-local Clipboard = game:GetService("ClipboardService") -- Untuk copy lokasi
+-- PromptService & ClipboardService sering bermasalah di executor.
+-- Kita akan menggunakan fungsi print() sebagai fallback untuk konfirmasi & copy.
 
 local player = Players.LocalPlayer
 
@@ -16,7 +16,7 @@ local player = Players.LocalPlayer
 
 -- Saved Location Feature Data (FITUR SAVE LOKASI)
 local localSavedLocations = {} -- { {Name = "Lokasi 1", CFrame = CFrame.new(x, y, z)}, ... }
-local isAutoTeleportingSaved = false -- Status untuk Auto-Teleporting melalui SAVED locations
+local isAutoTeleportingSaved = false 
 local autoTeleportTask = nil
 local featureScrollFrame -- Reference ke Saved Location List UI
 
@@ -121,23 +121,21 @@ local function updateLocationList()
         delCorner.Parent = deleteButton
 
         deleteButton.MouseButton1Click:Connect(function()
-            local confirmed = PromptService:PromptDialog and PromptService:PromptDialog("KONFIRMASI HAPUS", "Hapus lokasi '" .. data.Name .. "'?", "DELETE", "CANCEL") or Enum.PromptButton.Button1
+            -- Di executor, PromptService sering tidak didukung. Langsung hapus atau gunakan print sebagai notifikasi.
+            -- Karena ini exploit, kita langsung hapus tanpa konfirmasi GUI resmi Roblox.
             
-            if confirmed == Enum.PromptButton.Button1 then
-                localSavedLocations[index] = nil 
-                table.remove(localSavedLocations, index)
-                updateLocationList()
-                print("Lokasi dihapus: " .. data.Name)
-            end
+            localSavedLocations[index] = nil 
+            table.remove(localSavedLocations, index)
+            updateLocationList()
+            print("Lokasi dihapus: " .. data.Name)
+            
         end)
     end
     
     -- Update CanvasSize
-    if listLayout and listLayout.AbsoluteContentSize.Y > 0 then
-        featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
-    else
-        featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-    end
+    -- Perbaikan agar ScrollingFrame menyesuaikan konten
+    local contentSizeY = listLayout.AbsoluteContentSize.Y
+    featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, contentSizeY + 5) -- Tambah padding sedikit
 end
 
 local function saveCurrentLocation()
@@ -170,7 +168,7 @@ local function toggleAutoTeleportSaved(button)
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
             if not root then
-                warn("Tidak bisa Auto-Teleport: RootPart tidak ditemukan.")
+                warn("Tidak bisa Auto-Teleport: RootPart tidak ditemukan. Mematikan fitur.")
                 isAutoTeleportingSaved = false
                 updateButtonStatus(button, false, "AUTO TP SAVED")
                 return
@@ -184,6 +182,7 @@ local function toggleAutoTeleportSaved(button)
                 task.wait(1.5) 
             end
             
+            -- Matikan setelah selesai loop
             isAutoTeleportingSaved = false
             updateButtonStatus(button, false, "AUTO TP SAVED")
             print("Auto-Teleport Selesai.")
@@ -208,10 +207,20 @@ local function copyAllLocations()
         locationString = locationString .. string.format("[%d] %s: CFrame.new(%.3f, %.3f, %.3f)\n", index, data.Name, pos.X, pos.Y, pos.Z)
     end
     
-    pcall(function()
-        Clipboard:Set(locationString)
-        print("Semua lokasi berhasil dicopy ke clipboard.")
+    -- Menggunakan setclipboard() global yang sering disediakan oleh executor
+    local success = pcall(function()
+        if type(setclipboard) == "function" then
+            setclipboard(locationString)
+        elseif game:GetService("ClipboardService") then -- Fallback ke Roblox service
+            game:GetService("ClipboardService"):Set(locationString)
+        end
     end)
+
+    if success then
+        print("Semua lokasi berhasil dicopy ke clipboard.")
+    else
+        print("Gagal menyalin. Output string: \n" .. locationString)
+    end
 end
 
 -- 🔽 FUNGSI TELEPORT ID/SERVER (FITUR 3) 🔽
@@ -229,14 +238,8 @@ local function teleportToID()
 
     if serverIdText and serverIdText ~= "" then
         print("Mencoba Teleport ke Server: " .. serverIdText .. " di Place ID: " .. placeId)
-        local success, result = pcall(function()
-            TeleportService:TeleportToPlaceInstance(placeId, serverIdText, player)
-        end)
-
-        if not success then
-             print("Gagal Teleport ke Server ID. Mencoba Teleport standar...")
-             TeleportService:Teleport(placeId, player)
-        end
+        -- TeleportToPlaceInstance sering digunakan untuk server VIP/Private.
+        TeleportService:TeleportToPlaceInstance(placeId, serverIdText, player)
     else
         print("Mencoba Teleport standar ke Place ID: " .. placeId)
         TeleportService:Teleport(placeId, player)
@@ -253,6 +256,9 @@ local function teleportTo(pos)
 end
 
 local function autoFarmLoop()
+    -- Pastikan fitur berjalan
+    if not teleportingSummit then return end
+    
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then
@@ -279,9 +285,7 @@ local function autoFarmLoop()
         print("Auto Farm: Rejoining menggunakan Place ID: " .. placeId)
         
         if serverIdText and serverIdText ~= "" then
-            pcall(function()
-                TeleportService:TeleportToPlaceInstance(placeId, serverIdText, player)
-            end)
+            TeleportService:TeleportToPlaceInstance(placeId, serverIdText, player)
         else
             TeleportService:Teleport(placeId, player)
         end
@@ -290,6 +294,8 @@ local function autoFarmLoop()
         print("Auto Farm: Rejoining menggunakan game.PlaceId (Input ID tidak valid)")
         TeleportService:Teleport(game.PlaceId, player) 
     end
+    
+    -- Note: Teleport akan menghentikan skrip dan loop ini.
 end
 
 local function toggleAutoFarm(state)
@@ -305,6 +311,8 @@ local function toggleAutoFarm(state)
         buttonSummit.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
         task.spawn(autoFarmLoop)
     else
+        -- Mematikan fitur ini di tengah jalan tidak menghentikan TeleportService:Teleport, 
+        -- hanya mengubah status GUI.
         buttonSummit.Text = "SUMMIT"
         buttonSummit.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     end
@@ -533,7 +541,6 @@ featureScrollFrame = Instance.new("ScrollingFrame")
 featureScrollFrame.Name = "LocationList"
 featureScrollFrame.Size = UDim2.new(1, -20, 1, -330) 
 featureScrollFrame.Position = UDim2.new(0.5, -100, 0, 320)
-featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 featureScrollFrame.ScrollBarThickness = 6
 featureScrollFrame.BackgroundTransparency = 0.9
 featureScrollFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
@@ -546,12 +553,10 @@ locationListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 locationListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 locationListLayout.Parent = featureScrollFrame
 
+-- PENTING: Koneksi ulang agar CanvasSize selalu di-update
 locationListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    if locationListLayout.AbsoluteContentSize.Y > 0 then
-        featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, locationListLayout.AbsoluteContentSize.Y)
-    else
-        featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-    end
+    local contentSizeY = locationListLayout.AbsoluteContentSize.Y
+    featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, contentSizeY + 5)
 end)
 
 -- 🔽 LOGIKA STATUS AWAL 🔽
