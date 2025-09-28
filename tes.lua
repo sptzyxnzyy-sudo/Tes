@@ -11,9 +11,9 @@ local localSavedLocations = {} -- { {Name = "Lokasi 1", CFrame = CFrame.new(x, y
 local isAutoTeleporting = false
 local autoTeleportTask = nil
 
-local featureScrollFrame -- Dideklarasikan lebih awal untuk akses global dari updateLocationList
+local featureScrollFrame -- Dideklarasikan lebih awal
 
--- ** ⬇️ FUNGSI UTILITY GLOBAL ⬇️ **
+-- 🔽 FUNGSI UTILITY GLOBAL 🔽
 
 local function updateButtonStatus(button, isActive, featureName)
     if not button or not button.Parent then return end
@@ -27,11 +27,11 @@ local function updateButtonStatus(button, isActive, featureName)
     end
 end
 
--- 🔽 FUNGSI GUI 🔽
+-- 🔽 FUNGSI GUI LIST LOKASI 🔽
 
 -- Fungsi untuk mengupdate tampilan list lokasi
 local function updateLocationList()
-    -- Hapus semua elemen lama
+    -- Hapus semua elemen lama di ScrollingFrame
     for _, child in ipairs(featureScrollFrame:GetChildren()) do
         if child:IsA("Frame") and child.Name == "LocationEntry" then
             child:Destroy()
@@ -80,7 +80,6 @@ local function updateLocationList()
         tpCorner.CornerRadius = UDim.new(0, 5)
         tpCorner.Parent = tpButton
         
-        -- Karena list akan di-render ulang, gunakan data dari 'data'
         tpButton.MouseButton1Click:Connect(function()
             local character = player.Character
             if character and character:FindFirstChild("HumanoidRootPart") then
@@ -103,33 +102,21 @@ local function updateLocationList()
         delCorner.CornerRadius = UDim.new(0, 5)
         delCorner.Parent = deleteButton
 
-        -- Koneksi untuk Delete
         deleteButton.MouseButton1Click:Connect(function()
             -- Konfirmasi Hapus
             local confirmed = PromptService:PromptDialog("KONFIRMASI HAPUS", "Hapus lokasi '" .. data.Name .. "'?", "DELETE", "CANCEL")
             
             if confirmed == Enum.PromptButton.Button1 then -- DELETE
-                -- Cari dan hapus lokasi berdasarkan CFrame untuk keandalan
-                local foundIndex = nil
-                for i, loc in ipairs(localSavedLocations) do
-                    if loc.CFrame == data.CFrame then
-                        foundIndex = i
-                        break
-                    end
-                end
-                
-                if foundIndex then
-                    table.remove(localSavedLocations, foundIndex)
-                    updateLocationList()
-                    print("Lokasi dihapus: " .. data.Name)
-                end
-            else -- CANCEL
-                print("Penghapusan dibatalkan.")
+                -- Hapus item dari tabel
+                localSavedLocations[index] = nil 
+                table.remove(localSavedLocations, index)
+                updateLocationList()
+                print("Lokasi dihapus: " .. data.Name)
             end
         end)
     end
     
-    -- Update CanvasSize setelah semua entry ditambahkan
+    -- Update CanvasSize
     featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
 end
 
@@ -195,16 +182,15 @@ local function copyAllLocations()
     local locationString = "Saved Locations (CFrame):\n"
     for index, data in ipairs(localSavedLocations) do
         local pos = data.CFrame.p
-        -- Format CFrame menjadi string yang mudah dibaca/digunakan
         locationString = locationString .. string.format("[%d] %s: CFrame.new(%.3f, %.3f, %.3f)\n", index, data.Name, pos.X, pos.Y, pos.Z)
     end
     
-    -- Gunakan ClipboardService
     pcall(function()
         Clipboard:Set(locationString)
         print("Semua lokasi berhasil dicopy ke clipboard.")
     end)
 end
+
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -247,9 +233,9 @@ screenGui.Name = "CoreFeaturesGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Frame utama 
+-- Frame utama (Disesuaikan untuk fitur baru)
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 350) -- Ukuran ditingkatkan untuk menampung list
+frame.Size = UDim2.new(0, 220, 0, 350) -- Ukuran diperluas untuk List Lokasi
 frame.Position = UDim2.new(0.5, -110, 0.5, -175) 
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
@@ -265,16 +251,16 @@ corner.Parent = frame
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
-title.Text = "TELEPORT MANAGER"
+title.Text = "TELEPORT MANAGER" -- Judul diubah
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
--- ScrollingFrame untuk Daftar Pilihan Fitur (Tombol Utilitas)
+-- ScrollingFrame untuk Daftar Pilihan Fitur (Utilitas: Save, Auto TP, Copy)
 local utilityScrollFrame = Instance.new("ScrollingFrame")
 utilityScrollFrame.Name = "UtilityList"
-utilityScrollFrame.Size = UDim2.new(1, -20, 0, 95) -- Ukuran tetap untuk tombol utilitas
+utilityScrollFrame.Size = UDim2.new(1, -20, 0, 95) 
 utilityScrollFrame.Position = UDim2.new(0.5, -100, 0, 35)
 utilityScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 utilityScrollFrame.ScrollBarThickness = 6
@@ -291,7 +277,7 @@ utilityListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(functi
     utilityScrollFrame.CanvasSize = UDim2.new(0, 0, 0, utilityListLayout.AbsoluteContentSize.Y + 10)
 end)
 
--- Tombol Utilitas (Save, Auto TP, Copy)
+-- Fungsi pembuat tombol untuk utilitas
 local function makeUtilityButton(name, layoutOrder, color, callback)
     local featButton = Instance.new("TextButton")
     featButton.Name = name:gsub(" ", "") .. "Button"
@@ -314,15 +300,16 @@ local function makeUtilityButton(name, layoutOrder, color, callback)
     return featButton
 end
 
+-- Tombol Utilitas (LayoutOrder memastikan urutan)
 local saveButton = makeUtilityButton("SAVE LOKASI", 1, Color3.fromRGB(0, 150, 0), saveCurrentLocation)
 local autoTpButton = makeUtilityButton("AUTO TP ALL: OFF", 2, Color3.fromRGB(150, 0, 0), toggleAutoTeleport)
 local copyButton = makeUtilityButton("COPY ALL LOCATIONS", 3, Color3.fromRGB(200, 100, 0), copyAllLocations)
 
 
--- ScrollingFrame untuk Daftar Lokasi yang Disimpan
-featureScrollFrame = Instance.new("ScrollingFrame") -- Gunakan variabel global
+-- ScrollingFrame untuk Daftar Lokasi yang Disimpan (Menggantikan featureScrollFrame lama)
+featureScrollFrame = Instance.new("ScrollingFrame") -- Menimpa definisi featureScrollFrame lama
 featureScrollFrame.Name = "LocationList"
-featureScrollFrame.Size = UDim2.new(1, -20, 1, -150) -- Menyesuaikan dengan frame utama
+featureScrollFrame.Size = UDim2.new(1, -20, 1, -150) 
 featureScrollFrame.Position = UDim2.new(0.5, -100, 0, 135)
 featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 featureScrollFrame.ScrollBarThickness = 6
@@ -337,9 +324,10 @@ locationListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 locationListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 locationListLayout.Parent = featureScrollFrame
 
+
 -- 🔽 LOGIKA CHARACTER ADDED 🔽
 player.CharacterAdded:Connect(function(char)
-    -- Pastikan status auto teleport dimatikan saat respawn
+    -- Matikan status auto teleport saat respawn
     if isAutoTeleporting then
         isAutoTeleporting = false
         if autoTpButton and autoTpButton.Parent then
@@ -352,6 +340,6 @@ player.CharacterAdded:Connect(function(char)
 end)
 
 
--- Inisialisasi status awal
+-- Atur status awal tombol dan list
 updateButtonStatus(autoTpButton, isAutoTeleporting, "AUTO TP ALL")
 updateLocationList()
