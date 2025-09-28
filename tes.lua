@@ -240,16 +240,10 @@ local function forcePlayerRespawn(targetPlayer)
     local char = targetPlayer.Character
     local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 
-    -- ** Ini adalah fungsi sisi klien yang mencoba memicu respawn.
-    -- ** Di lingkungan Roblox standar, ini HANYA akan bekerja jika server
-    -- ** telah mengekspos RemoteEvent untuk fungsi ini.
-    -- ** Namun, dalam konteks Executor, ini bisa bekerja:
+    -- ** PERHATIAN: Baris ini hanya akan berfungsi di lingkungan Exploit/Executor **
     if humanoid then
-        humanoid.Health = 0 -- Mematikan pemain
+        humanoid.Health = 0 -- Mencoba mematikan pemain
         print("Mencoba mematikan: " .. targetPlayer.Name)
-        
-        -- Opsi lain (hanya akan berfungsi di lingkungan Executor/Server-side):
-        -- targetPlayer:LoadCharacter() 
     else
         warn("Gagal mematikan: Humanoid tidak ditemukan untuk " .. targetPlayer.Name)
     end
@@ -375,4 +369,4 @@ end)
 -- Inisialisasi: Atur status awal tombol dan daftar pemain
 updateButtonStatus(tetherButton, isTetherActive, "PLAYER TETHER")
 task.wait(0.1) -- Beri waktu GUI untuk diinisialisasi
-updatePlayerList() 
+updatePlayerList()
