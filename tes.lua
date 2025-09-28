@@ -5,14 +5,9 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
 -- ** ⬇️ STATUS FITUR CORE ⬇️ **
-local isShakerActive = false -- Ganti isTetherActive menjadi isShakerActive
-local shakerTouchConnection = nil
-local activeShakes = {} -- Menyimpan tween untuk part yang sedang digoyangkan
+local isDestroyerActive = false -- Ganti isShakerActive menjadi isDestroyerActive
+local destroyerTouchConnection = nil
 
--- Konstanta Goyang
-local SHAKE_DURATION = 0.1 -- Durasi setiap siklus goyang
-local SHAKE_MAGNITUDE = 0.5 -- Besarnya pergeseran goyang (dalam stud)
-local SHAKE_CYCLES = 10 -- Jumlah siklus goyang per sentuhan
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -115,70 +110,20 @@ local function updateButtonStatus(button, isActive, featureName)
 end
 
 
--- 🔽 FUNGSI PART SHAKER BARU (GOYANG PART SAAT SENTUH) 🔽
+-- 🔽 FUNGSI PART PROMPT DESTROYER BARU 🔽
 
-local function startShake(part)
-    if not part or activeShakes[part] then return end
+local function onPartDestroyerTouch(otherPart)
+    if not isDestroyerActive or not otherPart or not otherPart.Parent then return end
 
-    local originalCFrame = part.CFrame
-    local currentCycles = 0
-    local isShaking = true
-    
-    activeShakes[part] = isShaking -- Tandai part sedang digoyangkan
-
-    local function performShake()
-        if not part.Parent or currentCycles >= SHAKE_CYCLES or not isShaking then
-            activeShakes[part] = nil -- Hapus dari daftar aktif
-            if part.Parent then
-                -- Pastikan part kembali ke posisi semula
-                part.CFrame = originalCFrame 
-            end
-            return
-        end
-
-        currentCycles = currentCycles + 1
-        
-        -- Goyang ke arah acak (sedikit ke samping)
-        local randomVector = Vector3.new(math.random() * 2 - 1, math.random() * 2 - 1, math.random() * 2 - 1) * SHAKE_MAGNITUDE
-        local targetCFrame = originalCFrame * CFrame.new(randomVector)
-        
-        local tweenInfo = TweenInfo.new(SHAKE_DURATION, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
-        local tween = TweenService:Create(part, tweenInfo, {CFrame = targetCFrame})
-
-        tween.Completed:Connect(function()
-            -- Kembali ke posisi semula (atau lakukan siklus berikutnya)
-            if part.Parent and currentCycles < SHAKE_CYCLES and isShaking then
-                local resetTween = TweenService:Create(part, tweenInfo, {CFrame = originalCFrame})
-                resetTween.Completed:Wait() -- Tunggu sebentar untuk efek goyang
-                performShake()
-            else
-                activeShakes[part] = nil
-                if part.Parent then
-                    part.CFrame = originalCFrame 
-                end
-            end
-        end)
-        tween:Play()
-    end
-
-    performShake()
-end
-
-local function onShakerTouch(otherPart)
-    if not isShakerActive or not otherPart or not otherPart.Parent then return end
-
-    -- Mendapatkan Humanoid Root Part dari karakter kita sendiri untuk koneksi Touched
-    local myRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    
     -- Pastikan bagian yang disentuh BUKAN bagian dari karakter kita sendiri
-    if otherPart.Parent:FindFirstChildOfClass("Humanoid") and otherPart.Parent == player.Character then 
+    local char = player.Character
+    if char and otherPart.Parent == char then 
         return 
     end
 
-    -- Target adalah part yang disentuh (atau model/karakter lain)
     local targetPart = otherPart
     
-    -- Cek apakah target memiliki Prompt (misalnya ProximityPrompt) di dalamnya atau di induknya
+    -- Cek apakah target memiliki Prompt (misalnya ProximityPrompt) di dalamnya
     local hasPrompt = targetPart:FindFirstChildOfClass("ProximityPrompt")
     if not hasPrompt then
         -- Cek di model induknya
@@ -187,50 +132,50 @@ local function onShakerTouch(otherPart)
         end
     end
 
-    -- Hanya goyangkan jika part tersebut atau induknya memiliki ProximityPrompt DAN itu adalah BasePart yang dapat digoyangkan
-    if hasPrompt and targetPart:IsA("BasePart") and targetPart.Anchored == false then
-        if not activeShakes[targetPart] then
-            startShake(targetPart)
-            print("Part Shaker Aktif: Menggoyangkan " .. targetPart.Name)
-        end
+    -- Hanya hilangkan jika part tersebut atau induknya memiliki ProximityPrompt DAN itu adalah BasePart
+    if hasPrompt and targetPart:IsA("BasePart") then
+        -- ** PERHATIAN: Ini adalah aksi sisi klien (LocalScript) **
+        -- ** Part ini akan hilang HANYA di layar Anda, tetapi TIDAK di layar pemain lain (karena FE). **
+        
+        targetPart:Destroy()
+        print("Prompt Destroyer Aktif: Menghilangkan part bernama " .. targetPart.Name .. " (Hanya di layar Anda)")
     end
 end
 
-local function activateShaker(button)
-    if isShakerActive then return end
-    isShakerActive = true
+local function activateDestroyer(button)
+    if isDestroyerActive then return end
+    isDestroyerActive = true
     
     local character = player.Character
     local rootPart = character and character:FindFirstChild("HumanoidRootPart")
     
     if not rootPart then 
         warn("HumanoidRootPart tidak ditemukan.")
-        isShakerActive = false
-        updateButtonStatus(button, false, "PART SHAKER")
+        isDestroyerActive = false
+        updateButtonStatus(button, false, "PROMPT DESTROYER")
         return 
     end
 
-    updateButtonStatus(button, true, "PART SHAKER")
+    updateButtonStatus(button, true, "PROMPT DESTROYER")
     
     -- Hubungkan event Touched ke HumanoidRootPart pemain
-    if shakerTouchConnection then shakerTouchConnection:Disconnect() end
-    shakerTouchConnection = rootPart.Touched:Connect(onShakerTouch)
+    if destroyerTouchConnection then destroyerTouchConnection:Disconnect() end
+    destroyerTouchConnection = rootPart.Touched:Connect(onPartDestroyerTouch)
     
-    print("Part Shaker AKTIF.")
+    print("Prompt Destroyer AKTIF.")
 end
 
-local function deactivateShaker(button)
-    if not isShakerActive then return end
-    isShakerActive = false
+local function deactivateDestroyer(button)
+    if not isDestroyerActive then return end
+    isDestroyerActive = false
     
-    if shakerTouchConnection then
-        shakerTouchConnection:Disconnect()
-        shakerTouchConnection = nil
+    if destroyerTouchConnection then
+        destroyerTouchConnection:Disconnect()
+        destroyerTouchConnection = nil
     end
     
-    -- Tidak perlu fungsi releaseAllTethers lagi
-    updateButtonStatus(button, false, "PART SHAKER")
-    print("Part Shaker NONAKTIF.")
+    updateButtonStatus(button, false, "PROMPT DESTROYER")
+    print("Prompt Destroyer NONAKTIF.")
 end
 
 
@@ -259,12 +204,12 @@ end
 
 -- 🔽 PENAMBAHAN TOMBOL KE FEATURE LIST 🔽
 
--- Tombol PART SHAKER BARU
-local shakerButton = makeFeatureButton("PART SHAKER: OFF", Color3.fromRGB(150, 0, 0), function(button)
-    if isShakerActive then
-        deactivateShaker(button)
+-- Tombol PROMPT DESTROYER BARU
+local destroyerButton = makeFeatureButton("PROMPT DESTROYER: OFF", Color3.fromRGB(150, 0, 0), function(button)
+    if isDestroyerActive then
+        deactivateDestroyer(button)
     else
-        activateShaker(button)
+        activateDestroyer(button)
     end
 end)
 
@@ -272,16 +217,16 @@ end)
 -- 🔽 LOGIKA CHARACTER ADDED (PENTING UNTUK MEMPERTAHANKAN STATUS) 🔽
 player.CharacterAdded:Connect(function(char)
     -- Lakukan deactivate untuk membersihkan koneksi lama (jika ada)
-    deactivateShaker(shakerButton)
+    deactivateDestroyer(destroyerButton)
     
-    -- Pertahankan status Part Shaker
-    if isShakerActive then
+    -- Pertahankan status Destroyer
+    if isDestroyerActive then
         char:WaitForChild("HumanoidRootPart", 5)
-        local button = featureScrollFrame:FindFirstChild("PartShakerButton")
-        if button then activateShaker(button) end
+        local button = featureScrollFrame:FindFirstChild("PromptDestroyerButton")
+        if button then activateDestroyer(button) end
     end
 end)
 
 
 -- Atur status awal tombol
-updateButtonStatus(shakerButton, isShakerActive, "PART SHAKER")
+updateButtonStatus(destroyerButton, isDestroyerActive, "PROMPT DESTROYER")
