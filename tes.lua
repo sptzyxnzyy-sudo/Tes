@@ -1,15 +1,15 @@
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local PromptService = game:GetService("PromptService") -- Tambahkan layanan PromptService
+local PromptService = game:GetService("PromptService") -- Layanan Roblox untuk Prompt Dialog
 
 local player = Players.LocalPlayer
 
 -- ** ⬇️ STATUS FITUR CORE ⬇️ **
 local isTetherActive = false 
-local isPromptDestroyerActive = false -- Status baru untuk Prompt Destroyer
+local isPromptDestroyerActive = false 
 local tetherTouchConnection = nil
-local promptDestroyerConnection = nil -- Koneksi untuk Prompt Destroyer
+local promptDestroyerConnection = nil 
 local activeTethers = {} -- Menyimpan weld untuk pemain yang sedang diikat
 
 
@@ -54,10 +54,10 @@ screenGui.Name = "CoreFeaturesGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Frame utama (Disesuaikan untuk 2 tombol)
+-- Frame utama 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 150) -- Ditingkatkan ukurannya
-frame.Position = UDim2.new(0.4, -110, 0.5, -75) -- Disesuaikan agar tetap di tengah
+frame.Size = UDim2.new(0, 220, 0, 150) 
+frame.Position = UDim2.new(0.4, -110, 0.5, -75) 
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -163,6 +163,7 @@ local function activateTether(button)
 
     updateButtonStatus(button, true, "PLAYER TETHER")
     
+    -- Disconnect koneksi lama sebelum menghubungkan yang baru
     if tetherTouchConnection then tetherTouchConnection:Disconnect() end
     tetherTouchConnection = rootPart.Touched:Connect(onTetherTouch)
     
@@ -183,24 +184,23 @@ local function deactivateTether(button)
     print("Player Tether NONAKTIF.")
 end
 
----
----
+
 -- 🔽 FUNGSI PROMPT DESTROYER 🔽
+
 -- Fungsi yang dijalankan setiap frame untuk menampilkan dialog "PromptService"
-local function promptDestroyerLoop(deltaTime)
+local function promptDestroyerLoop()
     -- Pastikan fitur aktif
     if not isPromptDestroyerActive then return end
     
-    -- Gunakan dialog yang cepat muncul dan mengganggu
-    -- Menggunakan `PromptService:PromptDialog(Title, Message, Button1, Button2)`
-    -- Catatan: Fungsi ini mungkin memiliki batasan frekuensi/cooldown dari Roblox.
+    -- Menggunakan pcall untuk menghindari script error jika PromptService memiliki cooldown
     local success, result = pcall(function()
-        PromptService:PromptDialog("WARNING", "LAG", "OK", "CANCEL") 
-        -- Prompter yang sangat cepat dapat mengganggu sesi pemain
+        -- Prompter cepat yang mengganggu:
+        PromptService:PromptDialog("WARNING", "RESTART GAME NOW", "OK", "CLOSE") 
     end)
     
     if not success then
-        warn("PromptService call failed (cooldown?): " .. tostring(result))
+        -- Pesan ini mungkin muncul jika Roblox membatasi frekuensi panggilan PromptDialog
+        -- warn("PromptService call failed (cooldown?): " .. tostring(result))
     end
 end
 
@@ -210,9 +210,8 @@ local function activatePromptDestroyer(button)
     
     updateButtonStatus(button, true, "PROMPT DESTROYER")
     
-    -- Hubungkan fungsi loop ke RunService.RenderStepped atau Heartbeat
+    -- Hubungkan ke RenderStepped agar loop berjalan secepat mungkin (paling mengganggu)
     if promptDestroyerConnection then promptDestroyerConnection:Disconnect() end
-    -- Gunakan RenderStepped agar lebih cepat
     promptDestroyerConnection = RunService.RenderStepped:Connect(promptDestroyerLoop)
     
     print("Prompt Destroyer AKTIF.")
@@ -231,12 +230,10 @@ local function deactivatePromptDestroyer(button)
     print("Prompt Destroyer NONAKTIF.")
 end
 
----
----
 
 -- 🔽 FUNGSI PEMBUAT TOMBOL FITUR 🔽
 
-local function makeFeatureButton(name, color, callback)
+local function makeFeatureButton(name, layoutOrder, color, callback) -- Tambah parameter layoutOrder
     local featButton = Instance.new("TextButton")
     featButton.Name = name:gsub(" ", "") .. "Button"
     featButton.Size = UDim2.new(0, 180, 0, 40)
@@ -245,6 +242,7 @@ local function makeFeatureButton(name, color, callback)
     featButton.TextColor3 = Color3.new(1, 1, 1)
     featButton.Font = Enum.Font.GothamBold
     featButton.TextSize = 12
+    featButton.LayoutOrder = layoutOrder -- Atur urutan tampilan
     featButton.Parent = featureScrollFrame
 
     local featCorner = Instance.new("UICorner")
@@ -259,21 +257,21 @@ end
 
 -- 🔽 PENAMBAHAN TOMBOL KE FEATURE LIST 🔽
 
--- Tombol PLAYER TETHER
-local tetherButton = makeFeatureButton("PLAYER TETHER: OFF", Color3.fromRGB(150, 0, 0), function(button)
-    if isTetherActive then
-        deactivateTether(button)
-    else
-        activateTether(button)
-    end
-end)
-
--- Tombol PROMPT DESTROYER (BARU)
-local promptDestroyerButton = makeFeatureButton("PROMPT DESTROYER: OFF", Color3.fromRGB(150, 0, 0), function(button)
+-- Tombol PROMPT DESTROYER (LayoutOrder 1)
+local promptDestroyerButton = makeFeatureButton("PROMPT DESTROYER: OFF", 1, Color3.fromRGB(150, 0, 0), function(button)
     if isPromptDestroyerActive then
         deactivatePromptDestroyer(button)
     else
         activatePromptDestroyer(button)
+    end
+end)
+
+-- Tombol PLAYER TETHER (LayoutOrder 2)
+local tetherButton = makeFeatureButton("PLAYER TETHER: OFF", 2, Color3.fromRGB(150, 0, 0), function(button)
+    if isTetherActive then
+        deactivateTether(button)
+    else
+        activateTether(button)
     end
 end)
 
@@ -286,12 +284,9 @@ player.CharacterAdded:Connect(function(char)
     -- Pertahankan status Player Tether
     if isTetherActive then
         char:WaitForChild("HumanoidRootPart", 5)
-        local button = featureScrollFrame:FindFirstChild("PlayerTetherButton")
-        if button then activateTether(button) end
+        -- Pastikan menggunakan variabel 'tetherButton' yang sudah didefinisikan
+        if tetherButton and tetherButton.Parent then activateTether(tetherButton) end
     end
-    
-    -- Tidak perlu mempertahankan status Prompt Destroyer saat respawn,
-    -- karena tidak bergantung pada Character.
 end)
 
 
