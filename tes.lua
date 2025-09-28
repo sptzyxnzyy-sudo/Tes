@@ -14,17 +14,17 @@ local player = Players.LocalPlayer
 
 -- ** ⬇️ CORE STATUS & DATA ⬇️ **
 
--- Saved Location Feature Data (FITUR BARU)
+-- Saved Location Feature Data (FITUR SAVE LOKASI)
 local localSavedLocations = {} -- { {Name = "Lokasi 1", CFrame = CFrame.new(x, y, z)}, ... }
 local isAutoTeleportingSaved = false -- Status untuk Auto-Teleporting melalui SAVED locations
 local autoTeleportTask = nil
 local featureScrollFrame -- Reference ke Saved Location List UI
 
--- Teleport ID Input References
+-- Teleport ID Input References (FITUR 3)
 local teleportIdInput = nil 
 local serverIdInput = nil 
 
--- Auto Farm Status (Feature 1)
+-- Auto Farm Status (FITUR 1)
 local position1 = Vector3.new(625.27, 1799.83, 3432.84)
 local position2 = Vector3.new(780.47, 2183.38, 3945.07)
 local teleportingSummit = false 
@@ -214,7 +214,7 @@ local function copyAllLocations()
     end)
 end
 
--- 🔽 FUNGSI TELEPORT ID/SERVER 🔽
+-- 🔽 FUNGSI TELEPORT ID/SERVER (FITUR 3) 🔽
 
 local function teleportToID()
     local placeIdText = teleportIdInput and teleportIdInput.Text
@@ -243,7 +243,7 @@ local function teleportToID()
     end
 end
 
--- 🔽 AUTO FARM SYSTEM (Tombol SUMMIT) - DIHUBUNGKAN KE TELEPORT ID 🔽
+-- 🔽 AUTO FARM SYSTEM (Tombol SUMMIT - FITUR 1) - DIHUBUNGKAN KE TELEPORT ID 🔽
 
 local function teleportTo(pos)
     local char = player.Character
@@ -286,7 +286,7 @@ local function autoFarmLoop()
             TeleportService:Teleport(placeId, player)
         end
     else
-        -- Fallback
+        -- Fallback ke game.PlaceId jika input ID tidak valid
         print("Auto Farm: Rejoining menggunakan game.PlaceId (Input ID tidak valid)")
         TeleportService:Teleport(game.PlaceId, player) 
     end
@@ -310,7 +310,7 @@ local function toggleAutoFarm(state)
     end
 end
 
--- 🔽 ANIMASI "BY : Xraxor" 🔽
+-- 🔽 ANIMASI "BY : Xraxor" (FITUR 4) 🔽
 do
     local introGui = Instance.new("ScreenGui")
     introGui.Name = "IntroAnimation"
@@ -467,7 +467,7 @@ tpExecuteCorner.Parent = tpExecuteButton
 tpExecuteButton.MouseButton1Click:Connect(teleportToID)
 
 
--- 🔽 KELOMPOK SAVE LOKASI & UTILITY (Fitur Save Lama) 🔽
+-- 🔽 KELOMPOK SAVE LOKASI & UTILITY (Fitur Save) 🔽
 
 local saveTitle = Instance.new("TextLabel")
 saveTitle.Size = UDim2.new(1, -20, 0, 20)
