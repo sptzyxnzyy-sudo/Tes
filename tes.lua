@@ -1,25 +1,16 @@
--- credit: Xraxor1 (Original GUI/Intro structure)
--- Modification: Added Prompt Destroyer feature for global manipulation.
-
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage") 
-
--- 🚨 GANTI INI 🚨: Anda harus menemukan RemoteEvent yang rentan di game target 
--- yang menerima Part sebagai argumen dan menghancurkannya.
-local PromptDestroyerRemote = ReplicatedStorage:FindFirstChild("RemoteEventRentanyangAdayangBisaDigunakan") 
+local PromptService = game:GetService("PromptService") -- Tambahkan layanan PromptService
 
 local player = Players.LocalPlayer
 
 -- ** ⬇️ STATUS FITUR CORE ⬇️ **
 local isTetherActive = false 
+local isPromptDestroyerActive = false -- Status baru untuk Prompt Destroyer
 local tetherTouchConnection = nil
-local activeTethers = {} 
-
--- ** STATUS PROMPT DESTROYER **
-local isDestroyerActive = false
-local destroyerTouchConnection = nil
+local promptDestroyerConnection = nil -- Koneksi untuk Prompt Destroyer
+local activeTethers = {} -- Menyimpan weld untuk pemain yang sedang diikat
 
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
@@ -63,9 +54,10 @@ screenGui.Name = "CoreFeaturesGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
+-- Frame utama (Disesuaikan untuk 2 tombol)
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 150) 
-frame.Position = UDim2.new(0.4, -110, 0.5, -75) 
+frame.Size = UDim2.new(0, 220, 0, 150) -- Ditingkatkan ukurannya
+frame.Position = UDim2.new(0.4, -110, 0.5, -75) -- Disesuaikan agar tetap di tengah
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -76,6 +68,7 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 15)
 corner.Parent = frame
 
+-- Judul GUI
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
@@ -85,6 +78,7 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
+-- ScrollingFrame untuk Daftar Pilihan Fitur
 local featureScrollFrame = Instance.new("ScrollingFrame")
 featureScrollFrame.Name = "FeatureList"
 featureScrollFrame.Size = UDim2.new(1, -20, 1, -40)
@@ -120,7 +114,7 @@ local function updateButtonStatus(button, isActive, featureName)
 end
 
 
--- 🔽 FUNGSI PLAYER TETHER 🔽
+-- 🔽 FUNGSI PLAYER TETHER (IKAT PEMAIN) 🔽
 
 local function onTetherTouch(otherPart)
     if not isTetherActive or not otherPart or not otherPart.Parent then return end
@@ -131,6 +125,7 @@ local function onTetherTouch(otherPart)
 
     if not myRoot or not targetRoot or targetPlayer == player then return end
 
+    -- Hanya ikat pemain yang belum diikat
     if not activeTethers[targetPlayer.UserId] then
         local tetherWeld = Instance.new("WeldConstraint")
         tetherWeld.Name = "PlayerTetherWeld"
@@ -183,86 +178,61 @@ local function deactivateTether(button)
         tetherTouchConnection = nil
     end
     
-    releaseAllTethers()
+    releaseAllTethers() -- Lepaskan semua ikatan
     updateButtonStatus(button, false, "PLAYER TETHER")
     print("Player Tether NONAKTIF.")
 end
 
-
+---
+---
 -- 🔽 FUNGSI PROMPT DESTROYER 🔽
-
-local function onPartDestroyerTouch(otherPart)
-    if not isDestroyerActive or not otherPart or not otherPart.Parent then return end
-
-    local char = player.Character
-    local targetModel = otherPart.Parent
+-- Fungsi yang dijalankan setiap frame untuk menampilkan dialog "PromptService"
+local function promptDestroyerLoop(deltaTime)
+    -- Pastikan fitur aktif
+    if not isPromptDestroyerActive then return end
     
-    -- Logika Sentuh: Abaikan karakter pemain (Anda atau pemain lain)
-    local isTouchingMyCharacter = char and (targetModel == char or targetModel.Parent == char)
-    local isTouchingOtherPlayer = Players:GetPlayerFromCharacter(targetModel) or 
-                                  (targetModel.Parent and Players:GetPlayerFromCharacter(targetModel.Parent))
-
-    if isTouchingMyCharacter or isTouchingOtherPlayer then
-        return 
-    end
-
-    local targetPart = otherPart
+    -- Gunakan dialog yang cepat muncul dan mengganggu
+    -- Menggunakan `PromptService:PromptDialog(Title, Message, Button1, Button2)`
+    -- Catatan: Fungsi ini mungkin memiliki batasan frekuensi/cooldown dari Roblox.
+    local success, result = pcall(function()
+        PromptService:PromptDialog("WARNING", "LAG", "OK", "CANCEL") 
+        -- Prompter yang sangat cepat dapat mengganggu sesi pemain
+    end)
     
-    -- Logika Deteksi: Cek Part Promt
-    local hasPrompt = targetPart:FindFirstChildOfClass("ProximityPrompt")
-    if not hasPrompt then
-        if targetPart.Parent and targetPart.Parent:FindFirstChildOfClass("ProximityPrompt") then
-             hasPrompt = targetPart.Parent:FindFirstChildOfClass("ProximityPrompt")
-        end
-    end
-
-    if hasPrompt and targetPart:IsA("BasePart") then
-        if PromptDestroyerRemote then
-            -- Kunci: Mengirim sinyal ke Server untuk penghapusan global
-            -- Tidak ada penghapusan lokal agar fitur tidak terlihat "hanya di layar saya".
-            PromptDestroyerRemote:FireServer(targetPart)
-            print("Prompt Destroyer: Permintaan penghapusan part " .. targetPart.Name .. " dikirim ke Server.")
-        else
-            warn("Prompt Destroyer: RemoteEvent tidak ditemukan. Aksi global GAGAL.")
-        end
+    if not success then
+        warn("PromptService call failed (cooldown?): " .. tostring(result))
     end
 end
 
-local function activateDestroyer(button)
-    if isDestroyerActive then return end
-    isDestroyerActive = true
+local function activatePromptDestroyer(button)
+    if isPromptDestroyerActive then return end
+    isPromptDestroyerActive = true
     
-    local character = player.Character
-    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-    
-    if not rootPart then 
-        warn("HumanoidRootPart tidak ditemukan.")
-        isDestroyerActive = false
-        updateButtonStatus(button, false, "PROMPT DESTROYER")
-        return 
-    end
-
     updateButtonStatus(button, true, "PROMPT DESTROYER")
     
-    if destroyerTouchConnection then destroyerTouchConnection:Disconnect() end
-    destroyerTouchConnection = rootPart.Touched:Connect(onPartDestroyerTouch)
+    -- Hubungkan fungsi loop ke RunService.RenderStepped atau Heartbeat
+    if promptDestroyerConnection then promptDestroyerConnection:Disconnect() end
+    -- Gunakan RenderStepped agar lebih cepat
+    promptDestroyerConnection = RunService.RenderStepped:Connect(promptDestroyerLoop)
     
     print("Prompt Destroyer AKTIF.")
 end
 
-local function deactivateDestroyer(button)
-    if not isDestroyerActive then return end
-    isDestroyerActive = false
+local function deactivatePromptDestroyer(button)
+    if not isPromptDestroyerActive then return end
+    isPromptDestroyerActive = false
     
-    if destroyerTouchConnection then
-        destroyerTouchConnection:Disconnect()
-        destroyerTouchConnection = nil
+    if promptDestroyerConnection then
+        promptDestroyerConnection:Disconnect()
+        promptDestroyerConnection = nil
     end
     
     updateButtonStatus(button, false, "PROMPT DESTROYER")
     print("Prompt Destroyer NONAKTIF.")
 end
 
+---
+---
 
 -- 🔽 FUNGSI PEMBUAT TOMBOL FITUR 🔽
 
@@ -289,7 +259,7 @@ end
 
 -- 🔽 PENAMBAHAN TOMBOL KE FEATURE LIST 🔽
 
--- 1. Tombol PLAYER TETHER
+-- Tombol PLAYER TETHER
 local tetherButton = makeFeatureButton("PLAYER TETHER: OFF", Color3.fromRGB(150, 0, 0), function(button)
     if isTetherActive then
         deactivateTether(button)
@@ -298,34 +268,33 @@ local tetherButton = makeFeatureButton("PLAYER TETHER: OFF", Color3.fromRGB(150,
     end
 end)
 
--- 2. Tombol PROMPT DESTROYER
-local destroyerButton = makeFeatureButton("PROMPT DESTROYER: OFF", Color3.fromRGB(150, 0, 0), function(button)
-    if isDestroyerActive then
-        deactivateDestroyer(button)
+-- Tombol PROMPT DESTROYER (BARU)
+local promptDestroyerButton = makeFeatureButton("PROMPT DESTROYER: OFF", Color3.fromRGB(150, 0, 0), function(button)
+    if isPromptDestroyerActive then
+        deactivatePromptDestroyer(button)
     else
-        activateDestroyer(button)
+        activatePromptDestroyer(button)
     end
 end)
 
 
--- 🔽 LOGIKA CHARACTER ADDED 🔽
+-- 🔽 LOGIKA CHARACTER ADDED (PENTING UNTUK MEMPERTAHANKAN STATUS) 🔽
 player.CharacterAdded:Connect(function(char)
+    -- Pastikan semua ikatan dilepas saat respawn (untuk menghindari error)
     releaseAllTethers() 
     
+    -- Pertahankan status Player Tether
     if isTetherActive then
         char:WaitForChild("HumanoidRootPart", 5)
         local button = featureScrollFrame:FindFirstChild("PlayerTetherButton")
         if button then activateTether(button) end
     end
     
-    if isDestroyerActive then
-        char:WaitForChild("HumanoidRootPart", 5)
-        local button = featureScrollFrame:FindFirstChild("PromptDestroyerButton")
-        if button then activateDestroyer(button) end
-    end
+    -- Tidak perlu mempertahankan status Prompt Destroyer saat respawn,
+    -- karena tidak bergantung pada Character.
 end)
 
 
 -- Atur status awal tombol
 updateButtonStatus(tetherButton, isTetherActive, "PLAYER TETHER")
-updateButtonStatus(destroyerButton, isDestroyerActive, "PROMPT DESTROYER")
+updateButtonStatus(promptDestroyerButton, isPromptDestroyerActive, "PROMPT DESTROYER")
