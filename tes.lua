@@ -5,13 +5,14 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
 -- ** ⬇️ STATUS FITUR CORE ⬇️ **
-local isTetherActive = false 
-local tetherTouchConnection = nil
-local activeTethers = {} -- Menyimpan weld untuk pemain yang sedang diikat
+local isShakerActive = false -- Ganti isTetherActive menjadi isShakerActive
+local shakerTouchConnection = nil
+local activeShakes = {} -- Menyimpan tween untuk part yang sedang digoyangkan
 
--- ** ⬇️ STATUS FITUR RESPOND ⬇️ **
-local selectedPlayer = nil -- Menyimpan pemain yang saat ini dipilih
-local playerListButtons = {} -- Menyimpan referensi tombol pemain
+-- Konstanta Goyang
+local SHAKE_DURATION = 0.1 -- Durasi setiap siklus goyang
+local SHAKE_MAGNITUDE = 0.5 -- Besarnya pergeseran goyang (dalam stud)
+local SHAKE_CYCLES = 10 -- Jumlah siklus goyang per sentuhan
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -54,10 +55,10 @@ screenGui.Name = "CoreFeaturesGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Frame utama (Disesuaikan agar lebih besar)
+-- Frame utama (Disesuaikan untuk 1 tombol)
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 300) -- Ukuran diperbesar untuk menampung fitur baru
-frame.Position = UDim2.new(0.4, -110, 0.5, -150) -- Disesuaikan agar tetap di tengah
+frame.Size = UDim2.new(0, 220, 0, 100) 
+frame.Position = UDim2.new(0.4, -110, 0.5, -50)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -78,10 +79,10 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
--- ScrollingFrame untuk Daftar Pilihan Fitur (Player Tether)
+-- ScrollingFrame untuk Daftar Pilihan Fitur
 local featureScrollFrame = Instance.new("ScrollingFrame")
 featureScrollFrame.Name = "FeatureList"
-featureScrollFrame.Size = UDim2.new(1, -20, 0, 60) -- Lebih kecil
+featureScrollFrame.Size = UDim2.new(1, -20, 1, -40)
 featureScrollFrame.Position = UDim2.new(0.5, -100, 0, 35)
 featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 featureScrollFrame.ScrollBarThickness = 6
@@ -96,55 +97,6 @@ featureListLayout.Parent = featureScrollFrame
 
 featureListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, featureListLayout.AbsoluteContentSize.Y + 10)
-end)
-
--- *** KONTEN BARU: BAGIAN RESPAWN PEMAIN ***
-
--- Judul Respawn
-local respawnTitle = Instance.new("TextLabel")
-respawnTitle.Size = UDim2.new(1, 0, 0, 30)
-respawnTitle.Position = UDim2.new(0, 0, 0, 100) -- Posisi di bawah FeatureList
-respawnTitle.BackgroundTransparency = 1
-respawnTitle.Text = "FORCE RESPAWN"
-respawnTitle.TextColor3 = Color3.new(1, 1, 1)
-respawnTitle.Font = Enum.Font.GothamBold
-respawnTitle.TextSize = 16
-respawnTitle.Parent = frame
-
--- Tombol Respawn
-local killButton = Instance.new("TextButton")
-killButton.Name = "KillPlayerButton"
-killButton.Size = UDim2.new(0, 180, 0, 40)
-killButton.Position = UDim2.new(0.5, -90, 0, 135)
-killButton.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
-killButton.Text = "RESPAWN: BELUM DIPILIH"
-killButton.TextColor3 = Color3.new(1, 1, 1)
-killButton.Font = Enum.Font.GothamBold
-killButton.TextSize = 12
-killButton.Parent = frame
-
-local killCorner = Instance.new("UICorner")
-killCorner.CornerRadius = UDim.new(0, 10)
-killCorner.Parent = killButton
-
--- ScrollingFrame untuk Daftar Pemain
-local playerScrollFrame = Instance.new("ScrollingFrame")
-playerScrollFrame.Name = "PlayerList"
-playerScrollFrame.Size = UDim2.new(1, -20, 0, 100)
-playerScrollFrame.Position = UDim2.new(0.5, -100, 0, 180) -- Posisi di bawah KillButton
-playerScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-playerScrollFrame.ScrollBarThickness = 6
-playerScrollFrame.BackgroundTransparency = 1
-playerScrollFrame.Parent = frame
-
-local playerListLayout = Instance.new("UIListLayout")
-playerListLayout.Padding = UDim.new(0, 5)
-playerListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-playerListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-playerListLayout.Parent = playerScrollFrame
-
-playerListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    playerScrollFrame.CanvasSize = UDim2.new(0, 0, 0, playerListLayout.AbsoluteContentSize.Y + 10)
 end)
 
 
@@ -163,153 +115,126 @@ local function updateButtonStatus(button, isActive, featureName)
 end
 
 
--- 🔽 FUNGSI PLAYER TETHER (IKAT PEMAIN) 🔽
+-- 🔽 FUNGSI PART SHAKER BARU (GOYANG PART SAAT SENTUH) 🔽
 
-local function onTetherTouch(otherPart)
-    if not isTetherActive or not otherPart or not otherPart.Parent then return end
+local function startShake(part)
+    if not part or activeShakes[part] then return end
 
-    local targetPlayer = Players:GetPlayerFromCharacter(otherPart.Parent)
-    local myRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    local targetRoot = targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local originalCFrame = part.CFrame
+    local currentCycles = 0
+    local isShaking = true
+    
+    activeShakes[part] = isShaking -- Tandai part sedang digoyangkan
 
-    if not myRoot or not targetRoot or targetPlayer == player then return end
+    local function performShake()
+        if not part.Parent or currentCycles >= SHAKE_CYCLES or not isShaking then
+            activeShakes[part] = nil -- Hapus dari daftar aktif
+            if part.Parent then
+                -- Pastikan part kembali ke posisi semula
+                part.CFrame = originalCFrame 
+            end
+            return
+        end
 
-    -- Hanya ikat pemain yang belum diikat
-    if not activeTethers[targetPlayer.UserId] then
-        local tetherWeld = Instance.new("WeldConstraint")
-        tetherWeld.Name = "PlayerTetherWeld"
-        tetherWeld.Part0 = myRoot
-        tetherWeld.Part1 = targetRoot
-        tetherWeld.Parent = targetRoot
+        currentCycles = currentCycles + 1
         
-        activeTethers[targetPlayer.UserId] = tetherWeld
-        print("Tether Aktif: Mengikat " .. targetPlayer.Name)
+        -- Goyang ke arah acak (sedikit ke samping)
+        local randomVector = Vector3.new(math.random() * 2 - 1, math.random() * 2 - 1, math.random() * 2 - 1) * SHAKE_MAGNITUDE
+        local targetCFrame = originalCFrame * CFrame.new(randomVector)
+        
+        local tweenInfo = TweenInfo.new(SHAKE_DURATION, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+        local tween = TweenService:Create(part, tweenInfo, {CFrame = targetCFrame})
+
+        tween.Completed:Connect(function()
+            -- Kembali ke posisi semula (atau lakukan siklus berikutnya)
+            if part.Parent and currentCycles < SHAKE_CYCLES and isShaking then
+                local resetTween = TweenService:Create(part, tweenInfo, {CFrame = originalCFrame})
+                resetTween.Completed:Wait() -- Tunggu sebentar untuk efek goyang
+                performShake()
+            else
+                activeShakes[part] = nil
+                if part.Parent then
+                    part.CFrame = originalCFrame 
+                end
+            end
+        end)
+        tween:Play()
     end
+
+    performShake()
 end
 
-local function releaseAllTethers()
-    for userId, weld in pairs(activeTethers) do
-        if weld and weld.Parent then
-            weld:Destroy()
+local function onShakerTouch(otherPart)
+    if not isShakerActive or not otherPart or not otherPart.Parent then return end
+
+    -- Mendapatkan Humanoid Root Part dari karakter kita sendiri untuk koneksi Touched
+    local myRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    
+    -- Pastikan bagian yang disentuh BUKAN bagian dari karakter kita sendiri
+    if otherPart.Parent:FindFirstChildOfClass("Humanoid") and otherPart.Parent == player.Character then 
+        return 
+    end
+
+    -- Target adalah part yang disentuh (atau model/karakter lain)
+    local targetPart = otherPart
+    
+    -- Cek apakah target memiliki Prompt (misalnya ProximityPrompt) di dalamnya atau di induknya
+    local hasPrompt = targetPart:FindFirstChildOfClass("ProximityPrompt")
+    if not hasPrompt then
+        -- Cek di model induknya
+        if targetPart.Parent and targetPart.Parent:FindFirstChildOfClass("ProximityPrompt") then
+             hasPrompt = targetPart.Parent:FindFirstChildOfClass("ProximityPrompt")
         end
     end
-    activeTethers = {}
+
+    -- Hanya goyangkan jika part tersebut atau induknya memiliki ProximityPrompt DAN itu adalah BasePart yang dapat digoyangkan
+    if hasPrompt and targetPart:IsA("BasePart") and targetPart.Anchored == false then
+        if not activeShakes[targetPart] then
+            startShake(targetPart)
+            print("Part Shaker Aktif: Menggoyangkan " .. targetPart.Name)
+        end
+    end
 end
 
-local function activateTether(button)
-    if isTetherActive then return end
-    isTetherActive = true
+local function activateShaker(button)
+    if isShakerActive then return end
+    isShakerActive = true
     
     local character = player.Character
     local rootPart = character and character:FindFirstChild("HumanoidRootPart")
     
     if not rootPart then 
         warn("HumanoidRootPart tidak ditemukan.")
-        isTetherActive = false
-        updateButtonStatus(button, false, "PLAYER TETHER")
+        isShakerActive = false
+        updateButtonStatus(button, false, "PART SHAKER")
         return 
     end
 
-    updateButtonStatus(button, true, "PLAYER TETHER")
+    updateButtonStatus(button, true, "PART SHAKER")
     
-    if tetherTouchConnection then tetherTouchConnection:Disconnect() end
-    tetherTouchConnection = rootPart.Touched:Connect(onTetherTouch)
+    -- Hubungkan event Touched ke HumanoidRootPart pemain
+    if shakerTouchConnection then shakerTouchConnection:Disconnect() end
+    shakerTouchConnection = rootPart.Touched:Connect(onShakerTouch)
     
-    print("Player Tether AKTIF.")
+    print("Part Shaker AKTIF.")
 end
 
-local function deactivateTether(button)
-    if not isTetherActive then return end
-    isTetherActive = false
+local function deactivateShaker(button)
+    if not isShakerActive then return end
+    isShakerActive = false
     
-    if tetherTouchConnection then
-        tetherTouchConnection:Disconnect()
-        tetherTouchConnection = nil
+    if shakerTouchConnection then
+        shakerTouchConnection:Disconnect()
+        shakerTouchConnection = nil
     end
     
-    releaseAllTethers() -- Lepaskan semua ikatan
-    updateButtonStatus(button, false, "PLAYER TETHER")
-    print("Player Tether NONAKTIF.")
+    -- Tidak perlu fungsi releaseAllTethers lagi
+    updateButtonStatus(button, false, "PART SHAKER")
+    print("Part Shaker NONAKTIF.")
 end
 
--- 🔽 FUNGSI FORCE RESPAWN/KILL PEMAIN LAIN 🔽
 
-local function forcePlayerRespawn(targetPlayer)
-    if not targetPlayer then return end
-    
-    local char = targetPlayer.Character
-    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-
-    -- ** PERHATIAN: Baris ini hanya akan berfungsi di lingkungan Exploit/Executor **
-    if humanoid then
-        humanoid.Health = 0 -- Mencoba mematikan pemain
-        print("Mencoba mematikan: " .. targetPlayer.Name)
-    else
-        warn("Gagal mematikan: Humanoid tidak ditemukan untuk " .. targetPlayer.Name)
-    end
-end
-
--- 🔽 FUNGSI PEMBUAT TOMBOL PEMAIN 🔽
-
-local function makePlayerButton(targetPlayer)
-    local pButton = Instance.new("TextButton")
-    pButton.Name = targetPlayer.Name .. "Button"
-    pButton.Size = UDim2.new(0, 180, 0, 25)
-    pButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    pButton.Text = targetPlayer.Name
-    pButton.TextColor3 = Color3.new(1, 1, 1)
-    pButton.Font = Enum.Font.GothamBold
-    pButton.TextSize = 12
-    pButton.Parent = playerScrollFrame
-
-    local pCorner = Instance.new("UICorner")
-    pCorner.CornerRadius = UDim.new(0, 5)
-    pCorner.Parent = pButton
-
-    pButton.MouseButton1Click:Connect(function()
-        -- Atur ulang warna tombol yang sebelumnya dipilih
-        if selectedPlayer and playerListButtons[selectedPlayer.UserId] then
-            playerListButtons[selectedPlayer.UserId].BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        end
-
-        -- Pilih pemain baru
-        selectedPlayer = targetPlayer
-        pButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0) -- Warna untuk pemain terpilih
-
-        -- Perbarui teks tombol kill
-        killButton.Text = "RESPAWN: " .. targetPlayer.Name:upper()
-        print("Pemain dipilih: " .. targetPlayer.Name)
-    end)
-
-    playerListButtons[targetPlayer.UserId] = pButton
-    return pButton
-end
-
--- 🔽 FUNGSI UNTUK MEMPERBARUI DAFTAR PEMAIN 🔽
-
-local function updatePlayerList()
-    -- Hapus tombol lama
-    for _, button in pairs(playerListButtons) do
-        button:Destroy()
-    end
-    playerListButtons = {}
-    selectedPlayer = nil
-    killButton.Text = "RESPAWN: BELUM DIPILIH"
-
-    -- Tambahkan pemain baru
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= player then -- Jangan tambahkan diri sendiri
-            makePlayerButton(p)
-        end
-    end
-end
-
--- Hubungkan event Players.PlayerAdded dan Players.PlayerRemoving
-Players.PlayerAdded:Connect(updatePlayerList)
-Players.PlayerRemoving:Connect(updatePlayerList)
-
-
--- 🔽 FUNGSI PEMBUAT TOMBOL FITUR (Tether) 🔽
+-- 🔽 FUNGSI PEMBUAT TOMBOL FITUR 🔽
 
 local function makeFeatureButton(name, color, callback)
     local featButton = Instance.new("TextButton")
@@ -334,39 +259,29 @@ end
 
 -- 🔽 PENAMBAHAN TOMBOL KE FEATURE LIST 🔽
 
--- Tombol PLAYER TETHER
-local tetherButton = makeFeatureButton("PLAYER TETHER: OFF", Color3.fromRGB(150, 0, 0), function(button)
-    if isTetherActive then
-        deactivateTether(button)
+-- Tombol PART SHAKER BARU
+local shakerButton = makeFeatureButton("PART SHAKER: OFF", Color3.fromRGB(150, 0, 0), function(button)
+    if isShakerActive then
+        deactivateShaker(button)
     else
-        activateTether(button)
-    end
-end)
-
--- Hubungkan tombol Kill
-killButton.MouseButton1Click:Connect(function()
-    if selectedPlayer then
-        forcePlayerRespawn(selectedPlayer)
-    else
-        print("Pilih pemain terlebih dahulu.")
+        activateShaker(button)
     end
 end)
 
 
 -- 🔽 LOGIKA CHARACTER ADDED (PENTING UNTUK MEMPERTAHANKAN STATUS) 🔽
 player.CharacterAdded:Connect(function(char)
-    -- Pastikan semua ikatan dilepas saat respawn (untuk menghindari error)
-    releaseAllTethers() 
+    -- Lakukan deactivate untuk membersihkan koneksi lama (jika ada)
+    deactivateShaker(shakerButton)
     
-    -- Pertahankan status Player Tether
-    if isTetherActive then
+    -- Pertahankan status Part Shaker
+    if isShakerActive then
         char:WaitForChild("HumanoidRootPart", 5)
-        local button = featureScrollFrame:FindFirstChild("PlayerTetherButton")
-        if button then activateTether(button) end
+        local button = featureScrollFrame:FindFirstChild("PartShakerButton")
+        if button then activateShaker(button) end
     end
 end)
 
--- Inisialisasi: Atur status awal tombol dan daftar pemain
-updateButtonStatus(tetherButton, isTetherActive, "PLAYER TETHER")
-task.wait(0.1) -- Beri waktu GUI untuk diinisialisasi
-updatePlayerList()
+
+-- Atur status awal tombol
+updateButtonStatus(shakerButton, isShakerActive, "PART SHAKER")
