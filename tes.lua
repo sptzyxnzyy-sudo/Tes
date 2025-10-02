@@ -1,5 +1,5 @@
 -- credit: Xraxor1 (Original GUI/Intro structure)
--- Modification: Tambah ESP + Speed Feature dengan toggle
+-- Modification: Tambah ESP + Speed + AntiHealth Feature dengan toggle
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
@@ -50,8 +50,8 @@ screenGui.Parent = player:WaitForChild("PlayerGui")
 
 -- Frame utama
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 120) 
-frame.Position = UDim2.new(0.4, -110, 0.5, -60)
+frame.Size = UDim2.new(0, 220, 0, 150) 
+frame.Position = UDim2.new(0.4, -110, 0.5, -75)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -202,6 +202,15 @@ local function setSpeed(val)
     if hum then hum.WalkSpeed = val end
 end
 
+-- 🔽 FITUR ANTI HEALTH 🔽
+local ANTI_HEALTH = false
+RunService.Stepped:Connect(function()
+    if ANTI_HEALTH and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+        local hum = player.Character:FindFirstChildOfClass("Humanoid")
+        hum.Health = hum.MaxHealth -- darah dipaksa penuh
+    end
+end)
+
 -- 🔽 TAMBAHKAN TOGGLE KE MENU 🔽
 createToggle("ESP", featureScrollFrame, function(state)
     ESP_ENABLED = state
@@ -219,6 +228,10 @@ createToggle("Speed", featureScrollFrame, function(state)
     else
         setSpeed(DEFAULT_SPEED)
     end
+end)
+
+createToggle("Anti-Health", featureScrollFrame, function(state)
+    ANTI_HEALTH = state
 end)
 
 -- 🔽 INPUT SPEED 🔽
