@@ -68,16 +68,17 @@ espButton.TextSize = 18
 espButton.Parent = frame
 
 -- =========================
--- DRAG FUNCTION
+-- DRAG FUNCTION (Universal)
 -- =========================
-local function makeDraggable(gui)
-    local dragging, dragInput, dragStart, startPos
+local function makeDraggable(guiObject)
+    local dragging = false
+    local dragStart, startPos
 
-    gui.InputBegan:Connect(function(input)
+    guiObject.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
             dragStart = input.Position
-            startPos = gui.Position
+            startPos = guiObject.Position
 
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
@@ -87,16 +88,10 @@ local function makeDraggable(gui)
         end
     end)
 
-    gui.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            dragInput = input
-        end
-    end)
-
     UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local delta = input.Position - dragStart
-            gui.Position = UDim2.new(
+            guiObject.Position = UDim2.new(
                 startPos.X.Scale, startPos.X.Offset + delta.X,
                 startPos.Y.Scale, startPos.Y.Offset + delta.Y
             )
