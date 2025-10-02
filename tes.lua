@@ -1,5 +1,5 @@
 -- credit: Xraxor1 (Original GUI/Intro structure)
--- Modification: Tambah ESP + Speed + AntiHealth Feature dengan toggle
+-- Modification: Tambah ESP + Speed (toggle), AntiHealth (button)
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
@@ -202,55 +202,22 @@ local function setSpeed(val)
     if hum then hum.WalkSpeed = val end
 end
 
--- 🔽 FITUR ANTI HEALTH 🔽
-local ANTI_HEALTH = false
-RunService.Stepped:Connect(function()
-    if ANTI_HEALTH and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
-        local hum = player.Character:FindFirstChildOfClass("Humanoid")
-        hum.Health = hum.MaxHealth -- darah dipaksa penuh
-    end
-end)
+-- 🔽 FITUR ANTI HEALTH (button biasa) 🔽
+local function activateAntiHealth()
+    local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
 
--- 🔽 TAMBAHKAN TOGGLE KE MENU 🔽
+    -- Loop supaya darah terus penuh
+    task.spawn(function()
+        while hum and hum.Parent do
+            hum.Health = hum.MaxHealth
+            task.wait(0.1)
+        end
+    end)
+end
+
+-- 🔽 TAMBAHKAN TOGGLE & BUTTON 🔽
 createToggle("ESP", featureScrollFrame, function(state)
     ESP_ENABLED = state
     if state then
-        for _,pl in ipairs(Players:GetPlayers()) do if pl~=player then addESP(pl) end end
-    else
-        for _,pl in ipairs(Players:GetPlayers()) do if pl~=player then removeESP(pl) end end
-    end
-end)
-
-createToggle("Speed", featureScrollFrame, function(state)
-    SPEED_ENABLED = state
-    if state then
-        setSpeed(speedValue)
-    else
-        setSpeed(DEFAULT_SPEED)
-    end
-end)
-
-createToggle("Anti-Health", featureScrollFrame, function(state)
-    ANTI_HEALTH = state
-end)
-
--- 🔽 INPUT SPEED 🔽
-local speedBox = Instance.new("TextBox")
-speedBox.Size = UDim2.new(1, -10, 0, 35)
-speedBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-speedBox.Text = tostring(speedValue)
-speedBox.TextColor3 = Color3.new(1, 1, 1)
-speedBox.Font = Enum.Font.GothamBold
-speedBox.TextSize = 14
-speedBox.ClearTextOnFocus = false
-speedBox.Parent = featureScrollFrame
-
-speedBox.FocusLost:Connect(function()
-    local val = tonumber(speedBox.Text)
-    if val then
-        speedValue = val
-        if SPEED_ENABLED then setSpeed(speedValue) end
-    else
-        speedBox.Text = tostring(speedValue)
-    end
-end)
+        for _,
