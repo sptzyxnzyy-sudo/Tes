@@ -1,15 +1,11 @@
 -- credit: Xraxor1 (Original GUI/Intro structure)
--- Modification & Features by Sptzyy
--- Features: ESP, Speed, Aura, Infinite Jump, Auto Big Fish Catch
+-- Modification by Sptzyy
+-- Features: Auto Unlock All VIP Maps + Auto Chat (All/Team/Whisper)
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
 local player = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
 
 -- ================= INTRO ANIMATION =================
 do
@@ -23,18 +19,17 @@ do
     introLabel.Position = UDim2.new(0.5, -150, 0.4, 0)
     introLabel.BackgroundTransparency = 1
     introLabel.Text = "By : Sptzyy"
-    introLabel.TextColor3 = Color3.fromRGB(40, 40, 40)
+    introLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
     introLabel.TextScaled = true
     introLabel.Font = Enum.Font.GothamBold
     introLabel.Parent = introGui
 
-    local tweenInfoMove = TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+    local tweenInfoMove = TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
     local tweenMove = TweenService:Create(introLabel, tweenInfoMove, {Position = UDim2.new(0.5, -150, 0.42, 0)})
-
     tweenMove:Play()
 
     task.wait(2)
-    local fadeOut = TweenService:Create(introLabel, TweenInfo.new(0.5), {TextTransparency = 1})
+    local fadeOut = TweenService:Create(introLabel, TweenInfo.new(0.6), {TextTransparency = 1})
     fadeOut:Play()
     fadeOut.Completed:Connect(function()
         introGui:Destroy()
@@ -48,9 +43,9 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 250, 0, 350)
-frame.Position = UDim2.new(0.4, -125, 0.5, -175)
-frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.Size = UDim2.new(0, 280, 0, 240)
+frame.Position = UDim2.new(0.4, -140, 0.5, -120)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
@@ -63,13 +58,13 @@ corner.Parent = frame
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
-title.Text = "CORE FEATURES"
+title.Text = "AUTO FEATURES"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
--- ❌ Close Button
+-- ❌ tombol close
 local closeBtn = Instance.new("TextButton")
 closeBtn.Size = UDim2.new(0, 25, 0, 25)
 closeBtn.Position = UDim2.new(1, -30, 0, 5)
@@ -84,7 +79,6 @@ local cornerClose = Instance.new("UICorner")
 cornerClose.CornerRadius = UDim.new(1, 0)
 cornerClose.Parent = closeBtn
 
--- Tombol kecil buat buka menu lagi
 local openBtn = Instance.new("TextButton")
 openBtn.Size = UDim2.new(0, 40, 0, 40)
 openBtn.Position = UDim2.new(0, 10, 1, -50)
@@ -109,29 +103,11 @@ openBtn.MouseButton1Click:Connect(function()
     openBtn.Visible = false
 end)
 
--- Scroll fitur
-local featureScrollFrame = Instance.new("ScrollingFrame")
-featureScrollFrame.Name = "FeatureList"
-featureScrollFrame.Size = UDim2.new(1, -20, 1, -40)
-featureScrollFrame.Position = UDim2.new(0, 10, 0, 35)
-featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-featureScrollFrame.ScrollBarThickness = 6
-featureScrollFrame.BackgroundTransparency = 1
-featureScrollFrame.Parent = frame
-
-local featureListLayout = Instance.new("UIListLayout")
-featureListLayout.Padding = UDim.new(0, 5)
-featureListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-featureListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-featureListLayout.Parent = featureScrollFrame
-featureListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, featureListLayout.AbsoluteContentSize.Y + 10)
-end)
-
--- ================= TOGGLE CREATOR =================
-local function createToggle(name, parent, callback)
+-- ================= TOGGLE BUTTON CREATOR =================
+local function createToggle(name, parent, posY, callback)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -10, 0, 35)
+    btn.Size = UDim2.new(1, -20, 0, 35)
+    btn.Position = UDim2.new(0, 10, 0, posY)
     btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     btn.Text = name .. ": OFF"
     btn.TextColor3 = Color3.new(1, 1, 1)
@@ -154,179 +130,102 @@ local function createToggle(name, parent, callback)
     return btn
 end
 
---------------------------------------------------------
--- FEATURE 1: ESP
---------------------------------------------------------
-local ESP_ENABLED = false
-local tracers = {}
-
-local function createESP(target)
-    if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-        local billboard = Instance.new("BillboardGui")
-        billboard.Adornee = target.Character.HumanoidRootPart
-        billboard.Size = UDim2.new(0, 100, 0, 50)
-        billboard.AlwaysOnTop = true
-        billboard.Name = "ESP_" .. target.Name
-
-        local nameLabel = Instance.new("TextLabel")
-        nameLabel.Size = UDim2.new(1, 0, 0, 20)
-        nameLabel.BackgroundTransparency = 1
-        nameLabel.Text = target.Name
-        nameLabel.TextColor3 = Color3.new(1, 1, 0)
-        nameLabel.TextScaled = true
-        nameLabel.Parent = billboard
-
-        billboard.Parent = target.Character
-
-        local line = Drawing.new("Line")
-        line.Color = Color3.fromRGB(0,255,0)
-        line.Thickness = 2
-        line.Visible = true
-        tracers[target] = line
-    end
-end
-
-local function removeESP(target)
-    if target.Character then
-        local esp = target.Character:FindFirstChild("ESP_" .. target.Name)
-        if esp then esp:Destroy() end
-    end
-    if tracers[target] then
-        tracers[target]:Remove()
-        tracers[target] = nil
-    end
-end
-
-createToggle("Player ESP", featureScrollFrame, function(state)
-    ESP_ENABLED = state
-    if not state then
-        for _,p in pairs(Players:GetPlayers()) do
-            if p ~= player then removeESP(p) end
-        end
-    else
-        for _,p in pairs(Players:GetPlayers()) do
-            if p ~= player then createESP(p) end
-        end
-    end
-end)
-
-RunService.RenderStepped:Connect(function()
-    if ESP_ENABLED then
-        for target,line in pairs(tracers) do
-            if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                local hrp = target.Character.HumanoidRootPart
-                local pos,vis = Camera:WorldToViewportPoint(hrp.Position)
-                if vis then
-                    line.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
-                    line.To = Vector2.new(pos.X, pos.Y)
-                    line.Visible = true
-                else
-                    line.Visible = false
-                end
-            end
-        end
-    end
-end)
-
---------------------------------------------------------
--- FEATURE 2: SPEED
---------------------------------------------------------
-local SPEED_ENABLED = false
-local SpeedValue = 50
-
-local speedBox = Instance.new("TextBox")
-speedBox.Size = UDim2.new(1, -10, 0, 30)
-speedBox.PlaceholderText = "Speed Value (50)"
-speedBox.BackgroundColor3 = Color3.fromRGB(40,40,40)
-speedBox.TextColor3 = Color3.new(1,1,1)
-speedBox.Font = Enum.Font.GothamBold
-speedBox.TextSize = 14
-speedBox.Parent = featureScrollFrame
-
-speedBox.FocusLost:Connect(function()
-    local val = tonumber(speedBox.Text)
-    if val then SpeedValue = val end
-end)
-
-createToggle("Speed Hack", featureScrollFrame, function(state)
-    SPEED_ENABLED = state
-end)
-
-RunService.Stepped:Connect(function()
-    if SPEED_ENABLED and player.Character and player.Character:FindFirstChild("Humanoid") then
-        player.Character.Humanoid.WalkSpeed = SpeedValue
-    elseif player.Character and player.Character:FindFirstChild("Humanoid") then
-        player.Character.Humanoid.WalkSpeed = 16
-    end
-end)
-
---------------------------------------------------------
--- FEATURE 3: AURA EFFECT
---------------------------------------------------------
-local AURA_ENABLED = false
-local auraPart = nil
-
-createToggle("Aura Effect", featureScrollFrame, function(state)
-    AURA_ENABLED = state
-    if state then
-        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            auraPart = Instance.new("ParticleEmitter")
-            auraPart.Texture = "rbxassetid://3018122091"
-            auraPart.Rate = 15
-            auraPart.Lifetime = NumberRange.new(1)
-            auraPart.Speed = NumberRange.new(2)
-            auraPart.Parent = player.Character.HumanoidRootPart
-        end
-    else
-        if auraPart then
-            auraPart:Destroy()
-            auraPart = nil
-        end
-    end
-end)
-
---------------------------------------------------------
--- FEATURE 4: INFINITE JUMP
---------------------------------------------------------
-local INFJUMP_ENABLED = false
-
-createToggle("Infinite Jump", featureScrollFrame, function(state)
-    INFJUMP_ENABLED = state
-end)
-
-UserInputService.JumpRequest:Connect(function()
-    if INFJUMP_ENABLED and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
-        player.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
-    end
-end)
-
---------------------------------------------------------
--- FEATURE 5: AUTO BIG FISH
---------------------------------------------------------
-local AUTOFISH_ENABLED = false
-local BigFishList = {"Shark","Whale","GoldenFish","LegendaryTuna"}
-
-local function autoFish()
-    while AUTOFISH_ENABLED do
+-- ================= FEATURE: AUTO UNLOCK VIP ALL =================
+local VIP_UNLOCK = false
+local function unlockVIPAll()
+    while VIP_UNLOCK do
         task.wait(2)
-        -- cari pancing
-        local rod = player.Backpack:FindFirstChild("FishingRod") or (player.Character and player.Character:FindFirstChild("FishingRod"))
-        if rod then
-            local fishName = BigFishList[math.random(1,#BigFishList)]
-            print("[AUTO BIG FISH] Menangkap: " .. fishName)
-
-            -- cari remote yang biasa dipakai untuk pancing
-            local catchRemote = ReplicatedStorage:FindFirstChild("CatchFish") or ReplicatedStorage:FindFirstChild("RemoteEvent") 
-            if catchRemote and catchRemote:IsA("RemoteEvent") then
-                catchRemote:FireServer(fishName,true) -- true = langsung sukses
+        for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+            if obj:IsA("RemoteEvent") and string.find(string.lower(obj.Name), "vip") then
+                obj:FireServer(true)
             end
         end
     end
 end
 
-createToggle("Auto Big Fish", featureScrollFrame, function(state)
-    AUTOFISH_ENABLED = state
+createToggle("Auto Unlock All VIP", frame, 40, function(state)
+    VIP_UNLOCK = state
     if state then
-        task.spawn(autoFish)
+        task.spawn(unlockVIPAll)
+    end
+end)
+
+-- ================= FEATURE: AUTO CHAT (All / Team / Whisper) =================
+local AUTO_CHAT = false
+local CHAT_MESSAGE = "Halo semua!"
+local CHAT_MODE = "All"
+local WHISPER_TARGET = "PlayerName"
+
+-- input pesan
+local chatBox = Instance.new("TextBox")
+chatBox.Size = UDim2.new(1, -20, 0, 30)
+chatBox.Position = UDim2.new(0, 10, 0, 80)
+chatBox.PlaceholderText = "Masukkan pesan..."
+chatBox.Text = CHAT_MESSAGE
+chatBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+chatBox.TextColor3 = Color3.new(1, 1, 1)
+chatBox.Font = Enum.Font.Gotham
+chatBox.TextSize = 14
+chatBox.ClearTextOnFocus = false
+chatBox.Parent = frame
+
+chatBox.FocusLost:Connect(function()
+    CHAT_MESSAGE = chatBox.Text
+end)
+
+-- input mode (All / Team / Whisper)
+local modeBox = Instance.new("TextBox")
+modeBox.Size = UDim2.new(1, -20, 0, 30)
+modeBox.Position = UDim2.new(0, 10, 0, 120)
+modeBox.PlaceholderText = "Mode: All/Team/Whisper"
+modeBox.Text = CHAT_MODE
+modeBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+modeBox.TextColor3 = Color3.new(1, 1, 1)
+modeBox.Font = Enum.Font.Gotham
+modeBox.TextSize = 14
+modeBox.ClearTextOnFocus = false
+modeBox.Parent = frame
+
+modeBox.FocusLost:Connect(function()
+    CHAT_MODE = modeBox.Text
+end)
+
+-- input target whisper
+local whisperBox = Instance.new("TextBox")
+whisperBox.Size = UDim2.new(1, -20, 0, 30)
+whisperBox.Position = UDim2.new(0, 10, 0, 160)
+whisperBox.PlaceholderText = "Nama Player (Whisper)"
+whisperBox.Text = WHISPER_TARGET
+whisperBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+whisperBox.TextColor3 = Color3.new(1, 1, 1)
+whisperBox.Font = Enum.Font.Gotham
+whisperBox.TextSize = 14
+whisperBox.ClearTextOnFocus = false
+whisperBox.Parent = frame
+
+whisperBox.FocusLost:Connect(function()
+    WHISPER_TARGET = whisperBox.Text
+end)
+
+local function autoChatLoop()
+    while AUTO_CHAT do
+        task.wait() -- no delay, secepat mungkin
+        if CHAT_MODE == "All" then
+            ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(CHAT_MESSAGE, "All")
+        elseif CHAT_MODE == "Team" then
+            ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(CHAT_MESSAGE, "Team")
+        elseif CHAT_MODE == "Whisper" then
+            ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer("/w " .. WHISPER_TARGET .. " " .. CHAT_MESSAGE, "All")
+        end
+    end
+end
+
+createToggle("Auto Chat", frame, 200, function(state)
+    AUTO_CHAT = state
+    if state then
+        CHAT_MESSAGE = chatBox.Text
+        CHAT_MODE = modeBox.Text
+        WHISPER_TARGET = whisperBox.Text
+        task.spawn(autoChatLoop)
     end
 end)
