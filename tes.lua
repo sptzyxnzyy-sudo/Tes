@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
 
 -- Buat GUI utama
 local screenGui = Instance.new("ScreenGui")
@@ -16,6 +17,8 @@ frame.Position = UDim2.new(0, 20, 0, 200)
 frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 frame.BorderSizePixel = 0
 frame.Visible = true
+frame.Active = true -- penting untuk drag
+frame.Draggable = false -- kita bikin custom drag
 frame.Parent = screenGui
 
 -- Judul
@@ -30,7 +33,7 @@ title.Font = Enum.Font.SourceSansBold
 title.TextSize = 18
 title.Parent = frame
 
--- Tombol close (X) di pojok kanan atas
+-- Tombol close (X)
 local closeButton = Instance.new("TextButton")
 closeButton.Size = UDim2.new(0, 25, 0, 25)
 closeButton.Position = UDim2.new(1, -28, 0, 3)
@@ -51,6 +54,8 @@ floatingButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 floatingButton.Font = Enum.Font.SourceSansBold
 floatingButton.TextSize = 24
 floatingButton.Visible = false
+floatingButton.Active = true
+floatingButton.Draggable = false
 floatingButton.Parent = screenGui
 
 -- Tombol ESP toggle
@@ -63,6 +68,48 @@ espButton.Text = "ESP: OFF"
 espButton.Font = Enum.Font.SourceSansBold
 espButton.TextSize = 18
 espButton.Parent = frame
+
+-- =========================
+-- DRAG FUNCTION
+-- =========================
+local function makeDraggable(gui)
+    local dragging = false
+    local dragInput, dragStart, startPos
+
+    gui.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = gui.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    gui.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            gui.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+end
+
+-- bikin draggable
+makeDraggable(frame)
+makeDraggable(floatingButton)
 
 -- =========================
 -- ESP SYSTEM
