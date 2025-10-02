@@ -1,11 +1,13 @@
 -- credit: Xraxor1 (Original GUI/Intro structure)
 -- Modification by Sptzyy
--- Features: Auto Unlock All VIP Maps + Auto Chat (All/Team/Whisper)
+-- Feature: Universal Owner Label (Support All Maps)
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
+
+-- 🔑 Ganti dengan UserId kamu (Owner)
+local OWNER_USERID = 9374524895 
 
 -- ================= INTRO ANIMATION =================
 do
@@ -38,13 +40,13 @@ end
 
 -- ================= CORE GUI =================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "CoreFeaturesGUI"
+screenGui.Name = "OwnerLabelGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 240)
-frame.Position = UDim2.new(0.4, -140, 0.5, -120)
+frame.Size = UDim2.new(0, 220, 0, 100)
+frame.Position = UDim2.new(0.4, -110, 0.5, -50)
 frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -58,7 +60,7 @@ corner.Parent = frame
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
-title.Text = "AUTO FEATURES"
+title.Text = "OWNER LABEL FEATURE"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
@@ -103,7 +105,7 @@ openBtn.MouseButton1Click:Connect(function()
     openBtn.Visible = false
 end)
 
--- ================= TOGGLE BUTTON CREATOR =================
+-- ================= TOGGLE CREATOR =================
 local function createToggle(name, parent, posY, callback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -20, 0, 35)
@@ -130,102 +132,52 @@ local function createToggle(name, parent, posY, callback)
     return btn
 end
 
--- ================= FEATURE: AUTO UNLOCK VIP ALL =================
-local VIP_UNLOCK = false
-local function unlockVIPAll()
-    while VIP_UNLOCK do
-        task.wait(2)
-        for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-            if obj:IsA("RemoteEvent") and string.find(string.lower(obj.Name), "vip") then
-                obj:FireServer(true)
-            end
+-- ================= FEATURE: OWNER LABEL =================
+local LABEL_ENABLED = false
+local labelBillboard = nil
+
+local function applyOwnerLabel(char)
+    local head = char:FindFirstChild("Head")
+    if head then
+        if labelBillboard then
+            labelBillboard:Destroy()
         end
+        labelBillboard = Instance.new("BillboardGui")
+        labelBillboard.Size = UDim2.new(0, 120, 0, 30)
+        labelBillboard.StudsOffset = Vector3.new(0, 3, 0)
+        labelBillboard.AlwaysOnTop = true
+        labelBillboard.Parent = head
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = "👑 OWNER 👑"
+        label.TextColor3 = Color3.fromRGB(255, 215, 0)
+        label.TextScaled = true
+        label.Font = Enum.Font.GothamBold
+        label.Parent = labelBillboard
     end
 end
 
-createToggle("Auto Unlock All VIP", frame, 40, function(state)
-    VIP_UNLOCK = state
+createToggle("Owner Label", frame, 40, function(state)
+    LABEL_ENABLED = state
+    local owner = Players:GetPlayerByUserId(OWNER_USERID)
+
     if state then
-        task.spawn(unlockVIPAll)
-    end
-end)
-
--- ================= FEATURE: AUTO CHAT (All / Team / Whisper) =================
-local AUTO_CHAT = false
-local CHAT_MESSAGE = "Halo semua!"
-local CHAT_MODE = "All"
-local WHISPER_TARGET = "PlayerName"
-
--- input pesan
-local chatBox = Instance.new("TextBox")
-chatBox.Size = UDim2.new(1, -20, 0, 30)
-chatBox.Position = UDim2.new(0, 10, 0, 80)
-chatBox.PlaceholderText = "Masukkan pesan..."
-chatBox.Text = CHAT_MESSAGE
-chatBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-chatBox.TextColor3 = Color3.new(1, 1, 1)
-chatBox.Font = Enum.Font.Gotham
-chatBox.TextSize = 14
-chatBox.ClearTextOnFocus = false
-chatBox.Parent = frame
-
-chatBox.FocusLost:Connect(function()
-    CHAT_MESSAGE = chatBox.Text
-end)
-
--- input mode (All / Team / Whisper)
-local modeBox = Instance.new("TextBox")
-modeBox.Size = UDim2.new(1, -20, 0, 30)
-modeBox.Position = UDim2.new(0, 10, 0, 120)
-modeBox.PlaceholderText = "Mode: All/Team/Whisper"
-modeBox.Text = CHAT_MODE
-modeBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-modeBox.TextColor3 = Color3.new(1, 1, 1)
-modeBox.Font = Enum.Font.Gotham
-modeBox.TextSize = 14
-modeBox.ClearTextOnFocus = false
-modeBox.Parent = frame
-
-modeBox.FocusLost:Connect(function()
-    CHAT_MODE = modeBox.Text
-end)
-
--- input target whisper
-local whisperBox = Instance.new("TextBox")
-whisperBox.Size = UDim2.new(1, -20, 0, 30)
-whisperBox.Position = UDim2.new(0, 10, 0, 160)
-whisperBox.PlaceholderText = "Nama Player (Whisper)"
-whisperBox.Text = WHISPER_TARGET
-whisperBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-whisperBox.TextColor3 = Color3.new(1, 1, 1)
-whisperBox.Font = Enum.Font.Gotham
-whisperBox.TextSize = 14
-whisperBox.ClearTextOnFocus = false
-whisperBox.Parent = frame
-
-whisperBox.FocusLost:Connect(function()
-    WHISPER_TARGET = whisperBox.Text
-end)
-
-local function autoChatLoop()
-    while AUTO_CHAT do
-        task.wait() -- no delay, secepat mungkin
-        if CHAT_MODE == "All" then
-            ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(CHAT_MESSAGE, "All")
-        elseif CHAT_MODE == "Team" then
-            ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(CHAT_MESSAGE, "Team")
-        elseif CHAT_MODE == "Whisper" then
-            ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer("/w " .. WHISPER_TARGET .. " " .. CHAT_MESSAGE, "All")
+        if owner and owner.Character then
+            applyOwnerLabel(owner.Character)
         end
-    end
-end
-
-createToggle("Auto Chat", frame, 200, function(state)
-    AUTO_CHAT = state
-    if state then
-        CHAT_MESSAGE = chatBox.Text
-        CHAT_MODE = modeBox.Text
-        WHISPER_TARGET = whisperBox.Text
-        task.spawn(autoChatLoop)
+        if owner then
+            owner.CharacterAdded:Connect(function(char)
+                if LABEL_ENABLED then
+                    applyOwnerLabel(char)
+                end
+            end)
+        end
+    else
+        if labelBillboard then
+            labelBillboard:Destroy()
+            labelBillboard = nil
+        end
     end
 end)
