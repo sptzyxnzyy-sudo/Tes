@@ -1,6 +1,6 @@
 -- credit: Xraxor1 (Original GUI/Intro structure)
 -- Modification & Features by Sptzyy
--- Features: ESP, Speed, Aura, Infinite Jump, Auto Fishing
+-- Features: ESP, Speed, Aura, Infinite Jump, Auto Big Fish Catch
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
@@ -301,27 +301,30 @@ UserInputService.JumpRequest:Connect(function()
 end)
 
 --------------------------------------------------------
--- FEATURE 5: AUTO FISHING
+-- FEATURE 5: AUTO BIG FISH
 --------------------------------------------------------
 local AUTOFISH_ENABLED = false
 local BigFishList = {"Shark","Whale","GoldenFish","LegendaryTuna"}
 
 local function autoFish()
     while AUTOFISH_ENABLED do
-        task.wait(1.5)
+        task.wait(2)
+        -- cari pancing
         local rod = player.Backpack:FindFirstChild("FishingRod") or (player.Character and player.Character:FindFirstChild("FishingRod"))
         if rod then
-            local fishName = BigFishList[math.random(1, #BigFishList)]
-            print("[AUTO FISHING] Dapat ikan mahal: " .. fishName)
-            local remote = ReplicatedStorage:FindFirstChild("CatchFish")
-            if remote and remote:IsA("RemoteEvent") then
-                remote:FireServer(fishName)
+            local fishName = BigFishList[math.random(1,#BigFishList)]
+            print("[AUTO BIG FISH] Menangkap: " .. fishName)
+
+            -- cari remote yang biasa dipakai untuk pancing
+            local catchRemote = ReplicatedStorage:FindFirstChild("CatchFish") or ReplicatedStorage:FindFirstChild("RemoteEvent") 
+            if catchRemote and catchRemote:IsA("RemoteEvent") then
+                catchRemote:FireServer(fishName,true) -- true = langsung sukses
             end
         end
     end
 end
 
-createToggle("Auto Fishing", featureScrollFrame, function(state)
+createToggle("Auto Big Fish", featureScrollFrame, function(state)
     AUTOFISH_ENABLED = state
     if state then
         task.spawn(autoFish)
