@@ -1,5 +1,5 @@
 -- credit: Xraxor1 (Original GUI/Intro structure)
--- Modification: Tambah ESP + Speed (toggle), AntiHealth (button)
+-- Modification: ESP + Speed (with input) + AntiHealth
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
@@ -8,7 +8,7 @@ local Camera = workspace.CurrentCamera
 
 local player = Players.LocalPlayer
 
--- 🔽 ANIMASI "BY : Xraxor" 🔽
+-- 🔽 ANIMASI INTRO 🔽
 do
     local introGui = Instance.new("ScreenGui")
     introGui.Name = "IntroAnimation"
@@ -27,7 +27,6 @@ do
 
     local tweenInfoMove = TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
     local tweenMove = TweenService:Create(introLabel, tweenInfoMove, {Position = UDim2.new(0.5, -150, 0.42, 0)})
-
     local tweenInfoColor = TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
     local tweenColor = TweenService:Create(introLabel, tweenInfoColor, {TextColor3 = Color3.fromRGB(0, 0, 0)})
 
@@ -42,16 +41,15 @@ do
     end)
 end
 
--- 🔽 GUI Utama 🔽
+-- 🔽 GUI UTAMA 🔽
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "CoreFeaturesGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Frame utama
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 150) 
-frame.Position = UDim2.new(0.4, -110, 0.5, -75)
+frame.Size = UDim2.new(0, 240, 0, 220) 
+frame.Position = UDim2.new(0.4, -110, 0.5, -110)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -62,7 +60,6 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 15)
 corner.Parent = frame
 
--- Judul GUI
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
@@ -72,11 +69,10 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
--- ScrollingFrame untuk daftar fitur
 local featureScrollFrame = Instance.new("ScrollingFrame")
 featureScrollFrame.Name = "FeatureList"
 featureScrollFrame.Size = UDim2.new(1, -20, 1, -40)
-featureScrollFrame.Position = UDim2.new(0.5, -100, 0, 35)
+featureScrollFrame.Position = UDim2.new(0.5, -110, 0, 35)
 featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 featureScrollFrame.ScrollBarThickness = 6
 featureScrollFrame.BackgroundTransparency = 1
@@ -92,7 +88,7 @@ featureListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(functi
     featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, featureListLayout.AbsoluteContentSize.Y + 10)
 end)
 
--- 🔽 FUNGSI BUAT TOGGLE 🔽
+-- 🔽 TEMPLATE TOGGLE 🔽
 local function createToggle(text, parent, callback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -10, 0, 35)
@@ -119,7 +115,9 @@ local function createToggle(text, parent, callback)
     return btn
 end
 
+-- =========================
 -- 🔽 FITUR ESP 🔽
+-- =========================
 local ESP_ENABLED = false
 local tracers = {}
 
@@ -192,32 +190,72 @@ Players.PlayerAdded:Connect(function(p)
 end)
 Players.PlayerRemoving:Connect(removeESP)
 
+-- =========================
 -- 🔽 FITUR SPEED 🔽
+-- =========================
 local SPEED_ENABLED = false
 local DEFAULT_SPEED = 16
-local speedValue = 50
+local CUSTOM_SPEED = 50
 
 local function setSpeed(val)
     local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
     if hum then hum.WalkSpeed = val end
 end
 
--- 🔽 FITUR ANTI HEALTH (button biasa) 🔽
-local function activateAntiHealth()
-    local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-    if not hum then return end
+-- =========================
+-- 🔽 FITUR ANTI-HEALTH 🔽
+-- =========================
+local ANTIHEALTH_ENABLED = false
 
-    -- Loop supaya darah terus penuh
-    task.spawn(function()
-        while hum and hum.Parent do
-            hum.Health = hum.MaxHealth
-            task.wait(0.1)
+task.spawn(function()
+    while task.wait(0.1) do
+        if ANTIHEALTH_ENABLED then
+            local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health < hum.MaxHealth then
+                hum.Health = hum.MaxHealth
+            end
         end
-    end)
-end
+    end
+end)
 
--- 🔽 TAMBAHKAN TOGGLE & BUTTON 🔽
+-- =========================
+-- 🔽 TOGGLE BUTTONS + INPUT 🔽
+-- =========================
 createToggle("ESP", featureScrollFrame, function(state)
     ESP_ENABLED = state
     if state then
-        for _,
+        for _,pl in ipairs(Players:GetPlayers()) do if pl~=player then addESP(pl) end end
+    else
+        for _,pl in ipairs(Players:GetPlayers()) do if pl~=player then removeESP(pl) end end
+    end
+end)
+
+local speedBtn = createToggle("Speed", featureScrollFrame, function(state)
+    SPEED_ENABLED = state
+    if state then setSpeed(CUSTOM_SPEED) else setSpeed(DEFAULT_SPEED) end
+end)
+
+-- Box untuk input kecepatan
+local speedBox = Instance.new("TextBox")
+speedBox.Size = UDim2.new(1, -10, 0, 30)
+speedBox.BackgroundColor3 = Color3.fromRGB(40,40,40)
+speedBox.Text = tostring(CUSTOM_SPEED)
+speedBox.TextColor3 = Color3.new(1,1,1)
+speedBox.Font = Enum.Font.Gotham
+speedBox.TextSize = 14
+speedBox.ClearTextOnFocus = false
+speedBox.Parent = featureScrollFrame
+
+speedBox.FocusLost:Connect(function()
+    local num = tonumber(speedBox.Text)
+    if num and num > 0 then
+        CUSTOM_SPEED = num
+        if SPEED_ENABLED then setSpeed(CUSTOM_SPEED) end
+    else
+        speedBox.Text = tostring(CUSTOM_SPEED)
+    end
+end)
+
+createToggle("Anti-Health", featureScrollFrame, function(state)
+    ANTIHEALTH_ENABLED = state
+end)
