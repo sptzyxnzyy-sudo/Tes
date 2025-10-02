@@ -1,18 +1,19 @@
 -- credit: Xraxor1 (Original GUI/Intro structure)
--- Modification: ESP + Toggle + Speed Hack
+-- Modification: Tambah ESP + Speed Feature dengan toggle
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
-local LocalPlayer = Players.LocalPlayer
+
+local player = Players.LocalPlayer
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
     local introGui = Instance.new("ScreenGui")
     introGui.Name = "IntroAnimation"
     introGui.ResetOnSpawn = false
-    introGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    introGui.Parent = player:WaitForChild("PlayerGui")
 
     local introLabel = Instance.new("TextLabel")
     introLabel.Size = UDim2.new(0, 300, 0, 50)
@@ -41,191 +42,202 @@ do
     end)
 end
 
--- 🔽 MENU GUI 🔽
+-- 🔽 GUI Utama 🔽
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "HackMenu"
+screenGui.Name = "CoreFeaturesGUI"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+screenGui.Parent = player:WaitForChild("PlayerGui")
 
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0,200,0,200)
-mainFrame.Position = UDim2.new(0,20,0,100)
-mainFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
-mainFrame.Parent = screenGui
+-- Frame utama
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 220, 0, 120) 
+frame.Position = UDim2.new(0.4, -110, 0.5, -60)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screenGui
 
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 15)
+corner.Parent = frame
+
+-- Judul GUI
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1,0,0,30)
-title.BackgroundColor3 = Color3.fromRGB(20,20,20)
-title.Text = "Menu Hack"
-title.TextColor3 = Color3.new(1,1,1)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.Text = "CORE FEATURES"
+title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
-title.Parent = mainFrame
+title.Parent = frame
 
--- 🔽 ESP BUTTON 🔽
-local espButton = Instance.new("TextButton")
-espButton.Size = UDim2.new(1,-10,0,30)
-espButton.Position = UDim2.new(0,5,0,40)
-espButton.BackgroundColor3 = Color3.fromRGB(60,60,60)
-espButton.Text = "ESP: OFF"
-espButton.TextColor3 = Color3.new(1,1,1)
-espButton.Font = Enum.Font.GothamBold
-espButton.TextSize = 16
-espButton.Parent = mainFrame
+-- ScrollingFrame untuk daftar fitur
+local featureScrollFrame = Instance.new("ScrollingFrame")
+featureScrollFrame.Name = "FeatureList"
+featureScrollFrame.Size = UDim2.new(1, -20, 1, -40)
+featureScrollFrame.Position = UDim2.new(0.5, -100, 0, 35)
+featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+featureScrollFrame.ScrollBarThickness = 6
+featureScrollFrame.BackgroundTransparency = 1
+featureScrollFrame.Parent = frame
 
--- 🔽 SPEED TEXTBOX 🔽
-local speedBox = Instance.new("TextBox")
-speedBox.Size = UDim2.new(1,-10,0,30)
-speedBox.Position = UDim2.new(0,5,0,80)
-speedBox.BackgroundColor3 = Color3.fromRGB(60,60,60)
-speedBox.Text = "50" -- default speed value
-speedBox.TextColor3 = Color3.new(1,1,1)
-speedBox.Font = Enum.Font.GothamBold
-speedBox.TextSize = 16
-speedBox.Parent = mainFrame
+local featureListLayout = Instance.new("UIListLayout")
+featureListLayout.Padding = UDim.new(0, 5)
+featureListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+featureListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+featureListLayout.Parent = featureScrollFrame
 
--- 🔽 SPEED BUTTON 🔽
-local speedButton = Instance.new("TextButton")
-speedButton.Size = UDim2.new(1,-10,0,30)
-speedButton.Position = UDim2.new(0,5,0,120)
-speedButton.BackgroundColor3 = Color3.fromRGB(60,60,60)
-speedButton.Text = "Speed: OFF"
-speedButton.TextColor3 = Color3.new(1,1,1)
-speedButton.Font = Enum.Font.GothamBold
-speedButton.TextSize = 16
-speedButton.Parent = mainFrame
+featureListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, featureListLayout.AbsoluteContentSize.Y + 10)
+end)
 
--- ====== ESP SYSTEM ======
+-- 🔽 FUNGSI BUAT TOGGLE 🔽
+local function createToggle(text, parent, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -10, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn.Text = text .. ": OFF"
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 14
+    btn.Parent = parent
+
+    local state = false
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        if state then
+            btn.Text = text .. ": ON"
+            btn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+        else
+            btn.Text = text .. ": OFF"
+            btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        end
+        callback(state)
+    end)
+
+    return btn
+end
+
+-- 🔽 FITUR ESP 🔽
 local ESP_ENABLED = false
 local tracers = {}
 
-local function addESP(player)
-	if player == LocalPlayer or not player.Character then return end
-	if not player.Character:FindFirstChild("ESP_Highlight") then
-		local h = Instance.new("Highlight")
-		h.Name = "ESP_Highlight"
-		h.FillColor = Color3.fromRGB(0,255,0)
-		h.OutlineColor = Color3.fromRGB(255,255,255)
-		h.FillTransparency = 0.6
-		h.OutlineTransparency = 0
-		h.Parent = player.Character
-	end
-	if not player.Character:FindFirstChild("ESP_NameTag") and player.Character:FindFirstChild("Head") then
-		local tag = Instance.new("BillboardGui")
-		tag.Name = "ESP_NameTag"
-		tag.Adornee = player.Character.Head
-		tag.Size = UDim2.new(0,150,0,20)
-		tag.StudsOffset = Vector3.new(0,2.5,0)
-		tag.AlwaysOnTop = true
-		tag.Parent = player.Character
-		local text = Instance.new("TextLabel")
-		text.Size = UDim2.new(1,0,1,0)
-		text.BackgroundTransparency = 1
-		text.Text = player.Name
-		text.TextColor3 = Color3.fromRGB(255,255,255)
-		text.Font = Enum.Font.GothamBold
-		text.TextSize = 14
-		text.Parent = tag
-	end
-	if not tracers[player] then
-		local line = Drawing.new("Line")
-		line.Color = Color3.fromRGB(0,255,0)
-		line.Thickness = 1.8
-		line.Visible = false
-		tracers[player] = line
-	end
+local function addESP(p)
+    if p == player or not p.Character then return end
+    if not p.Character:FindFirstChild("ESP_Highlight") then
+        local h = Instance.new("Highlight")
+        h.Name = "ESP_Highlight"
+        h.FillColor = Color3.fromRGB(0,255,0)
+        h.OutlineColor = Color3.fromRGB(255,255,255)
+        h.FillTransparency = 0.6
+        h.Parent = p.Character
+    end
+    if not p.Character:FindFirstChild("ESP_Name") and p.Character:FindFirstChild("Head") then
+        local tag = Instance.new("BillboardGui")
+        tag.Name = "ESP_Name"
+        tag.Adornee = p.Character.Head
+        tag.Size = UDim2.new(0,120,0,20)
+        tag.StudsOffset = Vector3.new(0,2.5,0)
+        tag.AlwaysOnTop = true
+        tag.Parent = p.Character
+        local txt = Instance.new("TextLabel")
+        txt.Size = UDim2.new(1,0,1,0)
+        txt.BackgroundTransparency = 1
+        txt.Text = p.Name
+        txt.TextColor3 = Color3.new(1,1,1)
+        txt.Font = Enum.Font.GothamBold
+        txt.TextSize = 14
+        txt.Parent = tag
+    end
+    if not tracers[p] then
+        local line = Drawing.new("Line")
+        line.Color = Color3.fromRGB(0,255,0)
+        line.Thickness = 2
+        line.Visible = false
+        tracers[p] = line
+    end
 end
 
-local function removeESP(player)
-	if player.Character then
-		if player.Character:FindFirstChild("ESP_Highlight") then player.Character.ESP_Highlight:Destroy() end
-		if player.Character:FindFirstChild("ESP_NameTag") then player.Character.ESP_NameTag:Destroy() end
-	end
-	if tracers[player] then
-		tracers[player]:Remove()
-		tracers[player] = nil
-	end
+local function removeESP(p)
+    if p.Character then
+        if p.Character:FindFirstChild("ESP_Highlight") then p.Character.ESP_Highlight:Destroy() end
+        if p.Character:FindFirstChild("ESP_Name") then p.Character.ESP_Name:Destroy() end
+    end
+    if tracers[p] then tracers[p]:Remove() tracers[p]=nil end
 end
-
-espButton.MouseButton1Click:Connect(function()
-	ESP_ENABLED = not ESP_ENABLED
-	if ESP_ENABLED then
-		espButton.Text = "ESP: ON"
-		espButton.BackgroundColor3 = Color3.fromRGB(0,170,0)
-		for _,p in pairs(Players:GetPlayers()) do
-			if p ~= LocalPlayer then addESP(p) end
-		end
-	else
-		espButton.Text = "ESP: OFF"
-		espButton.BackgroundColor3 = Color3.fromRGB(60,60,60)
-		for _,p in pairs(Players:GetPlayers()) do
-			if p ~= LocalPlayer then removeESP(p) end
-		end
-	end
-end)
 
 RunService.RenderStepped:Connect(function()
-	if not ESP_ENABLED then
-		for _,line in pairs(tracers) do line.Visible = false end
-		return
-	end
-	if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
-	local myPos, onScreen = Camera:WorldToViewportPoint(LocalPlayer.Character.HumanoidRootPart.Position)
-	for _,p in pairs(Players:GetPlayers()) do
-		if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and tracers[p] then
-			local targetPos, onScr = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
-			if onScreen and onScr then
-				tracers[p].From = Vector2.new(myPos.X, myPos.Y)
-				tracers[p].To = Vector2.new(targetPos.X, targetPos.Y)
-				tracers[p].Visible = true
-			else
-				tracers[p].Visible = false
-			end
-		end
-	end
+    if not ESP_ENABLED or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+        for _,line in pairs(tracers) do line.Visible=false end
+        return
+    end
+    local myPos = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p~=player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and tracers[p] then
+            local pos,onScr = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
+            if onScr then
+                tracers[p].From = Vector2.new(myPos.X,myPos.Y)
+                tracers[p].To = Vector2.new(pos.X,pos.Y)
+                tracers[p].Visible = true
+            else tracers[p].Visible=false end
+        end
+    end
 end)
 
 Players.PlayerAdded:Connect(function(p)
-	p.CharacterAdded:Connect(function()
-		if ESP_ENABLED then
-			task.wait(1)
-			addESP(p)
-		end
-	end)
+    p.CharacterAdded:Connect(function()
+        if ESP_ENABLED then task.wait(1) addESP(p) end
+    end)
 end)
-Players.PlayerRemoving:Connect(function(p) removeESP(p) end)
+Players.PlayerRemoving:Connect(removeESP)
 
--- ====== SPEED SYSTEM ======
+-- 🔽 FITUR SPEED 🔽
 local SPEED_ENABLED = false
 local DEFAULT_SPEED = 16
+local speedValue = 50
 
-speedButton.MouseButton1Click:Connect(function()
-	SPEED_ENABLED = not SPEED_ENABLED
-	if SPEED_ENABLED then
-		speedButton.Text = "Speed: ON"
-		speedButton.BackgroundColor3 = Color3.fromRGB(0,170,0)
-		local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-		if hum then
-			local spd = tonumber(speedBox.Text) or 50
-			hum.WalkSpeed = spd
-		end
-	else
-		speedButton.Text = "Speed: OFF"
-		speedButton.BackgroundColor3 = Color3.fromRGB(60,60,60)
-		local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-		if hum then
-			hum.WalkSpeed = DEFAULT_SPEED
-		end
-	end
+local function setSpeed(val)
+    local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    if hum then hum.WalkSpeed = val end
+end
+
+-- 🔽 TAMBAHKAN TOGGLE KE MENU 🔽
+createToggle("ESP", featureScrollFrame, function(state)
+    ESP_ENABLED = state
+    if state then
+        for _,pl in ipairs(Players:GetPlayers()) do if pl~=player then addESP(pl) end end
+    else
+        for _,pl in ipairs(Players:GetPlayers()) do if pl~=player then removeESP(pl) end end
+    end
 end)
 
--- update kalau speedBox diganti saat aktif
+createToggle("Speed", featureScrollFrame, function(state)
+    SPEED_ENABLED = state
+    if state then
+        setSpeed(speedValue)
+    else
+        setSpeed(DEFAULT_SPEED)
+    end
+end)
+
+-- 🔽 INPUT SPEED 🔽
+local speedBox = Instance.new("TextBox")
+speedBox.Size = UDim2.new(1, -10, 0, 35)
+speedBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+speedBox.Text = tostring(speedValue)
+speedBox.TextColor3 = Color3.new(1, 1, 1)
+speedBox.Font = Enum.Font.GothamBold
+speedBox.TextSize = 14
+speedBox.ClearTextOnFocus = false
+speedBox.Parent = featureScrollFrame
+
 speedBox.FocusLost:Connect(function()
-	if SPEED_ENABLED then
-		local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-		if hum then
-			local spd = tonumber(speedBox.Text) or 50
-			hum.WalkSpeed = spd
-		end
-	end
+    local val = tonumber(speedBox.Text)
+    if val then
+        speedValue = val
+        if SPEED_ENABLED then setSpeed(speedValue) end
+    else
+        speedBox.Text = tostring(speedValue)
+    end
 end)
