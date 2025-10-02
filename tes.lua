@@ -68,13 +68,13 @@ espButton.TextSize = 18
 espButton.Parent = frame
 
 -- =========================
--- DRAG FUNCTION (Universal)
+-- DRAG FUNCTION (universal)
 -- =========================
-local function makeDraggable(guiObject)
+local function makeDraggable(guiObject, dragHandle)
     local dragging = false
     local dragStart, startPos
 
-    guiObject.InputBegan:Connect(function(input)
+    dragHandle.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
             dragStart = input.Position
@@ -99,9 +99,11 @@ local function makeDraggable(guiObject)
     end)
 end
 
--- bikin draggable
-makeDraggable(frame)
-makeDraggable(floatingButton)
+-- bikin draggable:
+-- menu list bisa digeser dari seluruh frame
+makeDraggable(frame, frame)
+-- floating bisa digeser dengan drag icon ⚙️
+makeDraggable(floatingButton, floatingButton)
 
 -- =========================
 -- ESP SYSTEM
