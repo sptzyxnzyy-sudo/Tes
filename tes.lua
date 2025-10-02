@@ -1,10 +1,12 @@
 -- credit: Xraxor1 (Original GUI/Intro structure)
 -- Modification & Features by Sptzyy
+-- Features: ESP, Speed, Aura, Infinite Jump, Auto Fishing
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -20,7 +22,7 @@ do
     introLabel.Size = UDim2.new(0, 300, 0, 50)
     introLabel.Position = UDim2.new(0.5, -150, 0.4, 0)
     introLabel.BackgroundTransparency = 1
-    introLabel.Text = "By : Xraxor"
+    introLabel.Text = "By : Sptzyy"
     introLabel.TextColor3 = Color3.fromRGB(40, 40, 40)
     introLabel.TextScaled = true
     introLabel.Font = Enum.Font.GothamBold
@@ -29,11 +31,7 @@ do
     local tweenInfoMove = TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
     local tweenMove = TweenService:Create(introLabel, tweenInfoMove, {Position = UDim2.new(0.5, -150, 0.42, 0)})
 
-    local tweenInfoColor = TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
-    local tweenColor = TweenService:Create(introLabel, tweenInfoColor, {TextColor3 = Color3.fromRGB(0, 0, 0)})
-
     tweenMove:Play()
-    tweenColor:Play()
 
     task.wait(2)
     local fadeOut = TweenService:Create(introLabel, TweenInfo.new(0.5), {TextTransparency = 1})
@@ -111,7 +109,7 @@ openBtn.MouseButton1Click:Connect(function()
     openBtn.Visible = false
 end)
 
--- ScrollingFrame untuk daftar fitur
+-- Scroll fitur
 local featureScrollFrame = Instance.new("ScrollingFrame")
 featureScrollFrame.Name = "FeatureList"
 featureScrollFrame.Size = UDim2.new(1, -20, 1, -40)
@@ -156,166 +154,176 @@ local function createToggle(name, parent, callback)
     return btn
 end
 
--- ================= FEATURE: ESP =================
+--------------------------------------------------------
+-- FEATURE 1: ESP
+--------------------------------------------------------
 local ESP_ENABLED = false
 local tracers = {}
-local function addESP(p)
-    if p == player or not p.Character then return end
-    if not p.Character:FindFirstChild("ESP_Highlight") then
-        local h = Instance.new("Highlight")
-        h.Name = "ESP_Highlight"
-        h.FillColor = Color3.fromRGB(0,255,0)
-        h.OutlineColor = Color3.fromRGB(255,255,255)
-        h.FillTransparency = 0.6
-        h.Parent = p.Character
-    end
-    if not p.Character:FindFirstChild("ESP_Name") and p.Character:FindFirstChild("Head") then
-        local tag = Instance.new("BillboardGui")
-        tag.Name = "ESP_Name"
-        tag.Adornee = p.Character.Head
-        tag.Size = UDim2.new(0,120,0,20)
-        tag.StudsOffset = Vector3.new(0,2.5,0)
-        tag.AlwaysOnTop = true
-        tag.Parent = p.Character
-        local txt = Instance.new("TextLabel")
-        txt.Size = UDim2.new(1,0,1,0)
-        txt.BackgroundTransparency = 1
-        txt.Text = p.Name
-        txt.TextColor3 = Color3.new(1,1,1)
-        txt.Font = Enum.Font.GothamBold
-        txt.TextSize = 14
-        txt.Parent = tag
-    end
-    if not tracers[p] then
+
+local function createESP(target)
+    if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+        local billboard = Instance.new("BillboardGui")
+        billboard.Adornee = target.Character.HumanoidRootPart
+        billboard.Size = UDim2.new(0, 100, 0, 50)
+        billboard.AlwaysOnTop = true
+        billboard.Name = "ESP_" .. target.Name
+
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Size = UDim2.new(1, 0, 0, 20)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = target.Name
+        nameLabel.TextColor3 = Color3.new(1, 1, 0)
+        nameLabel.TextScaled = true
+        nameLabel.Parent = billboard
+
+        billboard.Parent = target.Character
+
         local line = Drawing.new("Line")
         line.Color = Color3.fromRGB(0,255,0)
         line.Thickness = 2
-        line.Visible = false
-        tracers[p] = line
+        line.Visible = true
+        tracers[target] = line
     end
 end
-local function removeESP(p)
-    if p.Character then
-        if p.Character:FindFirstChild("ESP_Highlight") then p.Character.ESP_Highlight:Destroy() end
-        if p.Character:FindFirstChild("ESP_Name") then p.Character.ESP_Name:Destroy() end
+
+local function removeESP(target)
+    if target.Character then
+        local esp = target.Character:FindFirstChild("ESP_" .. target.Name)
+        if esp then esp:Destroy() end
     end
-    if tracers[p] then tracers[p]:Remove() tracers[p]=nil end
+    if tracers[target] then
+        tracers[target]:Remove()
+        tracers[target] = nil
+    end
 end
-RunService.RenderStepped:Connect(function()
-    if not ESP_ENABLED or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
-        for _,line in pairs(tracers) do line.Visible=false end
-        return
-    end
-    local myPos = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
-    for _,p in ipairs(Players:GetPlayers()) do
-        if p~=player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and tracers[p] then
-            local pos,onScr = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
-            if onScr then
-                tracers[p].From = Vector2.new(myPos.X,myPos.Y)
-                tracers[p].To = Vector2.new(pos.X,pos.Y)
-                tracers[p].Visible = true
-            else tracers[p].Visible=false end
+
+createToggle("Player ESP", featureScrollFrame, function(state)
+    ESP_ENABLED = state
+    if not state then
+        for _,p in pairs(Players:GetPlayers()) do
+            if p ~= player then removeESP(p) end
+        end
+    else
+        for _,p in pairs(Players:GetPlayers()) do
+            if p ~= player then createESP(p) end
         end
     end
 end)
-Players.PlayerAdded:Connect(function(p)
-    p.CharacterAdded:Connect(function() if ESP_ENABLED then task.wait(1) addESP(p) end end)
-end)
-Players.PlayerRemoving:Connect(removeESP)
 
-createToggle("ESP", featureScrollFrame, function(state)
-    ESP_ENABLED = state
-    if state then for _,pl in ipairs(Players:GetPlayers()) do if pl~=player then addESP(pl) end end
-    else for _,pl in ipairs(Players:GetPlayers()) do if pl~=player then removeESP(pl) end end end
+RunService.RenderStepped:Connect(function()
+    if ESP_ENABLED then
+        for target,line in pairs(tracers) do
+            if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                local hrp = target.Character.HumanoidRootPart
+                local pos,vis = Camera:WorldToViewportPoint(hrp.Position)
+                if vis then
+                    line.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+                    line.To = Vector2.new(pos.X, pos.Y)
+                    line.Visible = true
+                else
+                    line.Visible = false
+                end
+            end
+        end
+    end
 end)
 
--- ================= FEATURE: SPEED =================
+--------------------------------------------------------
+-- FEATURE 2: SPEED
+--------------------------------------------------------
 local SPEED_ENABLED = false
-local DEFAULT_SPEED = 16
-local speedValue = 50
-local function setSpeed(val)
-    local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-    if hum then hum.WalkSpeed = val end
-end
-createToggle("Speed", featureScrollFrame, function(state)
-    SPEED_ENABLED = state
-    if state then setSpeed(speedValue) else setSpeed(DEFAULT_SPEED) end
-end)
+local SpeedValue = 50
+
 local speedBox = Instance.new("TextBox")
-speedBox.Size = UDim2.new(1, -10, 0, 35)
-speedBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-speedBox.Text = tostring(speedValue)
-speedBox.TextColor3 = Color3.new(1, 1, 1)
+speedBox.Size = UDim2.new(1, -10, 0, 30)
+speedBox.PlaceholderText = "Speed Value (50)"
+speedBox.BackgroundColor3 = Color3.fromRGB(40,40,40)
+speedBox.TextColor3 = Color3.new(1,1,1)
 speedBox.Font = Enum.Font.GothamBold
 speedBox.TextSize = 14
-speedBox.ClearTextOnFocus = false
 speedBox.Parent = featureScrollFrame
+
 speedBox.FocusLost:Connect(function()
     local val = tonumber(speedBox.Text)
-    if val then
-        speedValue = val
-        if SPEED_ENABLED then setSpeed(speedValue) end
-    else
-        speedBox.Text = tostring(speedValue)
+    if val then SpeedValue = val end
+end)
+
+createToggle("Speed Hack", featureScrollFrame, function(state)
+    SPEED_ENABLED = state
+end)
+
+RunService.Stepped:Connect(function()
+    if SPEED_ENABLED and player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.WalkSpeed = SpeedValue
+    elseif player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.WalkSpeed = 16
     end
 end)
 
--- ================= FEATURE: AURA =================
+--------------------------------------------------------
+-- FEATURE 3: AURA EFFECT
+--------------------------------------------------------
 local AURA_ENABLED = false
-local auraEffect
-createToggle("Aura", featureScrollFrame, function(state)
+local auraPart = nil
+
+createToggle("Aura Effect", featureScrollFrame, function(state)
     AURA_ENABLED = state
     if state then
-        if player.Character and not auraEffect then
-            auraEffect = Instance.new("ParticleEmitter")
-            auraEffect.Rate = 50
-            auraEffect.Texture = "rbxassetid://241594440" -- aura keren
-            auraEffect.Lifetime = NumberRange.new(1,2)
-            auraEffect.Speed = NumberRange.new(0,0)
-            auraEffect.Rotation = NumberRange.new(0,360)
-            auraEffect.RotSpeed = NumberRange.new(-90,90)
-            auraEffect.Size = NumberSequence.new(1.5)
-            auraEffect.Parent = player.Character:FindFirstChild("HumanoidRootPart")
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            auraPart = Instance.new("ParticleEmitter")
+            auraPart.Texture = "rbxassetid://3018122091"
+            auraPart.Rate = 15
+            auraPart.Lifetime = NumberRange.new(1)
+            auraPart.Speed = NumberRange.new(2)
+            auraPart.Parent = player.Character.HumanoidRootPart
         end
     else
-        if auraEffect then auraEffect:Destroy() auraEffect=nil end
+        if auraPart then
+            auraPart:Destroy()
+            auraPart = nil
+        end
     end
 end)
 
--- ================= FEATURE: INFINITE JUMP =================
+--------------------------------------------------------
+-- FEATURE 4: INFINITE JUMP
+--------------------------------------------------------
 local INFJUMP_ENABLED = false
+
 createToggle("Infinite Jump", featureScrollFrame, function(state)
     INFJUMP_ENABLED = state
 end)
+
 UserInputService.JumpRequest:Connect(function()
     if INFJUMP_ENABLED and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
         player.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
     end
 end)
 
--- ================= FEATURE: FLY =================
-local FLY_ENABLED = false
-local flyVelocity
-createToggle("Fly", featureScrollFrame, function(state)
-    FLY_ENABLED = state
-    if state then
-        if player.Character and not flyVelocity then
-            flyVelocity = Instance.new("BodyVelocity")
-            flyVelocity.Velocity = Vector3.new(0,0,0)
-            flyVelocity.MaxForce = Vector3.new(4000,4000,4000)
-            flyVelocity.Parent = player.Character:FindFirstChild("HumanoidRootPart")
+--------------------------------------------------------
+-- FEATURE 5: AUTO FISHING
+--------------------------------------------------------
+local AUTOFISH_ENABLED = false
+local BigFishList = {"Shark","Whale","GoldenFish","LegendaryTuna"}
+
+local function autoFish()
+    while AUTOFISH_ENABLED do
+        task.wait(1.5)
+        local rod = player.Backpack:FindFirstChild("FishingRod") or (player.Character and player.Character:FindFirstChild("FishingRod"))
+        if rod then
+            local fishName = BigFishList[math.random(1, #BigFishList)]
+            print("[AUTO FISHING] Dapat ikan mahal: " .. fishName)
+            local remote = ReplicatedStorage:FindFirstChild("CatchFish")
+            if remote and remote:IsA("RemoteEvent") then
+                remote:FireServer(fishName)
+            end
         end
-    else
-        if flyVelocity then flyVelocity:Destroy() flyVelocity=nil end
     end
-end)
-RunService.RenderStepped:Connect(function()
-    if FLY_ENABLED and flyVelocity then
-        local move = Vector3.new()
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move=move+Camera.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move=move-Camera.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move=move-Camera.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move=move+Camera.CFrame.RightVector end
-        flyVelocity.Velocity = move*50
+end
+
+createToggle("Auto Fishing", featureScrollFrame, function(state)
+    AUTOFISH_ENABLED = state
+    if state then
+        task.spawn(autoFish)
     end
 end)
