@@ -11,7 +11,7 @@ screenGui.Parent = CoreGui
 
 -- Frame menu utama
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 200, 0, 100)
+frame.Size = UDim2.new(0, 200, 0, 120)
 frame.Position = UDim2.new(0, 20, 0, 200)
 frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 frame.BorderSizePixel = 0
@@ -20,8 +20,9 @@ frame.Parent = screenGui
 
 -- Judul
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -30, 0, 30)
-title.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+title.Size = UDim2.new(1, -35, 0, 30)
+title.Position = UDim2.new(0, 5, 0, 0)
+title.BackgroundTransparency = 1
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Text = "Fitur Menu"
 title.TextXAlignment = Enum.TextXAlignment.Left
@@ -29,11 +30,11 @@ title.Font = Enum.Font.SourceSansBold
 title.TextSize = 18
 title.Parent = frame
 
--- Tombol close (X)
+-- Tombol close (X) di pojok kanan atas
 local closeButton = Instance.new("TextButton")
-closeButton.Size = UDim2.new(0, 30, 0, 30)
-closeButton.Position = UDim2.new(1, -30, 0, 0)
-closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+closeButton.Size = UDim2.new(0, 25, 0, 25)
+closeButton.Position = UDim2.new(1, -28, 0, 3)
+closeButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- merah terang
 closeButton.Text = "X"
 closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeButton.Font = Enum.Font.SourceSansBold
@@ -54,8 +55,8 @@ floatingButton.Parent = screenGui
 
 -- Tombol ESP toggle
 local espButton = Instance.new("TextButton")
-espButton.Size = UDim2.new(1, 0, 0, 40)
-espButton.Position = UDim2.new(0, 0, 0, 40)
+espButton.Size = UDim2.new(1, -10, 0, 40)
+espButton.Position = UDim2.new(0, 5, 0, 40)
 espButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 espButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 espButton.Text = "ESP: OFF"
