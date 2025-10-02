@@ -68,9 +68,9 @@ espButton.TextSize = 18
 espButton.Parent = frame
 
 -- =========================
--- DRAG FUNCTION (universal)
+-- DRAG FUNCTION (universal + save posisi)
 -- =========================
-local function makeDraggable(guiObject, dragHandle)
+local function makeDraggable(guiObject, dragHandle, saveName)
     local dragging = false
     local dragStart, startPos
 
@@ -91,19 +91,25 @@ local function makeDraggable(guiObject, dragHandle)
     UserInputService.InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local delta = input.Position - dragStart
-            guiObject.Position = UDim2.new(
+            local newPos = UDim2.new(
                 startPos.X.Scale, startPos.X.Offset + delta.X,
                 startPos.Y.Scale, startPos.Y.Offset + delta.Y
             )
+            guiObject.Position = newPos
+            screenGui:SetAttribute(saveName, newPos) -- simpan posisi
         end
     end)
+
+    -- restore posisi kalau ada simpanan
+    local savedPos = screenGui:GetAttribute(saveName)
+    if savedPos then
+        guiObject.Position = savedPos
+    end
 end
 
 -- bikin draggable:
--- menu list bisa digeser dari seluruh frame
-makeDraggable(frame, frame)
--- floating bisa digeser dengan drag icon ⚙️
-makeDraggable(floatingButton, floatingButton)
+makeDraggable(frame, frame, "MenuPos")
+makeDraggable(floatingButton, floatingButton, "FloatPos")
 
 -- =========================
 -- ESP SYSTEM
