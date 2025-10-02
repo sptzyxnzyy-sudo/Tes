@@ -17,8 +17,7 @@ frame.Position = UDim2.new(0, 20, 0, 200)
 frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 frame.BorderSizePixel = 0
 frame.Visible = true
-frame.Active = true -- penting untuk drag
-frame.Draggable = false -- kita bikin custom drag
+frame.Active = true
 frame.Parent = screenGui
 
 -- Judul
@@ -55,7 +54,6 @@ floatingButton.Font = Enum.Font.SourceSansBold
 floatingButton.TextSize = 24
 floatingButton.Visible = false
 floatingButton.Active = true
-floatingButton.Draggable = false
 floatingButton.Parent = screenGui
 
 -- Tombol ESP toggle
@@ -73,8 +71,7 @@ espButton.Parent = frame
 -- DRAG FUNCTION
 -- =========================
 local function makeDraggable(gui)
-    local dragging = false
-    local dragInput, dragStart, startPos
+    local dragging, dragInput, dragStart, startPos
 
     gui.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -171,7 +168,7 @@ end)
 Players.PlayerAdded:Connect(function(player)
     if player ~= LocalPlayer then
         player.CharacterAdded:Connect(function()
-            task.wait(1) -- tunggu load
+            task.wait(1)
             if ESP_ENABLED then
                 addESP(player)
             end
