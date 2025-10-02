@@ -1,328 +1,231 @@
--- LocalScript (taruh di StarterPlayerScripts)
--- ESP + NameTag + Tracer + draggable menu + intro animation
+-- credit: Xraxor1 (Original GUI/Intro structure)
+-- Modification: ESP + Toggle + Speed Hack
+
+local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
-local TweenService = game:GetService("TweenService")
-local CoreGui = game:GetService("CoreGui")
-local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
 
--- Root ScreenGui
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "ESPMenu"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = CoreGui
+-- 🔽 ANIMASI "BY : Xraxor" 🔽
+do
+    local introGui = Instance.new("ScreenGui")
+    introGui.Name = "IntroAnimation"
+    introGui.ResetOnSpawn = false
+    introGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- ---------- Intro animation ----------
-local introLabel = Instance.new("TextLabel")
-introLabel.Size = UDim2.new(1,0,1,0)
-introLabel.BackgroundTransparency = 1
-introLabel.Text = "MOD SPTZYY"
-introLabel.TextColor3 = Color3.new(1,1,1)
-introLabel.Font = Enum.Font.SourceSansBold
-introLabel.TextSize = 56
-introLabel.TextTransparency = 1
-introLabel.Parent = screenGui
+    local introLabel = Instance.new("TextLabel")
+    introLabel.Size = UDim2.new(0, 300, 0, 50)
+    introLabel.Position = UDim2.new(0.5, -150, 0.4, 0)
+    introLabel.BackgroundTransparency = 1
+    introLabel.Text = "By : Xraxor"
+    introLabel.TextColor3 = Color3.fromRGB(40, 40, 40)
+    introLabel.TextScaled = true
+    introLabel.Font = Enum.Font.GothamBold
+    introLabel.Parent = introGui
 
-local function playIntro()
-    local tweenIn = TweenService:Create(introLabel, TweenInfo.new(0.9, Enum.EasingStyle.Quad), {TextTransparency = 0})
-    tweenIn:Play(); tweenIn.Completed:Wait()
-    task.wait(1.0)
-    local tweenOut = TweenService:Create(introLabel, TweenInfo.new(0.9, Enum.EasingStyle.Quad), {TextTransparency = 1})
-    tweenOut:Play(); tweenOut.Completed:Wait()
-    introLabel:Destroy()
+    local tweenInfoMove = TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+    local tweenMove = TweenService:Create(introLabel, tweenInfoMove, {Position = UDim2.new(0.5, -150, 0.42, 0)})
+
+    local tweenInfoColor = TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+    local tweenColor = TweenService:Create(introLabel, tweenInfoColor, {TextColor3 = Color3.fromRGB(0, 0, 0)})
+
+    tweenMove:Play()
+    tweenColor:Play()
+
+    task.wait(2)
+    local fadeOut = TweenService:Create(introLabel, TweenInfo.new(0.5), {TextTransparency = 1})
+    fadeOut:Play()
+    fadeOut.Completed:Connect(function()
+        introGui:Destroy()
+    end)
 end
 
--- ---------- UI: main frame, floating, buttons ----------
-local frame = Instance.new("Frame")
-frame.Name = "MenuFrame"
-frame.Size = UDim2.new(0, 220, 0, 140)
-frame.Position = UDim2.new(0, 20, 0, 120)
-frame.BackgroundColor3 = Color3.fromRGB(40,40,40)
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Parent = screenGui
+-- 🔽 MENU GUI 🔽
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "HackMenu"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0,200,0,200)
+mainFrame.Position = UDim2.new(0,20,0,100)
+mainFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
+mainFrame.Parent = screenGui
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -35, 0, 30)
-title.Position = UDim2.new(0, 8, 0, 0)
-title.BackgroundTransparency = 1
+title.Size = UDim2.new(1,0,0,30)
+title.BackgroundColor3 = Color3.fromRGB(20,20,20)
+title.Text = "Menu Hack"
 title.TextColor3 = Color3.new(1,1,1)
-title.Text = "Fitur Menu"
-title.Font = Enum.Font.SourceSansBold
-title.TextSize = 18
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Parent = frame
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.Parent = mainFrame
 
-local closeButton = Instance.new("TextButton")
-closeButton.Name = "CloseBtn"
-closeButton.Size = UDim2.new(0,26,0,26)
-closeButton.Position = UDim2.new(1, -30, 0, 4)
-closeButton.BackgroundColor3 = Color3.fromRGB(255,0,0)
-closeButton.Text = "X"
-closeButton.TextColor3 = Color3.new(1,1,1)
-closeButton.Font = Enum.Font.SourceSansBold
-closeButton.TextSize = 18
-closeButton.Parent = frame
-
+-- 🔽 ESP BUTTON 🔽
 local espButton = Instance.new("TextButton")
-espButton.Name = "ESP_Toggle"
-espButton.Size = UDim2.new(1,-12,0,40)
-espButton.Position = UDim2.new(0,6,0,40)
-espButton.BackgroundColor3 = Color3.fromRGB(80,80,80)
+espButton.Size = UDim2.new(1,-10,0,30)
+espButton.Position = UDim2.new(0,5,0,40)
+espButton.BackgroundColor3 = Color3.fromRGB(60,60,60)
 espButton.Text = "ESP: OFF"
 espButton.TextColor3 = Color3.new(1,1,1)
-espButton.Font = Enum.Font.SourceSansBold
+espButton.Font = Enum.Font.GothamBold
 espButton.TextSize = 16
-espButton.Parent = frame
+espButton.Parent = mainFrame
 
-local floatingButton = Instance.new("TextButton")
-floatingButton.Name = "FloatingBtn"
-floatingButton.Size = UDim2.new(0,48,0,48)
-floatingButton.Position = UDim2.new(0, 18, 0, 120)
-floatingButton.BackgroundColor3 = Color3.fromRGB(50,150,250)
-floatingButton.Text = "⚙️"
-floatingButton.TextColor3 = Color3.new(1,1,1)
-floatingButton.Font = Enum.Font.SourceSansBold
-floatingButton.TextSize = 26
-floatingButton.Visible = false
-floatingButton.Active = true
-floatingButton.Parent = screenGui
+-- 🔽 SPEED TEXTBOX 🔽
+local speedBox = Instance.new("TextBox")
+speedBox.Size = UDim2.new(1,-10,0,30)
+speedBox.Position = UDim2.new(0,5,0,80)
+speedBox.BackgroundColor3 = Color3.fromRGB(60,60,60)
+speedBox.Text = "50" -- default speed value
+speedBox.TextColor3 = Color3.new(1,1,1)
+speedBox.Font = Enum.Font.GothamBold
+speedBox.TextSize = 16
+speedBox.Parent = mainFrame
 
--- container for GUI fallback tracers
-local tracerGuiContainer = Instance.new("Folder")
-tracerGuiContainer.Name = "TracerGUIs"
-tracerGuiContainer.Parent = screenGui
+-- 🔽 SPEED BUTTON 🔽
+local speedButton = Instance.new("TextButton")
+speedButton.Size = UDim2.new(1,-10,0,30)
+speedButton.Position = UDim2.new(0,5,0,120)
+speedButton.BackgroundColor3 = Color3.fromRGB(60,60,60)
+speedButton.Text = "Speed: OFF"
+speedButton.TextColor3 = Color3.new(1,1,1)
+speedButton.Font = Enum.Font.GothamBold
+speedButton.TextSize = 16
+speedButton.Parent = mainFrame
 
--- ---------- state & persistence ----------
+-- ====== ESP SYSTEM ======
 local ESP_ENABLED = false
-local savedESP = screenGui:GetAttribute("ESPEnabled")
-if type(savedESP) == "boolean" then ESP_ENABLED = savedESP end
-local function saveESPState() screenGui:SetAttribute("ESPEnabled", ESP_ENABLED) end
-
--- ---------- detect Drawing availability ----------
-local drawingAvailable = false
-do
-    local ok, _ = pcall(function()
-        if Drawing and type(Drawing.new) == "function" then
-            local t = Drawing.new("Line")
-            t.Visible = false
-            t:Remove()
-            drawingAvailable = true
-        end
-    end)
-    if not ok then drawingAvailable = false end
-end
-
--- ---------- helper: create NameTag & Highlight & tracer ----------
 local tracers = {}
 
-local function createNameTag(player)
-    if not player.Character or not player.Character:FindFirstChild("Head") then return end
-    if player.Character:FindFirstChild("NameTag") then return end
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "NameTag"
-    billboard.Adornee = player.Character.Head
-    billboard.Size = UDim2.new(0,160,0,32)
-    billboard.StudsOffset = Vector3.new(0, 2.2, 0)
-    billboard.AlwaysOnTop = true
-    billboard.Parent = player.Character
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1,0,1,0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = player.Name
-    lbl.TextColor3 = Color3.new(1,1,1)
-    lbl.Font = Enum.Font.SourceSansBold
-    lbl.TextSize = 14
-    lbl.Parent = billboard
+local function addESP(player)
+	if player == LocalPlayer or not player.Character then return end
+	if not player.Character:FindFirstChild("ESP_Highlight") then
+		local h = Instance.new("Highlight")
+		h.Name = "ESP_Highlight"
+		h.FillColor = Color3.fromRGB(0,255,0)
+		h.OutlineColor = Color3.fromRGB(255,255,255)
+		h.FillTransparency = 0.6
+		h.OutlineTransparency = 0
+		h.Parent = player.Character
+	end
+	if not player.Character:FindFirstChild("ESP_NameTag") and player.Character:FindFirstChild("Head") then
+		local tag = Instance.new("BillboardGui")
+		tag.Name = "ESP_NameTag"
+		tag.Adornee = player.Character.Head
+		tag.Size = UDim2.new(0,150,0,20)
+		tag.StudsOffset = Vector3.new(0,2.5,0)
+		tag.AlwaysOnTop = true
+		tag.Parent = player.Character
+		local text = Instance.new("TextLabel")
+		text.Size = UDim2.new(1,0,1,0)
+		text.BackgroundTransparency = 1
+		text.Text = player.Name
+		text.TextColor3 = Color3.fromRGB(255,255,255)
+		text.Font = Enum.Font.GothamBold
+		text.TextSize = 14
+		text.Parent = tag
+	end
+	if not tracers[player] then
+		local line = Drawing.new("Line")
+		line.Color = Color3.fromRGB(0,255,0)
+		line.Thickness = 1.8
+		line.Visible = false
+		tracers[player] = line
+	end
 end
 
-local function createHighlight(player)
-    if not player.Character or player.Character:FindFirstChild("PlayerESP") then return end
-    local h = Instance.new("Highlight")
-    h.Name = "PlayerESP"
-    h.FillColor = Color3.fromRGB(0,255,0)
-    h.OutlineColor = Color3.fromRGB(255,255,255)
-    h.FillTransparency = 0.55
-    h.OutlineTransparency = 0
-    h.Parent = player.Character
+local function removeESP(player)
+	if player.Character then
+		if player.Character:FindFirstChild("ESP_Highlight") then player.Character.ESP_Highlight:Destroy() end
+		if player.Character:FindFirstChild("ESP_NameTag") then player.Character.ESP_NameTag:Destroy() end
+	end
+	if tracers[player] then
+		tracers[player]:Remove()
+		tracers[player] = nil
+	end
 end
 
-local function createTracerFor(player)
-    if tracers[player.Name] then
-        if tracers[player.Name].drawing then pcall(function() tracers[player.Name].drawing:Remove() end) end
-        if tracers[player.Name].frame then pcall(function() tracers[player.Name].frame:Destroy() end) end
-        tracers[player.Name] = nil
-    end
-    if drawingAvailable then
-        local line = Drawing.new("Line")
-        line.Color = Color3.fromRGB(0,255,0)
-        line.Thickness = 1.8
-        line.Transparency = 1
-        line.Visible = false
-        tracers[player.Name] = { drawing = line }
-    else
-        local lineFrame = Instance.new("Frame")
-        lineFrame.Name = "TracerFrame_"..player.Name
-        lineFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-        lineFrame.Size = UDim2.new(0, 10, 0, 3)
-        lineFrame.BackgroundColor3 = Color3.fromRGB(0,255,0)
-        lineFrame.BorderSizePixel = 0
-        lineFrame.Visible = false
-        lineFrame.Parent = tracerGuiContainer
-        tracers[player.Name] = { frame = lineFrame }
-    end
-end
-
-local function removeESPFor(player)
-    if player.Character then
-        if player.Character:FindFirstChild("PlayerESP") then pcall(function() player.Character.PlayerESP:Destroy() end) end
-        if player.Character:FindFirstChild("NameTag") then pcall(function() player.Character.NameTag:Destroy() end) end
-    end
-    if tracers[player.Name] then
-        if tracers[player.Name].drawing then pcall(function() tracers[player.Name].drawing:Remove() end) end
-        if tracers[player.Name].frame then pcall(function() tracers[player.Name].frame:Destroy() end) end
-        tracers[player.Name] = nil
-    end
-end
-
-local function addESPFor(player)
-    if player == LocalPlayer or not player.Character then return end
-    createHighlight(player)
-    createNameTag(player)
-    createTracerFor(player)
-end
-
--- ---------- update tracer positions ----------
-RunService.RenderStepped:Connect(function()
-    if not ESP_ENABLED then
-        for _, data in pairs(tracers) do
-            if data.drawing then pcall(function() data.drawing.Visible = false end) end
-            if data.frame then pcall(function() data.frame.Visible = false end) end
-        end
-        return
-    end
-    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
-    local myPos, myOnScreen = Camera:WorldToViewportPoint(LocalPlayer.Character.HumanoidRootPart.Position)
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and tracers[player.Name] then
-            local targetPos, onScreen = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
-            if onScreen and myOnScreen then
-                local from = Vector2.new(myPos.X, myPos.Y)
-                local to = Vector2.new(targetPos.X, targetPos.Y)
-                if tracers[player.Name].drawing then
-                    local line = tracers[player.Name].drawing
-                    line.From, line.To, line.Visible = from, to, true
-                elseif tracers[player.Name].frame then
-                    local frameLine = tracers[player.Name].frame
-                    local dx, dy = to.X-from.X, to.Y-from.Y
-                    local length = math.sqrt(dx*dx+dy*dy)
-                    local midX, midY = (from.X+to.X)/2, (from.Y+to.Y)/2
-                    frameLine.Size = UDim2.new(0, math.max(2,length), 0, 3)
-                    frameLine.Position = UDim2.new(0, midX, 0, midY)
-                    frameLine.Rotation = math.deg(math.atan2(dy,dx))
-                    frameLine.Visible = true
-                end
-            else
-                if tracers[player.Name].drawing then tracers[player.Name].drawing.Visible = false end
-                if tracers[player.Name].frame then tracers[player.Name].frame.Visible = false end
-            end
-        end
-    end
-end)
-
--- ---------- refresh / toggle logic ----------
-local function refreshAllESP()
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            if ESP_ENABLED then addESPFor(p) else removeESPFor(p) end
-        end
-    end
-end
-
-local function updateESPButtonVisual()
-    if ESP_ENABLED then
-        espButton.Text, espButton.BackgroundColor3 = "ESP: ON", Color3.fromRGB(0,170,0)
-    else
-        espButton.Text, espButton.BackgroundColor3 = "ESP: OFF", Color3.fromRGB(80,80,80)
-    end
-    saveESPState()
-end
-
--- ---------- UI interactions ----------
 espButton.MouseButton1Click:Connect(function()
-    ESP_ENABLED = not ESP_ENABLED
-    updateESPButtonVisual()
-    refreshAllESP()
+	ESP_ENABLED = not ESP_ENABLED
+	if ESP_ENABLED then
+		espButton.Text = "ESP: ON"
+		espButton.BackgroundColor3 = Color3.fromRGB(0,170,0)
+		for _,p in pairs(Players:GetPlayers()) do
+			if p ~= LocalPlayer then addESP(p) end
+		end
+	else
+		espButton.Text = "ESP: OFF"
+		espButton.BackgroundColor3 = Color3.fromRGB(60,60,60)
+		for _,p in pairs(Players:GetPlayers()) do
+			if p ~= LocalPlayer then removeESP(p) end
+		end
+	end
 end)
 
-closeButton.MouseButton1Click:Connect(function()
-    frame.Visible = false
-    floatingButton.Visible = true
-    screenGui:SetAttribute("MenuClosed", true)
-end)
-floatingButton.MouseButton1Click:Connect(function()
-    frame.Visible = true
-    floatingButton.Visible = false
-    screenGui:SetAttribute("MenuClosed", false)
-end)
-
--- ---------- player events ----------
-Players.PlayerAdded:Connect(function(player)
-    if player == LocalPlayer then return end
-    player.CharacterAdded:Connect(function()
-        task.wait(0.9)
-        if ESP_ENABLED then addESPFor(player) end
-    end)
-end)
-Players.PlayerRemoving:Connect(function(player) removeESPFor(player) end)
-for _, p in ipairs(Players:GetPlayers()) do
-    if p ~= LocalPlayer then
-        if ESP_ENABLED and p.Character then addESPFor(p) else createTracerFor(p) end
-        p.CharacterAdded:Connect(function() task.wait(0.9); if ESP_ENABLED then addESPFor(p) end end)
-    end
-end
-
--- ---------- draggable (title for frame, self for floating) ----------
-local function makeDraggable(guiObject, dragHandle, saveKey)
-    local dragging, dragStart, startPos = false, Vector2.new(), UDim2.new()
-    local saved = screenGui:GetAttribute(saveKey)
-    if saved and typeof(saved) == "UDim2" then guiObject.Position = saved end
-
-    dragHandle.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging, dragStart, startPos = true, input.Position, guiObject.Position
-            local conn; conn = input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging=false; conn:Disconnect() end
-            end)
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragStart
-            local newPos = UDim2.new(startPos.X.Scale, startPos.X.Offset+delta.X, startPos.Y.Scale, startPos.Y.Offset+delta.Y)
-            guiObject.Position = newPos
-            screenGui:SetAttribute(saveKey, newPos)
-        end
-    end)
-end
-
-makeDraggable(frame, title, "MenuPos")
-makeDraggable(floatingButton, floatingButton, "FloatPos")
-
--- ---------- initialization ----------
-task.defer(function()
-    playIntro()
-    if screenGui:GetAttribute("MenuClosed") == true then
-        frame.Visible = false
-        floatingButton.Visible = true
-    else
-        frame.Visible = true
-        floatingButton.Visible = false
-    end
+RunService.RenderStepped:Connect(function()
+	if not ESP_ENABLED then
+		for _,line in pairs(tracers) do line.Visible = false end
+		return
+	end
+	if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+	local myPos, onScreen = Camera:WorldToViewportPoint(LocalPlayer.Character.HumanoidRootPart.Position)
+	for _,p in pairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and tracers[p] then
+			local targetPos, onScr = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
+			if onScreen and onScr then
+				tracers[p].From = Vector2.new(myPos.X, myPos.Y)
+				tracers[p].To = Vector2.new(targetPos.X, targetPos.Y)
+				tracers[p].Visible = true
+			else
+				tracers[p].Visible = false
+			end
+		end
+	end
 end)
 
-updateESPButtonVisual()
-refreshAllESP()
-print("[ESPMenu] Initialized. Drawing available:", drawingAvailable)
+Players.PlayerAdded:Connect(function(p)
+	p.CharacterAdded:Connect(function()
+		if ESP_ENABLED then
+			task.wait(1)
+			addESP(p)
+		end
+	end)
+end)
+Players.PlayerRemoving:Connect(function(p) removeESP(p) end)
+
+-- ====== SPEED SYSTEM ======
+local SPEED_ENABLED = false
+local DEFAULT_SPEED = 16
+
+speedButton.MouseButton1Click:Connect(function()
+	SPEED_ENABLED = not SPEED_ENABLED
+	if SPEED_ENABLED then
+		speedButton.Text = "Speed: ON"
+		speedButton.BackgroundColor3 = Color3.fromRGB(0,170,0)
+		local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+		if hum then
+			local spd = tonumber(speedBox.Text) or 50
+			hum.WalkSpeed = spd
+		end
+	else
+		speedButton.Text = "Speed: OFF"
+		speedButton.BackgroundColor3 = Color3.fromRGB(60,60,60)
+		local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+		if hum then
+			hum.WalkSpeed = DEFAULT_SPEED
+		end
+	end
+end)
+
+-- update kalau speedBox diganti saat aktif
+speedBox.FocusLost:Connect(function()
+	if SPEED_ENABLED then
+		local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+		if hum then
+			local spd = tonumber(speedBox.Text) or 50
+			hum.WalkSpeed = spd
+		end
+	end
+end)
