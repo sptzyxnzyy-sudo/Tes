@@ -1,6 +1,6 @@
 -- credit: Xraxor1 (Original GUI/Intro structure)
 -- Modified by: Sptzyy
--- Features: Freeze Player, Auto Chat + Custom Messages, Label Owner, Hide Players (Switch Style)
+-- Features: Launch Player (Touch to Fly), Auto Chat + Custom Messages, Label Owner, Hide Other Players
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
@@ -10,16 +10,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 
 -- STATUS FITUR
-local isFreezeActive = false
+local isLaunchActive = false
 local isAutoChatActive = false
 local isLabelActive = false
 local isHideActive = false
 local autoChatConnection = nil
-local freezeTouchConnection = nil
+local launchTouchConnection = nil
 local ownerBillboard = nil
 
--- Daftar pemain yang dibekukan & pesan auto chat
-local frozenPlayers = {}
 local chatMessages = { "🔥 Auto chat aktif!", "😎 Chat by Sptzyy & Xraxor", "🚀 Roblox moment!" }
 
 ------------------------------------------------------------
@@ -61,7 +59,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 270, 0, 430)
+frame.Size = UDim2.new(0, 270, 0, 420)
 frame.Position = UDim2.new(0.38, 0, 0.35, 0)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
@@ -126,40 +124,33 @@ local function createSwitch(name, defaultState, onToggle)
 end
 
 ------------------------------------------------------------
--- 🔹 FITUR 1: FREEZE PLAYER
+-- 🔹 FITUR 1: LAUNCH PLAYER (TENDANG KE ATAS)
 ------------------------------------------------------------
-local function onFreezeTouch(otherPart)
-	if not isFreezeActive or not otherPart or not otherPart.Parent then return end
+local function onLaunchTouch(otherPart)
+	if not isLaunchActive or not otherPart or not otherPart.Parent then return end
 	local targetPlayer = Players:GetPlayerFromCharacter(otherPart.Parent)
 	if not targetPlayer or targetPlayer == player then return end
 
-	local root = targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-	if root and not frozenPlayers[targetPlayer.UserId] then
-		root.Anchored = true
-		frozenPlayers[targetPlayer.UserId] = root
-		print("❄️ Membekukan:", targetPlayer.Name)
+	local targetHumanoidRoot = targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+	if targetHumanoidRoot then
+		local bodyVelocity = Instance.new("BodyVelocity")
+		bodyVelocity.Velocity = Vector3.new(0, 250, 0) -- 🚀 dorongan super tinggi
+		bodyVelocity.MaxForce = Vector3.new(0, 1e5, 0)
+		bodyVelocity.Parent = targetHumanoidRoot
+		game:GetService("Debris"):AddItem(bodyVelocity, 0.5)
+		print("🚀 Meluncurkan:", targetPlayer.Name)
 	end
 end
 
-local function unfreezeAll()
-	for _, part in pairs(frozenPlayers) do
-		if part and part.Parent then
-			part.Anchored = false
-		end
-	end
-	frozenPlayers = {}
-end
-
-local function toggleFreeze(state)
-	isFreezeActive = state
+local function toggleLaunch(state)
+	isLaunchActive = state
 	if state then
 		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-		if root then freezeTouchConnection = root.Touched:Connect(onFreezeTouch) end
-		print("🧊 Freeze Player AKTIF.")
+		if root then launchTouchConnection = root.Touched:Connect(onLaunchTouch) end
+		print("🚀 Launch Player AKTIF.")
 	else
-		if freezeTouchConnection then freezeTouchConnection:Disconnect() end
-		unfreezeAll()
-		print("🧊 Freeze Player NONAKTIF.")
+		if launchTouchConnection then launchTouchConnection:Disconnect() end
+		print("🚀 Launch Player NONAKTIF.")
 	end
 end
 
@@ -169,7 +160,6 @@ end
 local function toggleAutoChat(state)
 	isAutoChatActive = state
 	if state then
-		print("💬 Auto Chat AKTIF.")
 		autoChatConnection = RunService.Heartbeat:Connect(function()
 			if math.random(1, 100) < 2 then
 				ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(
@@ -179,7 +169,6 @@ local function toggleAutoChat(state)
 		end)
 	else
 		if autoChatConnection then autoChatConnection:Disconnect() end
-		print("💬 Auto Chat NONAKTIF.")
 	end
 end
 
@@ -187,13 +176,12 @@ end
 -- 🔹 FITUR 3: LABEL OWNER
 ------------------------------------------------------------
 local function createOwnerLabel()
-	local character = player.Character
-	if not character then return end
-	local head = character:FindFirstChild("Head")
+	local char = player.Character
+	if not char then return end
+	local head = char:FindFirstChild("Head")
 	if not head then return end
 
 	local billboard = Instance.new("BillboardGui")
-	billboard.Name = "OwnerLabel"
 	billboard.Size = UDim2.new(0, 100, 0, 30)
 	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
 	billboard.AlwaysOnTop = true
@@ -213,51 +201,27 @@ end
 
 local function toggleOwnerLabel(state)
 	isLabelActive = state
-	if state then
-		createOwnerLabel()
-		print("👑 Label Owner AKTIF.")
-	else
-		if ownerBillboard then ownerBillboard:Destroy() end
-		print("👑 Label Owner NONAKTIF.")
-	end
+	if state then createOwnerLabel() else if ownerBillboard then ownerBillboard:Destroy() end end
 end
 
 ------------------------------------------------------------
--- 🔹 FITUR 4: SEMBUNYIKAN PEMAIN (HIDE PLAYERS)
+-- 🔹 FITUR 4: SEMBUNYIKAN PEMAIN LAIN
 ------------------------------------------------------------
-local function setPlayersVisible(visible)
-	for _, plr in pairs(Players:GetPlayers()) do
-		if plr ~= player and plr.Character then
-			for _, part in pairs(plr.Character:GetDescendants()) do
-				if part:IsA("BasePart") or part:IsA("Decal") then
-					part.Transparency = visible and 0 or 1
-					if part:IsA("Decal") then
-						part.Transparency = visible and 0 or 1
-					elseif part.Name == "Head" and plr.Character:FindFirstChild("face") then
-						plr.Character.face.Transparency = visible and 0 or 1
-					end
-				end
-			end
-		end
-	end
-end
-
 local function toggleHidePlayers(state)
 	isHideActive = state
-	if state then
-		setPlayersVisible(false)
-		print("👁️ Semua pemain disembunyikan (hanya kamu yang terlihat).")
-	else
-		setPlayersVisible(true)
-		print("👁️ Semua pemain dimunculkan kembali.")
+	for _, plr in pairs(Players:GetPlayers()) do
+		if plr ~= player and plr.Character then
+			plr.Character.Parent = state and nil or workspace
+		end
 	end
+	print(state and "🙈 Pemain lain disembunyikan" or "👁️ Pemain lain ditampilkan")
 end
 
 ------------------------------------------------------------
--- 🔹 SWITCH DAN UI CHAT
+-- 🔹 SWITCH BUTTONS
 ------------------------------------------------------------
-local freezeSwitch = createSwitch("Freeze Player", false, toggleFreeze)
-freezeSwitch.Position = UDim2.new(0, 15, 0, 40)
+local launchSwitch = createSwitch("Launch Player", false, toggleLaunch)
+launchSwitch.Position = UDim2.new(0, 15, 0, 40)
 
 local chatSwitch = createSwitch("Auto Chat", false, toggleAutoChat)
 chatSwitch.Position = UDim2.new(0, 15, 0, 85)
@@ -265,90 +229,17 @@ chatSwitch.Position = UDim2.new(0, 15, 0, 85)
 local labelSwitch = createSwitch("Label Owner", false, toggleOwnerLabel)
 labelSwitch.Position = UDim2.new(0, 15, 0, 130)
 
-local hideSwitch = createSwitch("Hide Players", false, toggleHidePlayers)
+local hideSwitch = createSwitch("Hide Other Players", false, toggleHidePlayers)
 hideSwitch.Position = UDim2.new(0, 15, 0, 175)
 
 ------------------------------------------------------------
--- 🔹 TAMBAH PESAN AUTO CHAT
-------------------------------------------------------------
-local msgLabel = Instance.new("TextLabel")
-msgLabel.Size = UDim2.new(1, -20, 0, 20)
-msgLabel.Position = UDim2.new(0, 10, 0, 220)
-msgLabel.Text = "Tambah Pesan Auto Chat:"
-msgLabel.TextColor3 = Color3.new(1, 1, 1)
-msgLabel.BackgroundTransparency = 1
-msgLabel.Font = Enum.Font.GothamBold
-msgLabel.TextSize = 12
-msgLabel.TextXAlignment = Enum.TextXAlignment.Left
-msgLabel.Parent = frame
-
-local inputBox = Instance.new("TextBox")
-inputBox.Size = UDim2.new(0, 170, 0, 25)
-inputBox.Position = UDim2.new(0, 10, 0, 245)
-inputBox.PlaceholderText = "Ketik pesan..."
-inputBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-inputBox.TextColor3 = Color3.new(1, 1, 1)
-inputBox.Font = Enum.Font.Gotham
-inputBox.TextSize = 12
-inputBox.Parent = frame
-
-local cornerInput = Instance.new("UICorner")
-cornerInput.CornerRadius = UDim.new(0, 8)
-cornerInput.Parent = inputBox
-
-local addButton = Instance.new("TextButton")
-addButton.Size = UDim2.new(0, 60, 0, 25)
-addButton.Position = UDim2.new(0, 190, 0, 245)
-addButton.Text = "Add"
-addButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-addButton.TextColor3 = Color3.new(1, 1, 1)
-addButton.Font = Enum.Font.GothamBold
-addButton.TextSize = 12
-addButton.Parent = frame
-
-local cornerAdd = Instance.new("UICorner")
-cornerAdd.CornerRadius = UDim.new(0, 8)
-cornerAdd.Parent = addButton
-
-local messageList = Instance.new("TextLabel")
-messageList.Size = UDim2.new(1, -20, 0, 150)
-messageList.Position = UDim2.new(0, 10, 0, 275)
-messageList.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-messageList.TextColor3 = Color3.new(1, 1, 1)
-messageList.Font = Enum.Font.Code
-messageList.TextSize = 11
-messageList.TextYAlignment = Enum.TextYAlignment.Top
-messageList.TextXAlignment = Enum.TextXAlignment.Left
-messageList.TextWrapped = true
-messageList.Text = "Pesan aktif:\n- " .. table.concat(chatMessages, "\n- ")
-messageList.Parent = frame
-
-local cornerList = Instance.new("UICorner")
-cornerList.CornerRadius = UDim.new(0, 10)
-cornerList.Parent = messageList
-
-addButton.MouseButton1Click:Connect(function()
-	local msg = inputBox.Text
-	if msg ~= "" then
-		table.insert(chatMessages, msg)
-		inputBox.Text = ""
-		messageList.Text = "Pesan aktif:\n- " .. table.concat(chatMessages, "\n- ")
-	end
-end)
-
-------------------------------------------------------------
--- 🔹 CHARACTER HANDLER (RESPAWN SAFE)
+-- 🔹 CHARACTER SAFE RELOAD
 ------------------------------------------------------------
 player.CharacterAdded:Connect(function(char)
-	unfreezeAll()
 	if isLabelActive then task.wait(1) createOwnerLabel() end
-	if isFreezeActive then
+	if isLaunchActive then
 		task.wait(1)
 		local root = char:FindFirstChild("HumanoidRootPart")
-		if root then freezeTouchConnection = root.Touched:Connect(onFreezeTouch) end
-	end
-	if isHideActive then
-		task.wait(1)
-		setPlayersVisible(false)
+		if root then launchTouchConnection = root.Touched:Connect(onLaunchTouch) end
 	end
 end)
