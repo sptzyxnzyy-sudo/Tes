@@ -1,27 +1,35 @@
 -- credit: Xraxor1 (Original GUI/Intro structure)
 -- Modified by: Sptzyy
--- Features: Launch Player (Touch to Fly), Auto Chat + Custom Messages, Label Owner, Hide Other Players, Spin Other Players
+-- Features: Label Owner, Hide Other Players, Escape, Player Check (ESP + Nama), Light/Bright Map, Tampilkan Nama Part
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
 
 local player = Players.LocalPlayer
 
 -- STATUS FITUR
-local isLaunchActive = false
-local isAutoChatActive = false
 local isLabelActive = false
 local isHideActive = false
-local isSpinActive = false
+local isEscapeActive = false
+local isESPActive = false
+local isLightActive = false
+local isPartNameActive = false
 
-local autoChatConnection = nil
-local launchTouchConnection = nil
-local spinConnection = nil
 local ownerBillboard = nil
+local escapeConnection = nil
+local espConnections = {}
+local partBillboards = {}
 
-local chatMessages = { "🔥 Auto chat aktif!", "😎 Chat by Sptzyy & Xraxor", "🚀 Roblox moment!" }
+-- SIMPAN SETTING LIGHT ASLI
+local originalLighting = {
+    Brightness = Lighting.Brightness,
+    ClockTime = Lighting.ClockTime,
+    Ambient = Lighting.Ambient
+}
 
 ------------------------------------------------------------
 -- 🔹 INTRO ANIMATION “BY : XRAXOR”
@@ -62,7 +70,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 270, 0, 460)
+frame.Size = UDim2.new(0, 270, 0, 450)
 frame.Position = UDim2.new(0.38, 0, 0.35, 0)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
@@ -127,56 +135,7 @@ local function createSwitch(name, defaultState, onToggle)
 end
 
 ------------------------------------------------------------
--- 🔹 FITUR 1: LAUNCH PLAYER
-------------------------------------------------------------
-local function onLaunchTouch(otherPart)
-	if not isLaunchActive or not otherPart or not otherPart.Parent then return end
-	local targetPlayer = Players:GetPlayerFromCharacter(otherPart.Parent)
-	if not targetPlayer or targetPlayer == player then return end
-
-	local targetHumanoidRoot = targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-	if targetHumanoidRoot then
-		local bodyVelocity = Instance.new("BodyVelocity")
-		bodyVelocity.Velocity = Vector3.new(0, 250, 0)
-		bodyVelocity.MaxForce = Vector3.new(0, 1e5, 0)
-		bodyVelocity.Parent = targetHumanoidRoot
-		game:GetService("Debris"):AddItem(bodyVelocity, 0.5)
-		print("🚀 Meluncurkan:", targetPlayer.Name)
-	end
-end
-
-local function toggleLaunch(state)
-	isLaunchActive = state
-	if state then
-		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-		if root then launchTouchConnection = root.Touched:Connect(onLaunchTouch) end
-		print("🚀 Launch Player AKTIF.")
-	else
-		if launchTouchConnection then launchTouchConnection:Disconnect() end
-		print("🚀 Launch Player NONAKTIF.")
-	end
-end
-
-------------------------------------------------------------
--- 🔹 FITUR 2: AUTO CHAT
-------------------------------------------------------------
-local function toggleAutoChat(state)
-	isAutoChatActive = state
-	if state then
-		autoChatConnection = RunService.Heartbeat:Connect(function()
-			if math.random(1, 100) < 2 then
-				ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(
-					chatMessages[math.random(1, #chatMessages)], "All"
-				)
-			end
-		end)
-	else
-		if autoChatConnection then autoChatConnection:Disconnect() end
-	end
-end
-
-------------------------------------------------------------
--- 🔹 FITUR 3: LABEL OWNER
+-- 🔹 FITUR LABEL OWNER
 ------------------------------------------------------------
 local function createOwnerLabel()
 	local char = player.Character
@@ -208,7 +167,7 @@ local function toggleOwnerLabel(state)
 end
 
 ------------------------------------------------------------
--- 🔹 FITUR 4: SEMBUNYIKAN PEMAIN LAIN
+-- 🔹 FITUR HIDE OTHER PLAYERS
 ------------------------------------------------------------
 local function toggleHidePlayers(state)
 	isHideActive = state
@@ -221,52 +180,178 @@ local function toggleHidePlayers(state)
 end
 
 ------------------------------------------------------------
--- 🔹 FITUR 5: SPIN PEMAIN LAIN (REAL)
+-- 🔹 FITUR ESCAPE / ANTI-DISRUPT
 ------------------------------------------------------------
-local function toggleSpinPlayers(state)
-	isSpinActive = state
+local function toggleEscape(state)
+	isEscapeActive = state
 	if state then
-		spinConnection = RunService.Heartbeat:Connect(function(dt)
-			for _, plr in pairs(Players:GetPlayers()) do
-				if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-					local hrp = plr.Character.HumanoidRootPart
-					hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(180 * dt), 0)
-				end
+		escapeConnection = RunService.Heartbeat:Connect(function()
+			local char = player.Character
+			if char and char:FindFirstChild("HumanoidRootPart") then
+				local hrp = char.HumanoidRootPart
+				local pos = hrp.Position
+				hrp.Velocity = Vector3.new(0, hrp.Velocity.Y, 0)
+				hrp.Position = Vector3.new(pos.X, hrp.Position.Y, pos.Z)
 			end
 		end)
-		print("🌀 Spin pemain lain AKTIF (terlihat semua pemain).")
+		print("🛡️ Escape AKTIF")
 	else
-		if spinConnection then spinConnection:Disconnect() spinConnection = nil end
-		print("🌀 Spin pemain lain NONAKTIF.")
+		if escapeConnection then escapeConnection:Disconnect() escapeConnection = nil end
+		print("🛡️ Escape NONAKTIF")
+	end
+end
+
+------------------------------------------------------------
+-- 🔹 FITUR CEK PEMAIN / ESP LINES + NAMA
+------------------------------------------------------------
+local function toggleESP(state)
+	isESPActive = state
+	for _, conn in pairs(espConnections) do
+		conn:Disconnect()
+	end
+	espConnections = {}
+	
+	if state then
+		local function createESPLine(targetPlayer)
+			if targetPlayer == player then return end
+			if not targetPlayer.Character then return end
+
+			local line = Instance.new("Part")
+			line.Anchored = true
+			line.CanCollide = false
+			line.Material = Enum.Material.Neon
+			line.Color = Color3.fromRGB(255, 0, 0)
+			line.Transparency = 0.5
+			line.Size = Vector3.new(0.1, 0.1, 0.1)
+			line.Parent = workspace
+
+			local head = targetPlayer.Character:FindFirstChild("Head")
+			if head then
+				local nameBillboard = Instance.new("BillboardGui")
+				nameBillboard.Size = UDim2.new(0,100,0,30)
+				nameBillboard.StudsOffset = Vector3.new(0,3,0)
+				nameBillboard.AlwaysOnTop = true
+				nameBillboard.Parent = head
+
+				local nameLabel = Instance.new("TextLabel")
+				nameLabel.Size = UDim2.new(1,0,1,0)
+				nameLabel.BackgroundTransparency = 1
+				nameLabel.TextColor3 = Color3.fromRGB(255,0,0)
+				nameLabel.Font = Enum.Font.GothamBold
+				nameLabel.TextScaled = true
+				nameLabel.Text = targetPlayer.Name
+				nameLabel.Parent = nameBillboard
+			end
+
+			local conn
+			conn = RunService.RenderStepped:Connect(function()
+				if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+					line:Destroy()
+					if head and head:FindFirstChildOfClass("BillboardGui") then
+						head:FindFirstChildOfClass("BillboardGui"):Destroy()
+					end
+					if conn then conn:Disconnect() end
+					return
+				end
+				local startPos = player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character.HumanoidRootPart.Position
+				local endPos = targetPlayer.Character.HumanoidRootPart.Position
+				if startPos then
+					local dir = endPos - startPos
+					line.CFrame = CFrame.new(startPos, endPos) * CFrame.new(0,0,-dir.Magnitude/2)
+					line.Size = Vector3.new(0.05,0.05,dir.Magnitude)
+				end
+			end)
+			table.insert(espConnections, conn)
+		end
+
+		for _, plr in pairs(Players:GetPlayers()) do
+			createESPLine(plr)
+			plr.CharacterAdded:Connect(function()
+				createESPLine(plr)
+			end)
+		end
+	end
+end
+
+------------------------------------------------------------
+-- 🔹 FITUR LIGHT / BRIGHT MAP
+------------------------------------------------------------
+local function toggleLight(state)
+	isLightActive = state
+	if state then
+		Lighting.Brightness = 2
+		Lighting.ClockTime = 14
+		Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+		print("💡 Light AKTIF: Map terang")
+	else
+		Lighting.Brightness = originalLighting.Brightness
+		Lighting.ClockTime = originalLighting.ClockTime
+		Lighting.Ambient = originalLighting.Ambient
+		print("💡 Light NONAKTIF: Map kembali normal")
+	end
+end
+
+------------------------------------------------------------
+-- 🔹 FITUR TAMPILKAN NAMA SEMUA PART
+------------------------------------------------------------
+local function togglePartNames(state)
+	isPartNameActive = state
+	-- Hapus billboards lama
+	for _, b in pairs(partBillboards) do
+		if b and b.Parent then
+			b:Destroy()
+		end
+	end
+	partBillboards = {}
+
+	if state then
+		for _, obj in pairs(workspace:GetDescendants()) do
+			if obj:IsA("BasePart") then
+				local billboard = Instance.new("BillboardGui")
+				billboard.Size = UDim2.new(0, 100, 0, 30)
+				billboard.StudsOffset = Vector3.new(0, obj.Size.Y/2 + 0.5, 0)
+				billboard.AlwaysOnTop = true
+				billboard.Parent = obj
+
+				local label = Instance.new("TextLabel")
+				label.Size = UDim2.new(1, 0, 1, 0)
+				label.BackgroundTransparency = 1
+				label.TextColor3 = Color3.fromRGB(0, 255, 0)
+				label.Font = Enum.Font.GothamBold
+				label.TextScaled = true
+				label.Text = obj.Name
+				label.Parent = billboard
+
+				table.insert(partBillboards, billboard)
+			end
+		end
 	end
 end
 
 ------------------------------------------------------------
 -- 🔹 SWITCH BUTTONS
 ------------------------------------------------------------
-local launchSwitch = createSwitch("Launch Player", false, toggleLaunch)
-launchSwitch.Position = UDim2.new(0, 15, 0, 40)
-
-local chatSwitch = createSwitch("Auto Chat", false, toggleAutoChat)
-chatSwitch.Position = UDim2.new(0, 15, 0, 85)
-
 local labelSwitch = createSwitch("Label Owner", false, toggleOwnerLabel)
-labelSwitch.Position = UDim2.new(0, 15, 0, 130)
+labelSwitch.Position = UDim2.new(0, 15, 0, 40)
 
 local hideSwitch = createSwitch("Hide Other Players", false, toggleHidePlayers)
-hideSwitch.Position = UDim2.new(0, 15, 0, 175)
+hideSwitch.Position = UDim2.new(0, 15, 0, 85)
 
-local spinSwitch = createSwitch("Spin Other Players", false, toggleSpinPlayers)
-spinSwitch.Position = UDim2.new(0, 15, 0, 220)
+local escapeSwitch = createSwitch("Escape / Anti-Disrupt", false, toggleEscape)
+escapeSwitch.Position = UDim2.new(0, 15, 0, 130)
+
+local espSwitch = createSwitch("Player Check / ESP", false, toggleESP)
+espSwitch.Position = UDim2.new(0, 15, 0, 175)
+
+local lightSwitch = createSwitch("Light / Bright Map", false, toggleLight)
+lightSwitch.Position = UDim2.new(0, 15, 0, 220)
+
+local partNameSwitch = createSwitch("Tampilkan Nama Part", false, togglePartNames)
+partNameSwitch.Position = UDim2.new(0, 15, 0, 265)
 
 ------------------------------------------------------------
 -- 🔹 CHARACTER SAFE RELOAD
 ------------------------------------------------------------
 player.CharacterAdded:Connect(function(char)
 	if isLabelActive then task.wait(1) createOwnerLabel() end
-	if isLaunchActive then
-		task.wait(1)
-		local root = char:FindFirstChild("HumanoidRootPart")
-		if root then launchTouchConnection = root.Touched:Connect(onLaunchTouch) end
-	end
 end)
