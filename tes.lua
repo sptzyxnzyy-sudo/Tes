@@ -1,6 +1,6 @@
 -- credit: Xraxor1 (Original GUI/Intro structure)
 -- Modified by: Sptzyy
--- Features: Launch Player (Touch to Fly), Auto Chat + Custom Messages, Label Owner, Hide Other Players
+-- Features: Launch Player (Touch to Fly), Auto Chat + Custom Messages, Label Owner, Hide Other Players, Spin Other Players
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
@@ -14,8 +14,11 @@ local isLaunchActive = false
 local isAutoChatActive = false
 local isLabelActive = false
 local isHideActive = false
+local isSpinActive = false
+
 local autoChatConnection = nil
 local launchTouchConnection = nil
+local spinConnection = nil
 local ownerBillboard = nil
 
 local chatMessages = { "🔥 Auto chat aktif!", "😎 Chat by Sptzyy & Xraxor", "🚀 Roblox moment!" }
@@ -59,7 +62,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 270, 0, 420)
+frame.Size = UDim2.new(0, 270, 0, 460)
 frame.Position = UDim2.new(0.38, 0, 0.35, 0)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
@@ -124,7 +127,7 @@ local function createSwitch(name, defaultState, onToggle)
 end
 
 ------------------------------------------------------------
--- 🔹 FITUR 1: LAUNCH PLAYER (TENDANG KE ATAS)
+-- 🔹 FITUR 1: LAUNCH PLAYER
 ------------------------------------------------------------
 local function onLaunchTouch(otherPart)
 	if not isLaunchActive or not otherPart or not otherPart.Parent then return end
@@ -134,7 +137,7 @@ local function onLaunchTouch(otherPart)
 	local targetHumanoidRoot = targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
 	if targetHumanoidRoot then
 		local bodyVelocity = Instance.new("BodyVelocity")
-		bodyVelocity.Velocity = Vector3.new(0, 250, 0) -- 🚀 dorongan super tinggi
+		bodyVelocity.Velocity = Vector3.new(0, 250, 0)
 		bodyVelocity.MaxForce = Vector3.new(0, 1e5, 0)
 		bodyVelocity.Parent = targetHumanoidRoot
 		game:GetService("Debris"):AddItem(bodyVelocity, 0.5)
@@ -218,6 +221,27 @@ local function toggleHidePlayers(state)
 end
 
 ------------------------------------------------------------
+-- 🔹 FITUR 5: SPIN PEMAIN LAIN (REAL)
+------------------------------------------------------------
+local function toggleSpinPlayers(state)
+	isSpinActive = state
+	if state then
+		spinConnection = RunService.Heartbeat:Connect(function(dt)
+			for _, plr in pairs(Players:GetPlayers()) do
+				if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+					local hrp = plr.Character.HumanoidRootPart
+					hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(180 * dt), 0)
+				end
+			end
+		end)
+		print("🌀 Spin pemain lain AKTIF (terlihat semua pemain).")
+	else
+		if spinConnection then spinConnection:Disconnect() spinConnection = nil end
+		print("🌀 Spin pemain lain NONAKTIF.")
+	end
+end
+
+------------------------------------------------------------
 -- 🔹 SWITCH BUTTONS
 ------------------------------------------------------------
 local launchSwitch = createSwitch("Launch Player", false, toggleLaunch)
@@ -231,6 +255,9 @@ labelSwitch.Position = UDim2.new(0, 15, 0, 130)
 
 local hideSwitch = createSwitch("Hide Other Players", false, toggleHidePlayers)
 hideSwitch.Position = UDim2.new(0, 15, 0, 175)
+
+local spinSwitch = createSwitch("Spin Other Players", false, toggleSpinPlayers)
+spinSwitch.Position = UDim2.new(0, 15, 0, 220)
 
 ------------------------------------------------------------
 -- 🔹 CHARACTER SAFE RELOAD
