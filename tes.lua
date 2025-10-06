@@ -6,6 +6,7 @@ local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
+local SoundService = game:GetService("SoundService")
 local player = Players.LocalPlayer
 
 -- STATUS FITUR
@@ -129,7 +130,8 @@ end
 local function toggleHidePlayers(state)
 	isHideActive = state
 	for _, plr in pairs(Players:GetPlayers()) do
-		if plr~=player and plr.Character then
+		if plr ~= player and plr.Character then
+			-- Sembunyikan karakter pemain lain jika state aktif
 			plr.Character.Parent = state and nil or workspace
 		end
 	end
@@ -141,7 +143,22 @@ end
 local function onPartTouched(part, otherPlayer)
 	-- Hapus part jika pemain lain menyentuhnya
 	if isDeletePartActive and otherPlayer and otherPlayer ~= player then
-		part:Destroy()
+		-- Efek suara saat part dihancurkan
+		local sound = Instance.new("Sound")
+		sound.SoundId = "rbxassetid://12345678" -- Ganti dengan ID suara yang sesuai
+		sound.Parent = part
+		sound:Play()
+
+		-- Efek visual (menghilangkan part dengan tween)
+		local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+		local tweenGoal = {Transparency = 1}
+		local tween = TweenService:Create(part, tweenInfo, tweenGoal)
+		tween:Play()
+
+		-- Menunggu tween selesai dan kemudian menghancurkan part
+		tween.Completed:Connect(function()
+			part:Destroy()
+		end)
 	end
 end
 
@@ -150,8 +167,9 @@ local function toggleDeletePart(state)
 	if state then
 		for _, obj in pairs(workspace:GetDescendants()) do
 			if obj:IsA("BasePart") then
+				-- Tambahkan event Touched hanya untuk part
 				obj.Touched:Connect(function(hit)
-					onPartTouched(obj, hit.Parent)
+					onPartTouched(obj, hit.Parent)  -- Memeriksa siapa yang menyentuh part
 				end)
 			end
 		end
