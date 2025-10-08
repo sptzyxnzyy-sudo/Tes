@@ -1,221 +1,210 @@
--- credit: Xraxor1
--- Diubah oleh: Sptzyy
--- Fitur: Label Pemilik, Sembunyikan Pemain, Hapus Part saat Disentuh oleh Pemain Lain, Dibawa Pemain Lain
-
-local TweenService = game:GetService("TweenService")
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Lighting = game:GetService("Lighting")
-local SoundService = game:GetService("SoundService")
-local player = Players.LocalPlayer
-
--- STATUS FITUR
-local isLabelActive = false
-local isHideActive = false
-local isDeletePartActive = false
-local isCarryActive = false
-
-local ownerBillboard = nil
-local escapeConnection = nil
-local partBillboards = {}
-
--- SIMPAN SETTING LIGHT ASLI
-local originalLighting = {Brightness = Lighting.Brightness, ClockTime = Lighting.ClockTime, Ambient = Lighting.Ambient}
-
-------------------------------------------------------------
--- GUI UTAMA
-------------------------------------------------------------
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "CoreFeaturesGUI"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = player:WaitForChild("PlayerGui")
-
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 360, 0, 700)
-frame.Position = UDim2.new(0.3,0,0.1,0)
-frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
-frame.Parent = screenGui
-
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0,15)
-corner.Parent = frame
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1,0,0,30)
-title.BackgroundTransparency = 1
-title.Text = "FITUR UTAMA"
-title.TextColor3 = Color3.new(1,1,1)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 16
-title.Parent = frame
-
-------------------------------------------------------------
--- TEMPLATE SWITCH
-------------------------------------------------------------
-local function createSwitch(name, defaultState, onToggle)
-	local container = Instance.new("Frame")
-	container.Size = UDim2.new(0,300,0,40)
-	container.BackgroundTransparency = 1
-	container.Parent = frame
-
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(0.6,0,1,0)
-	label.BackgroundTransparency = 1
-	label.Text = name
-	label.TextColor3 = Color3.new(1,1,1)
-	label.Font = Enum.Font.GothamBold
-	label.TextSize = 13
-	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.Parent = container
-
-	local switch = Instance.new("TextButton")
-	switch.Size = UDim2.new(0,60,0,25)
-	switch.Position = UDim2.new(0.75,0,0.15,0)
-	switch.BackgroundColor3 = defaultState and Color3.fromRGB(0,180,0) or Color3.fromRGB(150,0,0)
-	switch.Text = defaultState and "ON" or "OFF"
-	switch.TextColor3 = Color3.new(1,1,1)
-	switch.Font = Enum.Font.GothamBold
-	switch.TextSize = 12
-	switch.Parent = container
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0,10)
-	corner.Parent = switch
-
-	switch.MouseButton1Click:Connect(function()
-		defaultState = not defaultState
-		switch.Text = defaultState and "ON" or "OFF"
-		switch.BackgroundColor3 = defaultState and Color3.fromRGB(0,180,0) or Color3.fromRGB(150,0,0)
-		onToggle(defaultState)
-	end)
-	return container
+local function send(text)
+	local StarterGui = game:GetService("StarterGui")
+	StarterGui:SetCore("SendNotification",{
+		Title = "Fling by danya23131", -- You can remove this, idc
+		Text = text,
+		Duration = 5
+	})
 end
-
-------------------------------------------------------------
--- LABEL PEMILIK
-------------------------------------------------------------
-local function createOwnerLabel()
-	if ownerBillboard then ownerBillboard:Destroy() end
-	local char = player.Character
-	if not char then return end
-	local head = char:FindFirstChild("Head")
-	if not head then return end
-	local billboard = Instance.new("BillboardGui")
-	billboard.Size = UDim2.new(0,100,0,30)
-	billboard.StudsOffset = Vector3.new(0,2.5,0)
-	billboard.AlwaysOnTop = true
-	billboard.Parent = head
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1,0,1,0)
-	label.BackgroundTransparency = 1
-	label.Text = "👑 PEMILIK"
-	label.TextColor3 = Color3.fromRGB(255,255,0)
-	label.Font = Enum.Font.GothamBold
-	label.TextScaled = true
-	label.Parent = billboard
-	ownerBillboard = billboard
+local fakepart = Instance.new("Part", workspace)
+local att1 = Instance.new("Attachment", fakepart)
+local att2 = Instance.new("Attachment", game.Players.LocalPlayer.Character.HumanoidRootPart)
+local body = Instance.new("AlignPosition", fakepart)
+local mouse = game.Players.LocalPlayer:GetMouse()
+body.Attachment0 = att2
+body.Attachment1 = att1
+body.RigidityEnabled = true
+body.Responsiveness = math.huge
+body.MaxForce = math.huge
+body.MaxVelocity = math.huge
+body.MaxAxesForce = Vector3.new(math.huge,math.huge,math.huge)
+body.Visible = true
+body.Mode = Enum.PositionAlignmentMode.TwoAttachment
+game.Players.LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.StrafingNoPhysics)
+send("Please wait")
+local oldcf = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame
+game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(0,40000000,0)) * CFrame.fromEulerAnglesXYZ(math.rad(180),0,0)
+game.Players.LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(0,1000000,0)
+task.wait(3)
+game.Players.LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(0,0,0)
+game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = oldcf
+task.wait(.2)	
+local power = 100
+local attack = 5
+fakepart.Anchored = true
+fakepart.Size = Vector3.new(5,5,5)
+fakepart.Position = game.Players.LocalPlayer.Character.HumanoidRootPart.Position
+fakepart.CanCollide = false
+fakepart.Transparency = 0.5
+fakepart.Material = Enum.Material.ForceField
+for i,v in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
+	if v:IsA("BasePart") then
+		if v.Name ~= "HumanoidRootPart" then
+			v.Transparency = .75
+			v.Material = Enum.Material.Neon
+		end
+	elseif v:IsA("Decal") then
+		v:Remove()
+	end
 end
-
-local function toggleOwnerLabel(state)
-	isLabelActive = state
-	if state then createOwnerLabel() else if ownerBillboard then ownerBillboard:Destroy() end end
-end
-
-------------------------------------------------------------
--- SEMBUNYIKAN PEMAIN
-------------------------------------------------------------
-local function toggleHidePlayers(state)
-	isHideActive = state
-	for _, plr in pairs(Players:GetPlayers()) do
-		if plr ~= player and plr.Character then
-			-- Sembunyikan karakter pemain lain jika state aktif
-			plr.Character.Parent = state and nil or workspace
+local partic = Instance.new("ParticleEmitter", fakepart)
+partic.Texture = "rbxassetid://15273937357"
+partic.SpreadAngle = Vector2.new(-180,180)
+partic.Rate = 45
+partic.Size = NumberSequence.new(1,0)
+partic.Transparency = NumberSequence.new(0.9)
+partic.Lifetime = NumberRange.new(0.7,1)
+partic.RotSpeed = NumberRange.new(-45,45)
+workspace.CurrentCamera.CameraSubject = fakepart
+spawn(function()
+	while true do
+		task.wait()
+		for i = 0,1,0.01 do
+			task.wait()
+			fakepart.Color = Color3.fromHSV(i,1,1)
+			partic.Color = ColorSequence.new(Color3.fromHSV(i,1,1))
 		end
 	end
-end
-
-------------------------------------------------------------
--- HAPUS PART SAAT DISENTUH
-------------------------------------------------------------
-local function onPartTouched(part, otherPlayer)
-	-- Hapus part jika pemain lain menyentuhnya
-	if isDeletePartActive and otherPlayer and otherPlayer ~= player then
-		-- Efek suara saat part dihancurkan
-		local sound = Instance.new("Sound")
-		sound.SoundId = "rbxassetid://12345678" -- Ganti dengan ID suara yang sesuai
-		sound.Parent = part
-		sound:Play()
-
-		-- Efek visual (menghilangkan part dengan tween)
-		local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
-		local tweenGoal = {Transparency = 1}
-		local tween = TweenService:Create(part, tweenInfo, tweenGoal)
-		tween:Play()
-
-		-- Menunggu tween selesai dan kemudian menghancurkan part
-		tween.Completed:Connect(function()
-			part:Destroy()
-		end)
+end)
+spawn(function()
+	while true do
+		game.Players.LocalPlayer.Character.HumanoidRootPart.AssemblyAngularVelocity = Vector3.new(math.random(-500,50),math.random(-500,500) * power,math.random(-5,5))
+		task.wait(math.random(0,attack)/50)	
 	end
-end
+end)
+--[[
 
-local function toggleDeletePart(state)
-	isDeletePartActive = state
-	if state then
-		for _, obj in pairs(workspace:GetDescendants()) do
-			if obj:IsA("BasePart") then
-				-- Tambahkan event Touched hanya untuk part
-				obj.Touched:Connect(function(hit)
-					onPartTouched(obj, hit.Parent)  -- Memeriksa siapa yang menyentuh part
-				end)
-			end
+spawn(function()
+	while true do
+		if game.Players.LocalPlayer.Character.Humanoid.MoveDirection.Magnitude ~= 0 then
+			fakepart.Position = fakepart.Position + workspace.CurrentCamera.CFrame.LookVector * 2
 		end
+		task.wait()
 	end
-end
+end)
 
-------------------------------------------------------------
--- DIBAWA PEMAIN LAIN
-------------------------------------------------------------
-local function toggleCarry(state)
-	isCarryActive = state
-	local char = player.Character
-	if not char then return end
-	local humanoidRootPart = char:FindFirstChild("HumanoidRootPart")
-	local humanoid = char:FindFirstChildOfClass("Humanoid")
-	if not humanoidRootPart or not humanoid then return end
-	
-	if state then
-		RunService.Heartbeat:Connect(function()
-			for _, otherPlayer in pairs(Players:GetPlayers()) do
-				if otherPlayer ~= player and otherPlayer.Character then
-					local otherHumanoidRootPart = otherPlayer.Character:FindFirstChild("HumanoidRootPart")
-					if otherHumanoidRootPart and (otherHumanoidRootPart.Position - humanoidRootPart.Position).Magnitude < 5 then
-						-- Dibawa oleh pemain lain
-						humanoidRootPart.CFrame = otherHumanoidRootPart.CFrame * CFrame.new(0, 5, 0)  -- Sesuaikan offset jika perlu
-					end
+]]
+local w = false
+local a = false
+local s = false
+local d = false
+mouse.KeyDown:Connect(function(key)
+	if key == "w" then
+		w = true
+		--fakepart.Position = fakepart.Position + workspace.CurrentCamera.CFrame.LookVector * 2
+	end
+	if key == "a" then
+		a = true
+		--fakepart.Position = fakepart.Position - workspace.CurrentCamera.CFrame.RightVector * 2
+	end
+	if key == "s" then
+		s = true
+		--fakepart.Position = fakepart.Position - workspace.CurrentCamera.CFrame.LookVector * 2
+	end
+	if key == "d" then
+		d = true
+		--fakepart.Position = fakepart.Position + workspace.CurrentCamera.CFrame.RightVector * 2
+	end
+end)
+mouse.KeyUp:Connect(function(key)
+	if key == "w" then
+		w = false
+		--fakepart.Position = fakepart.Position + workspace.CurrentCamera.CFrame.LookVector * 2
+	end
+	if key == "a" then
+		a = false
+		--fakepart.Position = fakepart.Position - workspace.CurrentCamera.CFrame.RightVector * 2
+	end
+	if key == "s" then
+		s = false
+		--fakepart.Position = fakepart.Position - workspace.CurrentCamera.CFrame.LookVector * 2
+	end
+	if key == "d" then
+		d = false
+		--fakepart.Position = fakepart.Position + workspace.CurrentCamera.CFrame.RightVector * 2
+	end
+end)
+game:GetService("RunService").Heartbeat:Connect(function()
+	if w then
+		fakepart.Position = fakepart.Position + workspace.CurrentCamera.CFrame.LookVector * 2
+	end
+	if a then
+		fakepart.Position = fakepart.Position - workspace.CurrentCamera.CFrame.RightVector * 2
+	end
+	if s then
+		fakepart.Position = fakepart.Position - workspace.CurrentCamera.CFrame.LookVector * 2
+	end
+	if d then
+		fakepart.Position = fakepart.Position + workspace.CurrentCamera.CFrame.RightVector * 2
+	end
+end)
+spawn(function()
+	while true do
+		local players = game.Players:GetPlayers()
+		local closest = nil
+		local shortestDistance = math.huge
+		local localPlayer = game.Players.LocalPlayer
+		local localRootPart = localPlayer.Character.HumanoidRootPart
+
+		for _, player in pairs(players) do
+			if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+				local targetRootPart = player.Character.HumanoidRootPart
+				local distance = (localRootPart.Position - targetRootPart.Position).magnitude
+				if distance < shortestDistance then
+					shortestDistance = distance
+					closest = player
 				end
 			end
-		end)
-	else
-		-- Reset posisi ke default jika fitur dibawa dimatikan
-		humanoidRootPart.CFrame = humanoidRootPart.CFrame
+		end
+
+		if closest then
+			local targetRootPart = closest.Character.HumanoidRootPart
+			local direction = (targetRootPart.Position - localRootPart.Position).unit
+			local lookAtCFrame = CFrame.lookAt(localRootPart.Position, Vector3.new(targetRootPart.Position.X,localRootPart.Position.Y,targetRootPart.Position.Z))
+			localRootPart.CFrame = lookAtCFrame
+		end
+
+		fakepart.Rotation = localRootPart.Rotation
+		task.wait()
 	end
-end
-
-------------------------------------------------------------
--- SWITCH BUTTONS
-------------------------------------------------------------
-createSwitch("Label Pemilik", false, toggleOwnerLabel).Position = UDim2.new(0, 15, 0, 40)
-createSwitch("Sembunyikan Pemain Lain", false, toggleHidePlayers).Position = UDim2.new(0, 15, 0, 85)
-createSwitch("Hapus Part Saat Disentuh", false, toggleDeletePart).Position = UDim2.new(0, 15, 0, 130)
-createSwitch("Dibawa Pemain Lain", false, toggleCarry).Position = UDim2.new(0, 15, 0, 175)
-
-------------------------------------------------------------
--- CHARACTER SAFE RELOAD
-------------------------------------------------------------
-player.CharacterAdded:Connect(function(char)
-	if isLabelActive then task.wait(1) createOwnerLabel() end
 end)
+local isdown = false
+local mouse = game.Players.LocalPlayer:GetMouse()
+mouse.Button1Down:Connect(function()
+	isdown = true
+end)
+mouse.Button1Up:Connect(function()
+	isdown = false
+end)
+game:GetService("RunService").Heartbeat:Connect(function()
+	if isdown then
+		game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(math.random(-5,5)/5,math.random(0,8)/2,math.random(-5,5)/5)) * CFrame.fromEulerAnglesXYZ(0,math.rad(45),0)
+		game.Players.LocalPlayer.Character.HumanoidRootPart.AssemblyAngularVelocity = Vector3.new(10000,9999,-9999)
+		game.Players.LocalPlayer.Character.HumanoidRootPart.AssemblyLinearVelocity = Vector3.new(-17.7,500,17.7)
+	end
+end)
+spawn(function()
+	while true do
+		game.Players.LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Swimming)
+		task.wait(.5)
+		game.Players.LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+		task.wait(.5)
+	end
+end)
+while true do
+	--game.Players.LocalPlayer.Character.Humanoid.PlatformStand = true
+	fakepart.Rotation = game.Players.LocalPlayer.Character.HumanoidRootPart.Rotation
+	game.Players.LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+	if math.random(0,1)==1 then
+		game.Players.LocalPlayer.Character.Humanoid.Jump = true
+	else
+		game.Players.LocalPlayer.Character.Humanoid.Jump = false
+	end
+	if not isdown then
+		game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = fakepart.CFrame
+	end
+	game.Players.LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(math.random(-250,250),math.random(-500,500),math.random(-250,250))
+	--game.Players.LocalPlayer.Character.HumanoidRootPart.AssemblyLinearVelocity = Vector3.new(math.random(-250,250),math.random(-500,500),math.random(-250,250))
+	--game.Players.LocalPlayer.Character.HumanoidRootPart.AssemblyAngularVelocity = Vector3.new(0,180,0)
+	task.wait()
+end
