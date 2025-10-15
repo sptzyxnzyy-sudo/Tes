@@ -2,9 +2,8 @@
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 
 -- Kohl's Admin Config
 local ROOT_NAME = "Kohl's Admin Source"
@@ -15,45 +14,39 @@ local attachedLogger = false
 local loggerConnection
 
 -- =================================
--- 🔽 FUNCTION NOTIFIKASI BIASA 🔽
+-- 🔽 FUNCTION NOTIFIKASI 🔽
 -- =================================
 local function notify(title, text, duration)
-    pcall(function()
-        game:GetService("StarterGui"):SetCore("SendNotification", {
-            Title = title or "Notification",
-            Text = text or "",
-            Duration = duration or 3,
-        })
-    end)
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = title or "Notification",
+        Text = text or "",
+        Duration = duration or 3,
+    })
 end
 
--- =================================
--- 🔽 FUNCTION NOTIFIKASI ANIMASI 🔽
--- =================================
 local function animatedNotify(text)
     local gui = Instance.new("ScreenGui")
     gui.Name = "AnimatedNotify"
     gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(0,300,0,50)
-    label.Position = UDim2.new(0.5,-150,0.1,0)
-    label.BackgroundTransparency = 0.3
-    label.BackgroundColor3 = Color3.fromRGB(0,0,0)
+    label.Position = UDim2.new(0.5,-150,0.2,0)
+    label.BackgroundTransparency = 0.5
+    label.BackgroundColor3 = Color3.fromRGB(20,20,20)
+    label.Text = text
     label.TextColor3 = Color3.new(1,1,1)
     label.TextScaled = true
     label.Font = Enum.Font.GothamBold
-    label.Text = text
     label.Parent = gui
+    
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0,10)
     corner.Parent = label
-
-    -- Tween slide up & fade
-    local tween = TweenService:Create(label,TweenInfo.new(0.5,Enum.EasingStyle.Sine,Enum.EasingDirection.Out),{Position=UDim2.new(0.5,-150,0.05,0)})
-    tween:Play()
-    tween.Completed:Wait()
+    
+    TweenService:Create(label, TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position=UDim2.new(0.5,-150,0.25,0)}):Play()
     task.wait(2)
-    TweenService:Create(label,TweenInfo.new(0.5),{TextTransparency=1,BackgroundTransparency=1}):Play()
+    TweenService:Create(label, TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Position=UDim2.new(0.5,-150,0.15,0), TextTransparency=1}):Play()
     task.wait(0.5)
     gui:Destroy()
 end
@@ -67,8 +60,8 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 320, 0, 400)
-frame.Position = UDim2.new(0.5, -160, 0.45, -200)
+frame.Size = UDim2.new(0, 280, 0, 240)
+frame.Position = UDim2.new(0.4, -140, 0.5, -120)
 frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -107,6 +100,7 @@ listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     scrollFrame.CanvasSize = UDim2.new(0,0,0,listLayout.AbsoluteContentSize.Y+10)
 end)
 
+-- Status bar
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1,0,0,24)
 statusLabel.Position = UDim2.new(0,0,1,-24)
@@ -120,108 +114,6 @@ statusLabel.Parent = frame
 
 local function setStatus(txt)
     statusLabel.Text = "Status: "..tostring(txt)
-end
-
--- =================================
--- 🔽 KOHL'S ADMIN TOOL FUNCTIONS 🔽
--- =================================
-local function safeFindRoot()
-    local ok,root=pcall(function() return ReplicatedStorage:FindFirstChild(ROOT_NAME) end)
-    return ok and root or nil
-end
-
-local function findRemote()
-    local root = safeFindRoot()
-    if not root then return nil end
-    local container = root:FindFirstChild("Remote") or root:FindFirstChildWhichIsA("Folder")
-    if not container then return nil end
-    return container:FindFirstChild(REMOTE_NAME) or container:FindFirstChildWhichIsA("RemoteEvent")
-end
-
-local function notifyList(title, items)
-    local chunkSize = 5
-    for i = 1, #items, chunkSize do
-        local chunk = {}
-        for j = i, math.min(i + chunkSize - 1, #items) do
-            table.insert(chunk, items[j])
-        end
-        notify(title, table.concat(chunk, "\n"), 4)
-        task.wait(0.3)
-    end
-end
-
-local function scanRemotes(button)
-    setStatus("Scanning...")
-    notify("Scan", "Scanning remotes...")
-    local root = safeFindRoot()
-    if not root then 
-        setStatus("Root not found")
-        notify("Scan", "Root not found!", 2)
-        return 
-    end
-    local found={}
-    for _,v in ipairs(root:GetDescendants()) do
-        if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") then 
-            table.insert(found, v:GetFullName().." ("..v.ClassName..")") 
-        end
-    end
-    setStatus("Scan complete. Check notifications.")
-    notify("Scan Complete", "Found "..#found.." remotes.", 2)
-    if #found > 0 then
-        notifyList("Remotes List", found)
-    end
-end
-
-local function attachLogger(button)
-    if attachedLogger then
-        if loggerConnection then loggerConnection:Disconnect() end
-        attachedLogger=false
-        setStatus("Logger detached")
-        notify("Logger", "Logger detached", 2)
-        return
-    end
-    local remote = findRemote()
-    if not remote then 
-        setStatus("Remote not found")
-        notify("Logger", "Remote not found!", 2)
-        return 
-    end
-    loggerConnection = remote.OnClientEvent:Connect(function(...)
-        local args = {...}
-        local display = {}
-        for i,v in ipairs(args) do table.insert(display, tostring(v)) end
-        setStatus("Event printed")
-        notifyList("VIPUGCMethod Fired", display)
-    end)
-    attachedLogger=true
-    setStatus("Logger attached")
-    notify("Logger", "Logger attached successfully!", 2)
-end
-
-local function callVIPUGC(button)
-    local now = tick()
-    if now-lastCall<COOLDOWN then 
-        local cd = COOLDOWN-(now-lastCall)
-        setStatus(("Cooldown %.1fs"):format(cd))
-        notify("VIPUGCMethod", ("Cooldown %.1fs"):format(cd), 2)
-        return 
-    end
-    local remote = findRemote()
-    if not remote then 
-        setStatus("Remote not found")
-        notify("VIPUGCMethod", "Remote not found!", 2)
-        return 
-    end
-    local args = {92807314389236,"rbxassetid://89119211625300",true,"Gold Wings"}
-    local ok,err=pcall(function() remote:FireServer(unpack(args)) end)
-    if ok then 
-        setStatus("Call sent")
-        notify("VIPUGCMethod", "Call sent successfully!", 2)
-    else 
-        setStatus("Error: "..tostring(err))
-        notify("VIPUGCMethod", "Error: "..tostring(err), 3)
-    end
-    lastCall=now
 end
 
 -- =================================
@@ -244,117 +136,224 @@ local function makeButton(name,color,callback)
 end
 
 -- =================================
--- 🔽 VIP BOOMBOX GLOBAL SOUND + NOTIFIKASI ANIMASI 🔽
+-- 🔽 GLOBAL BOOMBOX INTERAKTIF 🔽
 -- =================================
-local function VIPBoomboxFeature()
-    local isVIP = true -- ganti check GamePass/whitelist
-    if not isVIP then
-        setStatus("VIP required")
-        notify("VIP Required","Fitur ini hanya untuk VIP!",4)
-        return
-    end
-
+local function GlobalBoomboxInteractive()
     -- GUI Input
     local inputGui = Instance.new("ScreenGui")
-    inputGui.Name = "BoomboxInputGUI"
+    inputGui.Name = "BoomboxInteractiveGUI"
     inputGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
     local inputFrame = Instance.new("Frame")
-    inputFrame.Size = UDim2.new(0,300,0,120)
-    inputFrame.Position = UDim2.new(0.5,-150,0.5,-60)
+    inputFrame.Size = UDim2.new(0,400,0,220)
+    inputFrame.Position = UDim2.new(0.5,-200,0.5,-110)
     inputFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
     inputFrame.BorderSizePixel = 0
     inputFrame.Parent = inputGui
     local frameCorner = Instance.new("UICorner")
-    frameCorner.CornerRadius = UDim.new(0,10)
+    frameCorner.CornerRadius = UDim.new(0,12)
     frameCorner.Parent = inputFrame
 
     local textBox = Instance.new("TextBox")
-    textBox.Size = UDim2.new(0,280,0,40)
+    textBox.Size = UDim2.new(0,380,0,40)
     textBox.Position = UDim2.new(0,10,0,10)
-    textBox.PlaceholderText = "Masukkan ID musik"
+    textBox.PlaceholderText = "Masukkan ID musik (pisahkan koma)"
     textBox.ClearTextOnFocus = false
-    textBox.Text = ""
     textBox.TextColor3 = Color3.new(1,1,1)
     textBox.BackgroundColor3 = Color3.fromRGB(50,50,50)
     textBox.Parent = inputFrame
 
-    local playBtn = Instance.new("TextButton")
-    playBtn.Size = UDim2.new(0,130,0,40)
-    playBtn.Position = UDim2.new(0,10,0,60)
-    playBtn.BackgroundColor3 = Color3.fromRGB(50,200,50)
-    playBtn.Text = "Play"
-    playBtn.TextColor3 = Color3.new(1,1,1)
-    playBtn.Font = Enum.Font.GothamBold
-    playBtn.TextSize = 14
-    playBtn.Parent = inputFrame
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0,10)
-    btnCorner.Parent = playBtn
+    -- Tombol Control
+    local btnNames = {"Play","Stop","Next","Prev","Shuffle","Loop"}
+    local btnColors = {Color3.fromRGB(50,200,50), Color3.fromRGB(200,50,50), Color3.fromRGB(0,120,255),
+                       Color3.fromRGB(0,120,255), Color3.fromRGB(200,200,0), Color3.fromRGB(200,0,200)}
+    local buttons = {}
+    for i,name in ipairs(btnNames) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0,120,0,30)
+        btn.Position = UDim2.new(0,10+((i-1)%3)*130,0,60+math.floor((i-1)/3)*40)
+        btn.BackgroundColor3 = btnColors[i]
+        btn.Text = name
+        btn.TextColor3 = Color3.new(1,1,1)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 14
+        btn.Parent = inputFrame
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0,8)
+        corner.Parent = btn
+        buttons[name] = btn
+    end
 
-    local stopBtn = Instance.new("TextButton")
-    stopBtn.Size = UDim2.new(0,130,0,40)
-    stopBtn.Position = UDim2.new(0,160,0,60)
-    stopBtn.BackgroundColor3 = Color3.fromRGB(200,50,50)
-    stopBtn.Text = "Stop"
-    stopBtn.TextColor3 = Color3.new(1,1,1)
-    stopBtn.Font = Enum.Font.GothamBold
-    stopBtn.TextSize = 14
-    stopBtn.Parent = inputFrame
-    local stopCorner = Instance.new("UICorner")
-    stopCorner.CornerRadius = UDim.new(0,10)
-    stopCorner.Parent = stopBtn
+    -- Volume Slider
+    local volumeLabel = Instance.new("TextLabel")
+    volumeLabel.Size = UDim2.new(0,120,0,20)
+    volumeLabel.Position = UDim2.new(0,10,0,140)
+    volumeLabel.BackgroundTransparency = 1
+    volumeLabel.Text = "Volume: 1.0"
+    volumeLabel.TextColor3 = Color3.new(1,1,1)
+    volumeLabel.Font = Enum.Font.GothamBold
+    volumeLabel.TextSize = 14
+    volumeLabel.Parent = inputFrame
 
-    -- Buat Sound di Workspace supaya semua pemain bisa dengar
-    local sound = Workspace:FindFirstChild("VIPBoomboxSound")
+    local volumeSlider = Instance.new("TextBox")
+    volumeSlider.Size = UDim2.new(0,260,0,20)
+    volumeSlider.Position = UDim2.new(0,130,0,140)
+    volumeSlider.PlaceholderText = "0-1"
+    volumeSlider.Text = "1"
+    volumeSlider.TextColor3 = Color3.new(1,1,1)
+    volumeSlider.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    volumeSlider.Parent = inputFrame
+
+    -- Progress Bar
+    local progressBar = Instance.new("Frame")
+    progressBar.Size = UDim2.new(0,360,0,10)
+    progressBar.Position = UDim2.new(0,20,0,175)
+    progressBar.BackgroundColor3 = Color3.fromRGB(80,80,80)
+    progressBar.Parent = inputFrame
+    local progressFill = Instance.new("Frame")
+    progressFill.Size = UDim2.new(0,0,1,0)
+    progressFill.BackgroundColor3 = Color3.fromRGB(50,200,50)
+    progressFill.Parent = progressBar
+
+    -- Sound global
+    local sound = Workspace:FindFirstChild("GlobalBoomboxSound")
     if not sound then
         sound = Instance.new("Sound")
-        sound.Name = "VIPBoomboxSound"
-        sound.Looped = true
+        sound.Name = "GlobalBoomboxSound"
+        sound.Looped = false
         sound.Volume = 1
         sound.RollOffMode = Enum.RollOffMode.Linear
         sound.MaxDistance = 100
         sound.Parent = Workspace
-        sound.Position = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and
-                         LocalPlayer.Character.HumanoidRootPart.Position or Vector3.new(0,5,0)
     end
 
-    -- Update posisi sound di karakter lokal
-    RunService.RenderStepped:Connect(function()
-        if LocalPlayer.Character and sound then
-            sound.Position = LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and 
-                             LocalPlayer.Character.HumanoidRootPart.Position or sound.Position
-        end
-    end)
+    -- Playlist
+    local playlist = {}
+    local currentIndex = 1
+    local isLoop = false
+    local isShuffle = false
 
-    playBtn.MouseButton1Click:Connect(function()
-        local id = tonumber(textBox.Text)
-        if id then
-            sound.SoundId = "rbxassetid://"..id
-            sound:Play()
-            setStatus("Now Playing ID: "..id)
-            animatedNotify("Now Playing Music!")
+    -- Play helper
+    local function playSong(index)
+        if #playlist == 0 then
+            notify("Boombox","Playlist kosong!",3)
+            return
+        end
+        index = math.clamp(index,1,#playlist)
+        currentIndex = index
+        sound.SoundId = "rbxassetid://"..playlist[currentIndex]
+        sound.Volume = tonumber(volumeSlider.Text) or 1
+        sound:Play()
+        setStatus("Now Playing: "..playlist[currentIndex])
+        animatedNotify("Now Playing Music!")
+    end
+
+    -- Update volume dynamically
+    volumeSlider.FocusLost:Connect(function(enter)
+        local vol = tonumber(volumeSlider.Text)
+        if vol then
+            sound.Volume = math.clamp(vol,0,1)
+            volumeLabel.Text = "Volume: "..sound.Volume
         else
-            notify("VIP Boombox","Masukkan ID musik yang valid!",3)
+            volumeSlider.Text = sound.Volume
         end
     end)
 
-    stopBtn.MouseButton1Click:Connect(function()
+    -- Button events
+    buttons.Play.MouseButton1Click:Connect(function()
+        local ids = {}
+        for id in string.gmatch(textBox.Text,"[^,%s]+") do
+            table.insert(ids,id)
+        end
+        if #ids == 0 then
+            notify("Boombox","Masukkan minimal 1 ID musik!",3)
+            return
+        end
+        playlist = ids
+        currentIndex = 1
+        playSong(currentIndex)
+    end)
+
+    buttons.Stop.MouseButton1Click:Connect(function()
         if sound.IsPlaying then
             sound:Stop()
             setStatus("Music Stopped")
             animatedNotify("Music Stopped!")
         end
     end)
+
+    buttons.Next.MouseButton1Click:Connect(function()
+        if #playlist == 0 then return end
+        if isShuffle then
+            currentIndex = math.random(1,#playlist)
+        else
+            currentIndex = currentIndex + 1
+            if currentIndex > #playlist then
+                currentIndex = isLoop and 1 or #playlist
+            end
+        end
+        playSong(currentIndex)
+    end)
+
+    buttons.Prev.MouseButton1Click:Connect(function()
+        if #playlist == 0 then return end
+        if isShuffle then
+            currentIndex = math.random(1,#playlist)
+        else
+            currentIndex = currentIndex - 1
+            if currentIndex < 1 then
+                currentIndex = isLoop and #playlist or 1
+            end
+        end
+        playSong(currentIndex)
+    end)
+
+    buttons.Shuffle.MouseButton1Click:Connect(function()
+        isShuffle = not isShuffle
+        notify("Boombox","Shuffle: "..tostring(isShuffle),2)
+    end)
+
+    buttons.Loop.MouseButton1Click:Connect(function()
+        isLoop = not isLoop
+        notify("Boombox","Loop: "..tostring(isLoop),2)
+    end)
+
+    -- Auto next on song end
+    sound.Ended:Connect(function()
+        if #playlist == 0 then return end
+        if isShuffle then
+            currentIndex = math.random(1,#playlist)
+        else
+            currentIndex = currentIndex + 1
+            if currentIndex > #playlist then
+                if isLoop then
+                    currentIndex = 1
+                else
+                    return
+                end
+            end
+        end
+        playSong(currentIndex)
+    end)
+
+    -- Posisi sound mengikuti karakter
+    RunService.RenderStepped:Connect(function()
+        if LocalPlayer.Character and sound then
+            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                sound.Position = hrp.Position
+            end
+        end
+        -- Update progress bar
+        if sound.TimeLength > 0 then
+            local ratio = math.clamp(sound.TimePosition/sound.TimeLength,0,1)
+            progressFill.Size = UDim2.new(ratio,0,1,0)
+        end
+    end)
 end
 
--- Tambahkan tombol VIP Boombox
-makeButton("VIP Boombox", Color3.fromRGB(255,50,50), VIPBoomboxFeature)
-
--- Tambahkan tombol admin lainnya
-makeButton("Scan Remotes", Color3.fromRGB(0,120,200), scanRemotes)
-makeButton("Attach Logger", Color3.fromRGB(0,200,120), attachLogger)
-makeButton("Call VIPUGCMethod", Color3.fromRGB(200,120,0), callVIPUGC)
+-- Tambahkan tombol Global Boombox Interaktif
+makeButton("Global Boombox Interactive", Color3.fromRGB(255,100,50), GlobalBoomboxInteractive)
 
 setStatus("Ready")
 notify("Core Features", "GUI Ready!", 2)
