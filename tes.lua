@@ -52,8 +52,8 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 240)
-frame.Position = UDim2.new(0.4, -140, 0.5, -120)
+frame.Size = UDim2.new(0, 320, 0, 360)
+frame.Position = UDim2.new(0.4, -160, 0.5, -180)
 frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -67,15 +67,15 @@ corner.Parent = frame
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1,0,0,30)
 title.BackgroundTransparency = 1
-title.Text = "CORE FEATURES"
+title.Text = "CORE FEATURES + CONSOLE"
 title.TextColor3 = Color3.new(1,1,1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
--- Scrollable list
+-- Scrollable list untuk tombol
 local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(1,-20,1,-60)
+scrollFrame.Size = UDim2.new(1,-20,0,140)
 scrollFrame.Position = UDim2.new(0,10,0,35)
 scrollFrame.CanvasSize = UDim2.new(0,0,0,0)
 scrollFrame.ScrollBarThickness = 6
@@ -91,6 +91,28 @@ listLayout.Parent = scrollFrame
 listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     scrollFrame.CanvasSize = UDim2.new(0,0,0,listLayout.AbsoluteContentSize.Y+10)
 end)
+
+-- TextBox console multi-line
+local consoleBox = Instance.new("TextBox")
+consoleBox.Size = UDim2.new(1,-20,1,-200)
+consoleBox.Position = UDim2.new(0,10,0,180)
+consoleBox.BackgroundColor3 = Color3.fromRGB(30,30,30)
+consoleBox.TextColor3 = Color3.new(1,1,1)
+consoleBox.Font = Enum.Font.SourceSans
+consoleBox.TextSize = 14
+consoleBox.MultiLine = true
+consoleBox.ClearTextOnFocus = false
+consoleBox.TextWrapped = true
+consoleBox.TextXAlignment = Enum.TextXAlignment.Left
+consoleBox.TextYAlignment = Enum.TextYAlignment.Top
+consoleBox.Text = ""
+consoleBox.ReadOnly = true -- user bisa copy tapi tidak bisa ketik
+consoleBox.Parent = frame
+
+local function appendConsole(text)
+    consoleBox.Text = consoleBox.Text .. "\n" .. text
+    consoleBox.CanvasPosition = Vector2.new(0, consoleBox.TextBounds.Y) -- auto scroll
+end
 
 -- Status bar
 local statusLabel = Instance.new("TextLabel")
@@ -114,10 +136,11 @@ local function notify(title,text)
         Text = text,
         Duration = 3
     })
+    appendConsole(title..": "..text)
 end
 
 -- =================================
--- 🔽 KOHL'S ADMIN TOOL FUNCTIONS (PRESET) 🔽
+-- 🔽 KOHL'S ADMIN TOOL FUNCTIONS 🔽
 -- =================================
 local function safeFindRoot()
     local ok,root=pcall(function() return ReplicatedStorage:FindFirstChild(ROOT_NAME) end)
@@ -146,8 +169,10 @@ local function scanRemotes(button)
     end
     setStatus("Scan complete. Check console.")
     notify("Scan Remotes", "Found "..#found.." remote(s). Check console.")
-    print("==== Scan Results ====")
-    for i,v in ipairs(found) do print(i,v:GetFullName(),v.ClassName) end
+    appendConsole("==== Scan Results ====")
+    for i,v in ipairs(found) do
+        appendConsole(i..". "..v:GetFullName().." ("..v.ClassName..")")
+    end
 end
 
 local function attachLogger(button)
@@ -165,7 +190,7 @@ local function attachLogger(button)
         return 
     end
     loggerConnection = remote.OnClientEvent:Connect(function(...)
-        print("VIPUGCMethod fired:", ...)
+        appendConsole("VIPUGCMethod fired: "..table.concat({...},", "))
         setStatus("Event printed to console")
         notify("Logger Event", "VIPUGCMethod fired! Check console.")
     end)
