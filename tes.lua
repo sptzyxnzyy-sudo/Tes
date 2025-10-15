@@ -49,8 +49,8 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 360)
-frame.Position = UDim2.new(0.4, -140, 0.5, -180)
+frame.Size = UDim2.new(0, 280, 0, 380)
+frame.Position = UDim2.new(0.4, -140, 0.5, -190)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -70,17 +70,17 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
--- Scrolling frame untuk tombol dan input
+-- Scrollable frame untuk tombol & input
 local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(1, -20, 1, -50)
+scrollFrame.Size = UDim2.new(1, -20, 1, -70)
 scrollFrame.Position = UDim2.new(0, 10, 0, 40)
-scrollFrame.CanvasSize = UDim2.new(0,0,0,0)
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 scrollFrame.ScrollBarThickness = 6
 scrollFrame.BackgroundTransparency = 1
 scrollFrame.Parent = frame
 
 local listLayout = Instance.new("UIListLayout")
-listLayout.Padding = UDim.new(0,5)
+listLayout.Padding = UDim.new(0, 5)
 listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 listLayout.Parent = scrollFrame
@@ -114,10 +114,10 @@ local function findRemote()
     return remoteContainer:FindFirstChild(REMOTE_NAME) or remoteContainer:FindFirstChildWhichIsA("RemoteEvent")
 end
 
--- Fungsi tombol fitur
+-- Fungsi buat tombol fitur
 local function makeFeatureButton(name, color, callback)
     local featButton = Instance.new("TextButton")
-    featButton.Size = UDim2.new(0, 220, 0, 40)
+    featButton.Size = UDim2.new(0, 240, 0, 40)
     featButton.BackgroundColor3 = color
     featButton.Text = name
     featButton.TextColor3 = Color3.new(1,1,1)
@@ -173,13 +173,14 @@ local nameBox = makeLabelInput("Display:", "Gold Wings")
 -- Status label
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1,0,0,24)
+statusLabel.Position = UDim2.new(0,0,1,-24)
 statusLabel.BackgroundTransparency = 0.3
 statusLabel.BackgroundColor3 = Color3.fromRGB(30,30,30)
 statusLabel.Text = "Status: Idle"
 statusLabel.TextColor3 = Color3.new(1,1,1)
 statusLabel.Font = Enum.Font.SourceSansBold
 statusLabel.TextSize = 14
-statusLabel.Parent = scrollFrame
+statusLabel.Parent = frame
 
 local function setStatus(txt)
     statusLabel.Text = "Status: "..tostring(txt)
