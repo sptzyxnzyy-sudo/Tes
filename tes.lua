@@ -1,32 +1,98 @@
+-- Services
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
 local LocalPlayer = Players.LocalPlayer
 
--- GUI Utama
+-- =================================
+-- 🔽 ANIMASI "BY : Xraxor" 🔽
+-- =================================
+do
+    local introGui = Instance.new("ScreenGui")
+    introGui.Name = "IntroAnimation"
+    introGui.ResetOnSpawn = false
+    introGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+    local introLabel = Instance.new("TextLabel")
+    introLabel.Size = UDim2.new(0, 300, 0, 50)
+    introLabel.Position = UDim2.new(0.5, -150, 0.4, 0)
+    introLabel.BackgroundTransparency = 1
+    introLabel.Text = "By : Xraxor"
+    introLabel.TextColor3 = Color3.fromRGB(40, 40, 40)
+    introLabel.TextScaled = true
+    introLabel.Font = Enum.Font.GothamBold
+    introLabel.Parent = introGui
+
+    local tweenInfoMove = TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+    local tweenMove = TweenService:Create(introLabel, tweenInfoMove, {Position = UDim2.new(0.5, -150, 0.42, 0)})
+
+    local tweenInfoColor = TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+    local tweenColor = TweenService:Create(introLabel, tweenInfoColor, {TextColor3 = Color3.fromRGB(0, 0, 0)})
+
+    tweenMove:Play()
+    tweenColor:Play()
+
+    task.wait(2)
+    local fadeOut = TweenService:Create(introLabel, TweenInfo.new(0.5), {TextTransparency = 1})
+    fadeOut:Play()
+    fadeOut.Completed:Connect(function()
+        introGui:Destroy()
+    end)
+end
+
+-- =================================
+-- 🔽 GUI UTAMA (List-based Menu) 🔽
+-- =================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "KohlAdminGUI"
+screenGui.Name = "KohlAdminListGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 420, 0, 260)
-frame.Position = UDim2.new(0, 10, 0, 80)
-frame.BackgroundTransparency = 0.12
+frame.Size = UDim2.new(0, 220, 0, 260)
+frame.Position = UDim2.new(0.4, -110, 0.5, -130)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
-frame.Name = "MainFrame"
+frame.Active = true
+frame.Draggable = true
 frame.Parent = screenGui
 
-local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1, 0, 0, 28)
-title.BackgroundTransparency = 1
-title.Text = "Kohl's Admin — Test Toolkit (Private)"
-title.TextScaled = true
-title.Font = Enum.Font.SourceSansBold
-title.TextColor3 = Color3.new(1,1,1)
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 15)
+corner.Parent = frame
 
--- UTIL
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.Text = "KOHL'S ADMIN TOOLKIT"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.Parent = frame
+
+local featureScrollFrame = Instance.new("ScrollingFrame")
+featureScrollFrame.Name = "FeatureList"
+featureScrollFrame.Size = UDim2.new(1, -20, 1, -40)
+featureScrollFrame.Position = UDim2.new(0.5, -100, 0, 35)
+featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+featureScrollFrame.ScrollBarThickness = 6
+featureScrollFrame.BackgroundTransparency = 1
+featureScrollFrame.Parent = frame
+
+local featureListLayout = Instance.new("UIListLayout")
+featureListLayout.Padding = UDim.new(0, 5)
+featureListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+featureListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+featureListLayout.Parent = featureScrollFrame
+
+featureListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, featureListLayout.AbsoluteContentSize.Y + 10)
+end)
+
+-- =================================
+-- 🔽 KOHL'S ADMIN TOOL FEATURES 🔽
+-- =================================
 local ROOT_NAME = "Kohl's Admin Source"
 local REMOTE_NAME = "VIPUGCMethod"
 local COOLDOWN = 1
@@ -49,162 +115,126 @@ local function findRemote()
     return remoteContainer:FindFirstChild(REMOTE_NAME) or remoteContainer:FindFirstChildWhichIsA("RemoteEvent")
 end
 
--- Label & Input
-local function makeLabel(text, y)
-    local lbl = Instance.new("TextLabel", frame)
-    lbl.Size = UDim2.new(0, 180, 0, 20)
-    lbl.Position = UDim2.new(0, 8, 0, y)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.Font = Enum.Font.SourceSans
-    lbl.TextSize = 14
-    lbl.TextColor3 = Color3.new(1,1,1)
-    return lbl
+-- Fungsi buat tombol fitur
+local function makeFeatureButton(name, color, callback)
+    local featButton = Instance.new("TextButton")
+    featButton.Size = UDim2.new(0, 180, 0, 40)
+    featButton.BackgroundColor3 = color
+    featButton.Text = name
+    featButton.TextColor3 = Color3.new(1,1,1)
+    featButton.Font = Enum.Font.GothamBold
+    featButton.TextSize = 12
+    featButton.Parent = featureScrollFrame
+
+    local featCorner = Instance.new("UICorner")
+    featCorner.CornerRadius = UDim.new(0, 10)
+    featCorner.Parent = featButton
+
+    featButton.MouseButton1Click:Connect(function()
+        callback(featButton)
+    end)
 end
 
-local function makeInput(y, placeholder)
-    local box = Instance.new("TextBox", frame)
-    box.Size = UDim2.new(0, 220, 0, 24)
-    box.Position = UDim2.new(0, 190, 0, y)
-    box.Text = placeholder or ""
+-- STATUS LABEL
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -10, 0, 24)
+statusLabel.Position = UDim2.new(0, 5, 1, -28)
+statusLabel.BackgroundTransparency = 0.3
+statusLabel.BackgroundColor3 = Color3.fromRGB(30,30,30)
+statusLabel.Text = "Status: Idle"
+statusLabel.TextColor3 = Color3.new(1,1,1)
+statusLabel.Font = Enum.Font.SourceSansBold
+statusLabel.TextSize = 14
+statusLabel.Parent = frame
+
+local function setStatus(txt)
+    statusLabel.Text = "Status: "..tostring(txt)
+end
+
+-- Inputs
+local function makeLabelInput(text, y, default)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0, 80, 0, 20)
+    lbl.Position = UDim2.new(0, 5, 0, y)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = Color3.new(1,1,1)
+    lbl.Font = Enum.Font.SourceSans
+    lbl.TextSize = 14
+    lbl.Parent = frame
+
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(0, 120, 0, 20)
+    box.Position = UDim2.new(0, 90, 0, y)
+    box.Text = default or ""
     box.ClearTextOnFocus = false
     box.Font = Enum.Font.SourceSans
     box.TextSize = 14
     box.TextColor3 = Color3.new(0,0,0)
+    box.Parent = frame
+
     return box
 end
 
-makeLabel("ID (number):", 36)
-local idBox = makeInput(36, "92807314389236")
-makeLabel("Asset URI:", 66)
-local assetBox = makeInput(66, "rbxassetid://89119211625300")
-makeLabel("Flag (true/false):", 96)
-local flagBox = makeInput(96, "true")
-makeLabel("Display name:", 126)
-local nameBox = makeInput(126, "Gold Wings")
+local idBox = makeLabelInput("ID:", 40, "92807314389236")
+local assetBox = makeLabelInput("Asset URI:", 70, "rbxassetid://89119211625300")
+local flagBox = makeLabelInput("Flag:", 100, "true")
+local nameBox = makeLabelInput("Display:", 130, "Gold Wings")
 
--- Buttons
-local function makeButton(text, x, y, w)
-    local btn = Instance.new("TextButton", frame)
-    btn.Size = UDim2.new(0, w or 120, 0, 28)
-    btn.Position = UDim2.new(0, x, 0, y)
-    btn.Text = text
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 14
-    btn.AutoButtonColor = true
-    return btn
-end
-
-local scanBtn = makeButton("Scan Remotes", 8, 160, 130)
-local loggerBtn = makeButton("Attach Logger", 150, 160, 130)
-local callBtn = makeButton("Call VIPUGCMethod", 292, 160, 120)
-local statusLabel = makeLabel("Status: Idle", 200)
-
--- Functions
-local function setStatus(txt)
-    statusLabel.Text = "Status: " .. tostring(txt)
-end
-
-scanBtn.MouseButton1Click:Connect(function()
+-- Tombol fitur
+makeFeatureButton("Scan Remotes", Color3.fromRGB(0,120,200), function()
     setStatus("Scanning...")
     local root = safeFindRoot()
     if not root then
-        setStatus(("Root '%s' not found"):format(ROOT_NAME))
+        setStatus("Root not found")
         return
     end
     local found = {}
-    for _, v in ipairs(root:GetDescendants()) do
+    for _,v in ipairs(root:GetDescendants()) do
         if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") then
-            table.insert(found, {name = v.Name, class = v.ClassName, path = v:GetFullName()})
+            table.insert(found, v)
         end
     end
-    if #found == 0 then
-        setStatus("No Remotes found under root.")
-        return
+    setStatus(("Found %d remote(s). Check console"):format(#found))
+    print("==== Scan Results ====")
+    for i,v in ipairs(found) do
+        print(i,v:GetFullName(),v.ClassName)
     end
-    setStatus(("Found %d remote(s). See console."):format(#found))
-    print("==== Kohl's Admin Remote Scan Results ====")
-    for i, r in ipairs(found) do
-        print(("[%d] %s (%s) -> %s"):format(i, r.name, r.class, r.path))
-    end
-    print("=========================================")
 end)
 
-loggerBtn.MouseButton1Click:Connect(function()
+makeFeatureButton("Attach Logger", Color3.fromRGB(0,200,120), function()
     if attachedLogger then
-        if loggerConnection then
-            loggerConnection:Disconnect()
-            loggerConnection = nil
-        end
+        if loggerConnection then loggerConnection:Disconnect() end
         attachedLogger = false
         setStatus("Logger detached")
-        loggerBtn.Text = "Attach Logger"
         return
     end
-
     local remote = findRemote()
-    if not remote or not remote:IsA("RemoteEvent") then
-        setStatus("RemoteEvent not found!")
-        return
-    end
-
+    if not remote then setStatus("Remote not found"); return end
     loggerConnection = remote.OnClientEvent:Connect(function(...)
-        local args = {...}
-        print("---- VIPUGCMethod OnClientEvent fired ----")
-        for i, a in ipairs(args) do
-            print(("arg[%d] -> %s (type: %s)"):format(i, tostring(a), typeof(a)))
-        end
-        print("------------------------------------------")
-        setStatus("Logger: last event printed to console")
+        print("VIPUGCMethod OnClientEvent fired", ...)
+        setStatus("Event printed to console")
     end)
-
     attachedLogger = true
-    loggerBtn.Text = "Detach Logger"
     setStatus("Logger attached")
 end)
 
-callBtn.MouseButton1Click:Connect(function()
+makeFeatureButton("Call VIPUGCMethod", Color3.fromRGB(200,120,0), function()
     local now = tick()
     if now - lastCall < COOLDOWN then
-        setStatus(("Cooldown: wait %.2fs"):format(COOLDOWN - (now - lastCall)))
+        setStatus(("Cooldown: wait %.1fs"):format(COOLDOWN-(now-lastCall)))
         return
     end
-
     local remote = findRemote()
-    if not remote or not remote:IsA("RemoteEvent") then
-        setStatus("RemoteEvent not found!")
-        return
-    end
-
-    local idNum = tonumber(idBox.Text) or idBox.Text
-    local assetUri = tostring(assetBox.Text or "")
-    local flagVal = (tostring(flagBox.Text or "true"):lower() == "true")
-    local displayName = tostring(nameBox.Text or "")
-    local args = { idNum, assetUri, flagVal, displayName }
-
-    local ok, err = pcall(function()
-        remote:FireServer(unpack(args))
-    end)
-    if ok then
-        setStatus("Call sent (check server / console).")
-    else
-        setStatus("Error calling remote: " .. tostring(err))
-    end
-
+    if not remote then setStatus("Remote not found"); return end
+    local args = {
+        tonumber(idBox.Text) or idBox.Text,
+        assetBox.Text,
+        (flagBox.Text:lower()=="true"),
+        nameBox.Text
+    }
+    local ok,err = pcall(function() remote:FireServer(unpack(args)) end)
+    if ok then setStatus("Call sent")
+    else setStatus("Error: "..tostring(err)) end
     lastCall = now
 end)
-
--- Shortcut toggle GUI
-local uis = game:GetService("UserInputService")
-local visible = true
-uis.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.RightControl then
-        visible = not visible
-        screenGui.Enabled = visible
-        setStatus(visible and "Visible" or "Hidden")
-    end
-end)
-
-setStatus("Ready")
-print("[KohlAdminTool] Ready.")
