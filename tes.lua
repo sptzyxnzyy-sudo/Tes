@@ -1,6 +1,7 @@
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+-- local UserInputService = game:GetService("UserInputService") -- Tidak digunakan
 
 local player = Players.LocalPlayer
 
@@ -10,8 +11,9 @@ local flyflingConnection = nil
 local isFlyflingRadiusOn = true 
 local isFlyflingSpeedOn = true 
 local isPartFollowActive = false 
-local flyflingSpeedMultiplier = 30 
-local flyflingRadius = 30 
+local isScanAnchoredOn = false -- Status untuk scan anchored parts
+local flyflingSpeedMultiplier = 100 -- DIUBAH: Default langsung 100x
+local flyflingRadius = 30 -- DIUBAH: Default langsung 30
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -103,6 +105,43 @@ end)
 
 -- 🔽 FUNGSI UTILITY GLOBAL 🔽
 
+-- FUNGSI BARU: Notifikasi dengan Animasi
+local function showNotification(message)
+    local notifGui = Instance.new("ScreenGui")
+    notifGui.Name = "Notification"
+    notifGui.ResetOnSpawn = false
+    notifGui.Parent = player:WaitForChild("PlayerGui")
+
+    local notifLabel = Instance.new("TextLabel")
+    notifLabel.Size = UDim2.new(0, 400, 0, 50)
+    notifLabel.Position = UDim2.new(0.5, -200, 0.1, 0)
+    notifLabel.BackgroundTransparency = 1
+    notifLabel.BackgroundColor3 = Color3.new(0, 0, 0)
+    notifLabel.Text = message
+    notifLabel.TextColor3 = Color3.new(1, 1, 1)
+    notifLabel.TextScaled = true
+    notifLabel.Font = Enum.Font.GothamBold
+    notifLabel.Parent = notifGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = notifLabel
+
+    -- Animation: Fade In (with background)
+    local fadeIn = TweenService:Create(notifLabel, TweenInfo.new(0.3), {TextTransparency = 0, BackgroundTransparency = 0.2, BackgroundColor3 = Color3.fromRGB(0, 100, 200)})
+    -- Animation: Fade Out (with background fade)
+    local fadeOut = TweenService:Create(notifLabel, TweenInfo.new(0.5), {TextTransparency = 1, BackgroundTransparency = 1})
+
+    fadeIn:Play()
+    fadeIn.Completed:Connect(function()
+        task.wait(1.5)
+        fadeOut:Play()
+        fadeOut.Completed:Connect(function()
+            notifGui:Destroy()
+        end)
+    end)
+end
+
 local function updateButtonStatus(button, isActive, featureName, isToggle)
     if not button or not button.Parent then return end
     local name = featureName or button.Name:gsub("Button", ""):gsub("_", " "):upper()
@@ -141,13 +180,19 @@ local function doFlyfling()
 
     -- Ambil semua part di Workspace
     for _, obj in ipairs(game.Workspace:GetDescendants()) do
-        -- Cek kriteria: BasePart, tidak ditambatkan (Unanchored), bukan Baseplate, bukan bagian karakter/Humanoid
-        if obj:IsA("BasePart") and obj.Name ~= "Baseplate" and obj.Anchored == false then
+        -- Cek kriteria: BasePart, bukan Baseplate, bukan bagian karakter/Humanoid
+        if obj:IsA("BasePart") and obj.Name ~= "Baseplate" then
             -- Lewati jika part tersebut adalah bagian dari karakter pemain lain atau NPC
             if Players:GetPlayerFromCharacter(obj.Parent) or obj.Parent:FindFirstChildOfClass("Humanoid") then
                 continue
             end
             
+            -- ** MODIFIKASI: Mendukung Scan Anchored Parts **
+            -- Lewati part yang ditambatkan (Anchored) KECUALI fitur Scan Anchored diaktifkan
+            if (not isScanAnchoredOn) and obj.Anchored then
+                continue
+            end
+
             local distance = (myRoot.Position - obj.Position).Magnitude
             
             -- Cek Radius
@@ -165,11 +210,12 @@ local function doFlyfling()
         local direction = (part.Position - myRoot.Position).Unit
         local force = direction * part:GetMass() * speed * 10 
         
-        -- Fling: Dorongan menjauhi pemain
+        -- Fling: Dorongan menjauhi pemain (Hanya efektif pada part yang Unanchored)
         part.Velocity = part.Velocity + (force / part:GetMass())
         
-        -- Part Follow: Membuat part mengikuti pemain (Hanya sumbu X dan Z)
+        -- Part Follow: Membuat part mengikuti pemain
         if isPartFollowActive then
+            -- Set kecepatan Part pada sumbu X dan Z agar sama dengan kecepatan pemain
             part.AssemblyLinearVelocity = Vector3.new(myVelocity.X, part.AssemblyLinearVelocity.Y, myVelocity.Z) 
         end
     end
@@ -182,6 +228,7 @@ local function toggleFlyfling(button)
         updateButtonStatus(button, true, "FLYFLING PART")
         flyflingConnection = RunService.Heartbeat:Connect(doFlyfling)
         FlyflingFrame.Visible = true 
+        showNotification("FLYFLING PART AKTIF (Speed: " .. flyflingSpeedMultiplier .. "x, Radius: " .. flyflingRadius .. ")") -- NOTIFIKASI
         print("Flyfling Part AKTIF.")
     else
         updateButtonStatus(button, false, "FLYFLING PART")
@@ -190,6 +237,7 @@ local function toggleFlyfling(button)
             flyflingConnection = nil
         end
         FlyflingFrame.Visible = false 
+        showNotification("FLYFLING PART NONAKTIF.") -- NOTIFIKASI
         print("Flyfling Part NONAKTIF.")
     end
 end
@@ -229,7 +277,7 @@ local flyflingButton = makeFeatureButton("FLYFLING PART: OFF", Color3.fromRGB(12
 
 local FlyflingFrame = Instance.new("Frame")
 FlyflingFrame.Name = "FlyflingSettings"
-FlyflingFrame.Size = UDim2.new(1, -20, 0, 320) -- Ukuran disesuaikan untuk input baru
+FlyflingFrame.Size = UDim2.new(1, -20, 0, 310) -- Ukuran disesuaikan
 FlyflingFrame.Position = UDim2.new(0, 10, 0, 0)
 FlyflingFrame.BackgroundTransparency = 1
 FlyflingFrame.Visible = false 
@@ -241,60 +289,75 @@ FlyflingLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 FlyflingLayout.SortOrder = Enum.SortOrder.LayoutOrder
 FlyflingLayout.Parent = FlyflingFrame
 
--- [1] Tombol PART FOLLOW
+-- Tombol PART FOLLOW
 local partFollowButton = makeFeatureButton("PART FOLLOW: OFF", Color3.fromRGB(150, 0, 0), function(button)
     isPartFollowActive = not isPartFollowActive
     updateButtonStatus(button, isPartFollowActive, "PART FOLLOW", true)
+    showNotification("PART FOLLOW diatur ke: " .. (isPartFollowActive and "ON" or "OFF")) -- NOTIFIKASI
+end, FlyflingFrame)
+
+-- Tombol SCAN ANCHORED
+local scanAnchoredButton = makeFeatureButton("SCAN ANCHORED: OFF", Color3.fromRGB(150, 0, 0), function(button)
+    isScanAnchoredOn = not isScanAnchoredOn
+    updateButtonStatus(button, isScanAnchoredOn, "SCAN ANCHORED", true)
+    showNotification("SCAN ANCHORED diatur ke: " .. (isScanAnchoredOn and "ON" or "OFF")) -- NOTIFIKASI
 end, FlyflingFrame)
 
 
--- [2] Tombol Radius ON/OFF
+-- Tombol Radius ON/OFF
 local radiusButton = makeFeatureButton("RADIUS ON/OFF", Color3.fromRGB(0, 180, 0), function(button)
     isFlyflingRadiusOn = not isFlyflingRadiusOn
     updateButtonStatus(button, isFlyflingRadiusOn, "RADIUS", true)
+    showNotification("RADIUS FLING diatur ke: " .. (isFlyflingRadiusOn and "ON" or "OFF")) -- NOTIFIKASI
 end, FlyflingFrame)
 
--- [3] Input Jumlah Radius (BARU)
-local radiusValueInput = Instance.new("TextBox")
-radiusValueInput.Name = "RadiusValueInput"
-radiusValueInput.Size = UDim2.new(0, 180, 0, 40)
-radiusValueInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-radiusValueInput.PlaceholderText = "Atur Radius: " .. tostring(flyflingRadius)
-radiusValueInput.Text = ""
-radiusValueInput.TextColor3 = Color3.new(1, 1, 1)
-radiusValueInput.Font = Enum.Font.Gotham
-radiusValueInput.TextSize = 12
-radiusValueInput.Parent = FlyflingFrame
+-- Input Jumlah Radius
+local radiusInput = Instance.new("TextBox")
+radiusInput.Name = "RadiusInput"
+radiusInput.Size = UDim2.new(0, 180, 0, 40)
+radiusInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+radiusInput.PlaceholderText = "Atur Radius: " .. tostring(flyflingRadius) 
+radiusInput.Text = ""
+radiusInput.TextColor3 = Color3.new(1, 1, 1)
+radiusInput.Font = Enum.Font.Gotham
+radiusInput.TextSize = 12
+radiusInput.Parent = FlyflingFrame
 
-radiusValueInput.FocusLost:Connect(function(enterPressed)
+radiusInput.FocusLost:Connect(function(enterPressed)
     if enterPressed then
-        local newRadius = tonumber(radiusValueInput.Text)
+        local newRadius = tonumber(radiusInput.Text)
         if newRadius and newRadius >= 0 then
             flyflingRadius = newRadius
-            radiusValueInput.PlaceholderText = "Atur Radius: " .. tostring(flyflingRadius)
-            radiusValueInput.Text = "" 
-            print("Flyfling Radius diatur ke: " .. tostring(flyflingRadius))
+            radiusInput.PlaceholderText = "Atur Radius: " .. tostring(flyflingRadius)
+            radiusInput.Text = "" 
+            showNotification("Radius diatur ke: " .. tostring(newRadius)) -- NOTIFIKASI
         else
-            radiusValueInput.Text = "Invalid Number!"
+            radiusInput.Text = "Invalid Number!"
             task.wait(1)
-            radiusValueInput.Text = ""
+            radiusInput.Text = ""
         end
     end
 end)
 
 
--- [4] Tombol Speed ON/OFF
+-- Tombol Speed ON/OFF
 local speedToggleButton = makeFeatureButton("SPEED ON/OFF", Color3.fromRGB(0, 180, 0), function(button)
     isFlyflingSpeedOn = not isFlyflingSpeedOn
     updateButtonStatus(button, isFlyflingSpeedOn, "SPEED", true)
+    showNotification("SPEED FLING diatur ke: " .. (isFlyflingSpeedOn and "ON" or "OFF")) -- NOTIFIKASI
+    
+    local speedInput = FlyflingFrame:FindFirstChild("SpeedInput")
+    if speedInput then
+        speedInput.PlaceholderText = "Speed: " .. tostring(flyflingSpeedMultiplier)
+    end
 end, FlyflingFrame)
 
--- [5] Input Jumlah Speed
+-- Input Jumlah Speed
 local speedInput = Instance.new("TextBox")
 speedInput.Name = "SpeedInput"
 speedInput.Size = UDim2.new(0, 180, 0, 40)
 speedInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-speedInput.PlaceholderText = "Atur Speed: " .. tostring(flyflingSpeedMultiplier) 
+speedInput.PlaceholderText = "Atur Speed: " .. tostring(flyflingSpeedMultiplier) -- Text diperbarui
 speedInput.Text = ""
 speedInput.TextColor3 = Color3.new(1, 1, 1)
 speedInput.Font = Enum.Font.Gotham
@@ -308,7 +371,7 @@ speedInput.FocusLost:Connect(function(enterPressed)
             flyflingSpeedMultiplier = newSpeed
             speedInput.PlaceholderText = "Atur Speed: " .. tostring(flyflingSpeedMultiplier)
             speedInput.Text = "" 
-            print("Flyfling Speed diatur ke: " .. tostring(flyflingSpeedMultiplier))
+            showNotification("Speed diatur ke: " .. tostring(newSpeed) .. "x") -- NOTIFIKASI
         else
             speedInput.Text = "Invalid Number!"
             task.wait(1)
@@ -318,7 +381,7 @@ speedInput.FocusLost:Connect(function(enterPressed)
 end)
 
 
--- [6] Button Speed List (Jumlah x)
+-- Button Speed List (Jumlah x)
 local speedListFrame = Instance.new("Frame")
 speedListFrame.Name = "SpeedListFrame"
 speedListFrame.Size = UDim2.new(0, 180, 0, 40) 
@@ -332,7 +395,7 @@ speedListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 speedListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 speedListLayout.Parent = speedListFrame
 
-local speedOptions = {10, 30, 50, 80, 150} 
+local speedOptions = {100, 200, 500, 1000} -- Daftar opsi diperbarui
 
 for i, speedValue in ipairs(speedOptions) do
     local speedListItem = Instance.new("TextButton")
@@ -353,6 +416,7 @@ for i, speedValue in ipairs(speedOptions) do
         flyflingSpeedMultiplier = speedValue
         speedInput.PlaceholderText = "Atur Speed: " .. tostring(flyflingSpeedMultiplier)
         speedInput.Text = "" 
+        showNotification("Flyfling Speed diatur ke: " .. tostring(speedValue) .. "x") -- NOTIFIKASI
         print("Flyfling Speed diatur ke: " .. tostring(speedValue))
     end)
 end
@@ -381,5 +445,6 @@ end)
 -- Atur status awal tombol
 updateButtonStatus(flyflingButton, isFlyflingActive, "FLYFLING PART")
 updateButtonStatus(partFollowButton, isPartFollowActive, "PART FOLLOW", true)
+updateButtonStatus(scanAnchoredButton, isScanAnchoredOn, "SCAN ANCHORED", true)
 updateButtonStatus(radiusButton, isFlyflingRadiusOn, "RADIUS", true)
 updateButtonStatus(speedToggleButton, isFlyflingSpeedOn, "SPEED", true)
