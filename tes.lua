@@ -4,7 +4,6 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
 local LocalPlayer = Players.LocalPlayer
-local UserInputService = game:GetService("UserInputService")
 
 -- Kohl's Admin Config
 local ROOT_NAME = "Kohl's Admin Source"
@@ -53,8 +52,8 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 360, 0, 500)
-frame.Position = UDim2.new(0.5, -180, 0.5, -250)
+frame.Size = UDim2.new(0, 360, 0, 250)
+frame.Position = UDim2.new(0.5, -180, 0.5, -125)
 frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -77,7 +76,7 @@ title.Parent = frame
 
 -- ScrollFrame untuk tombol fitur
 local featureScroll = Instance.new("ScrollingFrame")
-featureScroll.Size = UDim2.new(1,-20,0,150)
+featureScroll.Size = UDim2.new(1,-20,1,-40)
 featureScroll.Position = UDim2.new(0,10,0,35)
 featureScroll.CanvasSize = UDim2.new(0,0,0,0)
 featureScroll.ScrollBarThickness = 6
@@ -94,81 +93,13 @@ listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     featureScroll.CanvasSize = UDim2.new(0,0,0,listLayout.AbsoluteContentSize.Y+10)
 end)
 
--- Console di bawah
-local consoleBox = Instance.new("TextBox")
-consoleBox.Size = UDim2.new(1,-20,1,-210)
-consoleBox.Position = UDim2.new(0,10,0,195)
-consoleBox.BackgroundColor3 = Color3.fromRGB(30,30,30)
-consoleBox.TextColor3 = Color3.new(1,1,1)
-consoleBox.Font = Enum.Font.SourceSans
-consoleBox.TextSize = 14
-consoleBox.MultiLine = true
-consoleBox.ClearTextOnFocus = false
-consoleBox.TextWrapped = true
-consoleBox.TextXAlignment = Enum.TextXAlignment.Left
-consoleBox.TextYAlignment = Enum.TextYAlignment.Top
-consoleBox.Text = ""
-consoleBox.ReadOnly = true
-consoleBox.Parent = frame
-
--- Copy & Clear buttons
-local copyBtn = Instance.new("TextButton")
-copyBtn.Size = UDim2.new(0,80,0,28)
-copyBtn.Position = UDim2.new(0,10,1,-30)
-copyBtn.Text = "Copy All"
-copyBtn.Font = Enum.Font.GothamBold
-copyBtn.TextSize = 14
-copyBtn.BackgroundColor3 = Color3.fromRGB(0,150,150)
-copyBtn.TextColor3 = Color3.new(1,1,1)
-copyBtn.Parent = frame
-
-local clearBtn = Instance.new("TextButton")
-clearBtn.Size = UDim2.new(0,80,0,28)
-clearBtn.Position = UDim2.new(0,100,1,-30)
-clearBtn.Text = "Clear"
-clearBtn.Font = Enum.Font.GothamBold
-clearBtn.TextSize = 14
-clearBtn.BackgroundColor3 = Color3.fromRGB(150,50,50)
-clearBtn.TextColor3 = Color3.new(1,1,1)
-clearBtn.Parent = frame
-
-local function appendConsole(text)
-    consoleBox.Text = consoleBox.Text.."\n"..text
-    consoleBox.CanvasPosition = Vector2.new(0, consoleBox.TextBounds.Y)
-end
-
-copyBtn.MouseButton1Click:Connect(function()
-    setclipboard(consoleBox.Text)
-    appendConsole("Console copied to clipboard!")
-end)
-
-clearBtn.MouseButton1Click:Connect(function()
-    consoleBox.Text = ""
-end)
-
--- Status label
-local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1,0,0,24)
-statusLabel.Position = UDim2.new(0,0,1,-60)
-statusLabel.BackgroundTransparency = 0.3
-statusLabel.BackgroundColor3 = Color3.fromRGB(30,30,30)
-statusLabel.Text = "Status: Idle"
-statusLabel.TextColor3 = Color3.new(1,1,1)
-statusLabel.Font = Enum.Font.SourceSansBold
-statusLabel.TextSize = 14
-statusLabel.Parent = frame
-
-local function setStatus(txt)
-    statusLabel.Text = "Status: "..tostring(txt)
-end
-
+-- Notifikasi helper
 local function notify(title,text)
     StarterGui:SetCore("SendNotification",{
         Title = title,
         Text = text,
         Duration = 3
     })
-    appendConsole(title..": "..text)
 end
 
 -- =================================
@@ -218,19 +149,13 @@ end
 -- Feature functions
 local function scanRemotes(active)
     if not active then return end
-    setStatus("Scanning...")
     local root = safeFindRoot()
     if not root then notify("Scan Remotes","Root not found") return end
     local found={}
     for _,v in ipairs(root:GetDescendants()) do
         if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") then table.insert(found,v) end
     end
-    setStatus("Scan complete.")
-    notify("Scan Remotes","Found "..#found.." remote(s). Check console.")
-    appendConsole("==== Scan Results ====")
-    for i,v in ipairs(found) do
-        appendConsole(i..". "..v:GetFullName().." ("..v.ClassName..")")
-    end
+    notify("Scan Remotes","Found "..#found.." remote(s).")
 end
 
 local function attachLogger(active)
@@ -239,9 +164,8 @@ local function attachLogger(active)
     if active then
         if loggerConnection then loggerConnection:Disconnect() end
         loggerConnection = remote.OnClientEvent:Connect(function(...)
-            appendConsole("VIPUGCMethod fired: "..table.concat({...},", "))
-            setStatus("Event printed")
-            notify("Logger Event","VIPUGCMethod fired! Check console.")
+            local args={...}
+            notify("Logger Event","VIPUGCMethod fired! Args: "..table.concat(args,", "))
         end)
         notify("Logger","Logger attached")
     else
@@ -267,6 +191,5 @@ makeFeatureButton("Scan Remotes", scanRemotes)
 makeFeatureButton("Attach Logger", attachLogger)
 makeFeatureButton("Call VIPUGCMethod", callVIPUGC)
 
--- Initial status
-setStatus("Ready")
+-- Initial notification
 notify("Core Features GUI","Ready. Toggle buttons to test features.")
