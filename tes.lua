@@ -1,19 +1,17 @@
 -- credit: Xraxor1 (Original GUI/Intro structure)
--- Modification for Core Features Only (DESTROYER & PHANTOM TOUCH): [AI Assistant]
+-- Modification: Only retained the touch-based disruptive feature (Player Tether).
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 
 -- ** ⬇️ STATUS FITUR CORE ⬇️ **
-local isDestroyerActive = false 
-local destroyerTouchConnection = nil 
-local isPhantomTouchActive = false
-local touchConnection = nil
-local partsTouched = {} 
+local isTetherActive = false 
+local tetherTouchConnection = nil
+local activeTethers = {} -- Menyimpan weld untuk pemain yang sedang diikat
+
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -49,25 +47,17 @@ do
     end)
 end
 
--- 🔽 Status AutoFarm (Dipertahankan) 🔽
-local statusValue = ReplicatedStorage:FindFirstChild("AutoFarmStatus")
-if not statusValue then
-    statusValue = Instance.new("BoolValue")
-    statusValue.Name = "AutoFarmStatus"
-    statusValue.Value = false
-    statusValue.Parent = ReplicatedStorage
-end
 
--- 🔽 GUI Utama (Hanya Core Features List) 🔽
+-- 🔽 GUI Utama 🔽
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "CoreFeaturesGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Frame utama (ukuran disesuaikan karena hanya 2 fitur)
+-- Frame utama (Disesuaikan untuk 1 tombol)
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 140) -- Ukuran diperkecil untuk 2 tombol
-frame.Position = UDim2.new(0.4, -110, 0.5, -70)
+frame.Size = UDim2.new(0, 220, 0, 100) 
+frame.Position = UDim2.new(0.4, -110, 0.5, -50) -- Disesuaikan agar tetap di tengah
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -104,7 +94,6 @@ featureListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 featureListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 featureListLayout.Parent = featureScrollFrame
 
--- Sesuaikan CanvasSize saat item ditambahkan
 featureListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, featureListLayout.AbsoluteContentSize.Y + 10)
 end)
@@ -125,110 +114,75 @@ local function updateButtonStatus(button, isActive, featureName)
 end
 
 
--- 🔽 1. FUNGSI AGGRESSIVE LOCAL DESTROYER 🔽
+-- 🔽 FUNGSI PLAYER TETHER (IKAT PEMAIN) 🔽
 
-local function destroyerTouch(otherPart)
-    if not isDestroyerActive or not otherPart or not otherPart.Parent then return end
-    
-    local parentModel = otherPart.Parent
-    local hitHumanoid = parentModel:FindFirstChildOfClass("Humanoid")
-    
-    if parentModel == player.Character then return end
-    
-    if otherPart:IsA("BasePart") or otherPart:IsA("MeshPart") or otherPart:IsA("UnionOperation") then
+local function onTetherTouch(otherPart)
+    if not isTetherActive or not otherPart or not otherPart.Parent then return end
+
+    local targetPlayer = Players:GetPlayerFromCharacter(otherPart.Parent)
+    local myRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    local targetRoot = targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+    if not myRoot or not targetRoot or targetPlayer == player then return end
+
+    -- Hanya ikat pemain yang belum diikat
+    if not activeTethers[targetPlayer.UserId] then
+        local tetherWeld = Instance.new("WeldConstraint")
+        tetherWeld.Name = "PlayerTetherWeld"
+        tetherWeld.Part0 = myRoot
+        tetherWeld.Part1 = targetRoot
+        tetherWeld.Parent = targetRoot
         
-        if hitHumanoid and parentModel:FindFirstChild("HumanoidRootPart") then
-            hitHumanoid.Health = 0 -- Pembunuhan LOKAL
-        end
-        
-        pcall(function() otherPart:Destroy() end) -- Penghancuran Bagian LOKAL
+        activeTethers[targetPlayer.UserId] = tetherWeld
+        print("Tether Aktif: Mengikat " .. targetPlayer.Name)
     end
 end
 
-local function activatePartDestroyer(button)
-    if isDestroyerActive then return end
-    isDestroyerActive = true
+local function releaseAllTethers()
+    for userId, weld in pairs(activeTethers) do
+        if weld and weld.Parent then
+            weld:Destroy()
+        end
+    end
+    activeTethers = {}
+end
+
+local function activateTether(button)
+    if isTetherActive then return end
+    isTetherActive = true
     
     local character = player.Character
     local rootPart = character and character:FindFirstChild("HumanoidRootPart")
     
     if not rootPart then 
         warn("HumanoidRootPart tidak ditemukan.")
-        isDestroyerActive = false
-        updateButtonStatus(button, false, "DESTROYER")
+        isTetherActive = false
+        updateButtonStatus(button, false, "PLAYER TETHER")
         return 
     end
 
-    updateButtonStatus(button, true, "DESTROYER")
+    updateButtonStatus(button, true, "PLAYER TETHER")
     
-    if destroyerTouchConnection then destroyerTouchConnection:Disconnect() end
-    destroyerTouchConnection = rootPart.Touched:Connect(destroyerTouch)
+    if tetherTouchConnection then tetherTouchConnection:Disconnect() end
+    tetherTouchConnection = rootPart.Touched:Connect(onTetherTouch)
     
-    print("Aggressive Local Destroyer AKTIF.")
+    print("Player Tether AKTIF.")
 end
 
-local function deactivatePartDestroyer(button)
-    if not isDestroyerActive then return end
-    isDestroyerActive = false
-    updateButtonStatus(button, false, "DESTROYER")
+local function deactivateTether(button)
+    if not isTetherActive then return end
+    isTetherActive = false
     
-    if destroyerTouchConnection then
-        destroyerTouchConnection:Disconnect()
-        destroyerTouchConnection = nil
-    end
-    print("Aggressive Local Destroyer NONAKTIF.")
-end
-
-
--- 🔽 2. FUNGSI PHANTOM TOUCH 🔽
-
-local function onPartTouched(otherPart)
-    if not isPhantomTouchActive or not otherPart or not otherPart:IsA("BasePart") then return end
-    if otherPart:IsDescendantOf(player.Character) or otherPart.Parent:IsA("Accessory") or partsTouched[otherPart] then return end
-
-    otherPart.Transparency = 1
-    otherPart.CanCollide = false
-    
-    partsTouched[otherPart] = true
-    print("Phantom Touched: " .. otherPart.Name .. " menghilang.")
-end
-
-local function updatePhantomButton(button)
-    if not button or not button.Parent then return end
-    updateButtonStatus(button, isPhantomTouchActive, "PHANTOM TOUCH")
-end
-
-local function enablePhantomTouch(button)
-    isPhantomTouchActive = true
-    updatePhantomButton(button)
-    
-    local char = player.Character or player.CharacterAdded:Wait()
-    local root = char:WaitForChild("HumanoidRootPart")
-    
-    if touchConnection then touchConnection:Disconnect() end
-    touchConnection = root.Touched:Connect(onPartTouched)
-    
-    print("Phantom Touch Dinyalakan.")
-end
-
-local function disablePhantomTouch(button)
-    isPhantomTouchActive = false
-    updatePhantomButton(button)
-    
-    if touchConnection then
-        touchConnection:Disconnect()
-        touchConnection = nil
+    if tetherTouchConnection then
+        tetherTouchConnection:Disconnect()
+        tetherTouchConnection = nil
     end
     
-    for part, _ in pairs(partsTouched) do
-        if part and part.Parent then 
-             part.Transparency = 0 
-             part.CanCollide = true
-        end
-    end
-    partsTouched = {}
-    print("Phantom Touch Dimatikan.")
+    releaseAllTethers() -- Lepaskan semua ikatan
+    updateButtonStatus(button, false, "PLAYER TETHER")
+    print("Player Tether NONAKTIF.")
 end
+
 
 -- 🔽 FUNGSI PEMBUAT TOMBOL FITUR 🔽
 
@@ -255,45 +209,29 @@ end
 
 -- 🔽 PENAMBAHAN TOMBOL KE FEATURE LIST 🔽
 
--- 1. Tombol DESTROYER
-local destroyerButton = makeFeatureButton("DESTROYER: OFF", Color3.fromRGB(150, 0, 0), function(button)
-    if isDestroyerActive then
-        deactivatePartDestroyer(button)
+-- Tombol PLAYER TETHER
+local tetherButton = makeFeatureButton("PLAYER TETHER: OFF", Color3.fromRGB(150, 0, 0), function(button)
+    if isTetherActive then
+        deactivateTether(button)
     else
-        activatePartDestroyer(button)
-    end
-end)
-
--- 2. Tombol PHANTOM TOUCH
-local phantomButton = makeFeatureButton("PHANTOM TOUCH: OFF", Color3.fromRGB(150, 0, 0), function(button)
-    if isPhantomTouchActive then
-        disablePhantomTouch(button)
-    else
-        enablePhantomTouch(button)
+        activateTether(button)
     end
 end)
 
 
 -- 🔽 LOGIKA CHARACTER ADDED (PENTING UNTUK MEMPERTAHANKAN STATUS) 🔽
 player.CharacterAdded:Connect(function(char)
-    -- Pertahankan status Destroyer
-    if isDestroyerActive then
-        local button = featureScrollFrame:FindFirstChild("DestroyerButton")
-        -- Periksa kembali tombol sudah dibuat sebelum memanggil activatePartDestroyer
-        if button then activatePartDestroyer(button) end
-    end
+    -- Pastikan semua ikatan dilepas saat respawn (untuk menghindari error)
+    releaseAllTethers() 
     
-    -- Pertahankan status Phantom Touch
-    if isPhantomTouchActive then
-        local button = featureScrollFrame:FindFirstChild("PhantomTouchButton")
-        -- Periksa kembali tombol sudah dibuat sebelum memanggil enablePhantomTouch
-        if button then enablePhantomTouch(button) end
+    -- Pertahankan status Player Tether
+    if isTetherActive then
+        char:WaitForChild("HumanoidRootPart", 5)
+        local button = featureScrollFrame:FindFirstChild("PlayerTetherButton")
+        if button then activateTether(button) end
     end
-    
-    -- Tidak perlu reset stat default (WalkSpeed/JumpPower) karena fitur reset sudah dihapus.
 end)
 
 
 -- Atur status awal tombol
-updateButtonStatus(destroyerButton, isDestroyerActive, "DESTROYER")
-updatePhantomButton(phantomButton)
+updateButtonStatus(tetherButton, isTetherActive, "PLAYER TETHER")
