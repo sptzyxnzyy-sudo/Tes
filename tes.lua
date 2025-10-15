@@ -248,5 +248,6 @@ makeButton("Scan Remotes", Color3.fromRGB(0,120,200), scanRemotes)
 makeButton("Attach Logger", Color3.fromRGB(0,200,120), attachLogger)
 makeButton("Call VIPUGCMethod", Color3.fromRGB(200,120,0), callVIPUGC)
 
+-- Status awal
 setStatus("Ready")
 notify("Core Features GUI", "Ready. Use the buttons to test features.")
