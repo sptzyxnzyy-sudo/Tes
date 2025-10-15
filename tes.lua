@@ -2,13 +2,8 @@
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
 local LocalPlayer = Players.LocalPlayer
-local RunService = game:GetService("RunService")
-
--- Core Status
-local isTetherActive = false
-local tetherTouchConnection = nil
-local activeTethers = {}
 
 -- Kohl's Admin Config
 local ROOT_NAME = "Kohl's Admin Source"
@@ -57,8 +52,8 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 400)
-frame.Position = UDim2.new(0.4, -140, 0.5, -200)
+frame.Size = UDim2.new(0, 280, 0, 240)
+frame.Position = UDim2.new(0.4, -140, 0.5, -120)
 frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -113,61 +108,12 @@ local function setStatus(txt)
     statusLabel.Text = "Status: "..tostring(txt)
 end
 
--- =================================
--- 🔽 FUNGSI FITUR UTILITY 🔽
--- =================================
-local function updateButtonStatus(button,isActive,name)
-    if not button then return end
-    local n = name or button.Name:gsub("Button",""):gsub("_"," "):upper()
-    if isActive then
-        button.Text = n..": ON"
-        button.BackgroundColor3 = Color3.fromRGB(0,180,0)
-    else
-        button.Text = n..": OFF"
-        button.BackgroundColor3 = Color3.fromRGB(150,0,0)
-    end
-end
-
--- =================================
--- 🔽 PLAYER TETHER 🔽
--- =================================
-local function onTetherTouch(otherPart)
-    if not isTetherActive or not otherPart or not otherPart.Parent then return end
-    local targetPlayer = Players:GetPlayerFromCharacter(otherPart.Parent)
-    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    local targetRoot = targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not myRoot or not targetRoot or targetPlayer==LocalPlayer then return end
-    if not activeTethers[targetPlayer.UserId] then
-        local weld = Instance.new("WeldConstraint")
-        weld.Part0 = myRoot
-        weld.Part1 = targetRoot
-        weld.Parent = targetRoot
-        activeTethers[targetPlayer.UserId]=weld
-        print("Tether Aktif: "..targetPlayer.Name)
-    end
-end
-
-local function releaseAllTethers()
-    for _,weld in pairs(activeTethers) do if weld and weld.Parent then weld:Destroy() end end
-    activeTethers = {}
-end
-
-local function activateTether(button)
-    if isTetherActive then return end
-    local rootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then warn("HumanoidRootPart tidak ditemukan"); return end
-    isTetherActive = true
-    updateButtonStatus(button,true,"PLAYER TETHER")
-    if tetherTouchConnection then tetherTouchConnection:Disconnect() end
-    tetherTouchConnection=rootPart.Touched:Connect(onTetherTouch)
-end
-
-local function deactivateTether(button)
-    if not isTetherActive then return end
-    isTetherActive=false
-    if tetherTouchConnection then tetherTouchConnection:Disconnect() tetherTouchConnection=nil end
-    releaseAllTethers()
-    updateButtonStatus(button,false,"PLAYER TETHER")
+local function notify(title,text)
+    StarterGui:SetCore("SendNotification",{
+        Title = title,
+        Text = text,
+        Duration = 3
+    })
 end
 
 -- =================================
@@ -189,12 +135,17 @@ end
 local function scanRemotes(button)
     setStatus("Scanning...")
     local root = safeFindRoot()
-    if not root then setStatus("Root not found"); return end
+    if not root then 
+        setStatus("Root not found")
+        notify("Scan Remotes", "Root not found")
+        return 
+    end
     local found={}
     for _,v in ipairs(root:GetDescendants()) do
         if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") then table.insert(found,v) end
     end
     setStatus("Scan complete. Check console.")
+    notify("Scan Remotes", "Found "..#found.." remote(s). Check console.")
     print("==== Scan Results ====")
     for i,v in ipairs(found) do print(i,v:GetFullName(),v.ClassName) end
 end
@@ -204,27 +155,47 @@ local function attachLogger(button)
         if loggerConnection then loggerConnection:Disconnect() end
         attachedLogger=false
         setStatus("Logger detached")
+        notify("Logger", "Logger detached")
         return
     end
     local remote = findRemote()
-    if not remote then setStatus("Remote not found"); return end
+    if not remote then 
+        setStatus("Remote not found") 
+        notify("Logger", "Remote not found")
+        return 
+    end
     loggerConnection = remote.OnClientEvent:Connect(function(...)
         print("VIPUGCMethod fired:", ...)
         setStatus("Event printed to console")
+        notify("Logger Event", "VIPUGCMethod fired! Check console.")
     end)
     attachedLogger=true
     setStatus("Logger attached")
+    notify("Logger", "Logger attached")
 end
 
 local function callVIPUGC(button)
     local now = tick()
-    if now-lastCall<COOLDOWN then setStatus(("Cooldown %.1fs"):format(COOLDOWN-(now-lastCall))) return end
+    if now-lastCall<COOLDOWN then 
+        setStatus(("Cooldown %.1fs"):format(COOLDOWN-(now-lastCall))) 
+        notify("Call VIPUGCMethod","Cooldown active") 
+        return 
+    end
     local remote = findRemote()
-    if not remote then setStatus("Remote not found"); return end
+    if not remote then 
+        setStatus("Remote not found") 
+        notify("Call VIPUGCMethod","Remote not found") 
+        return 
+    end
     local args = {92807314389236,"rbxassetid://89119211625300",true,"Gold Wings"} -- preset args
     local ok,err=pcall(function() remote:FireServer(unpack(args)) end)
-    if ok then setStatus("Call sent")
-    else setStatus("Error: "..tostring(err)) end
+    if ok then 
+        setStatus("Call sent")
+        notify("Call VIPUGCMethod","Call sent successfully")
+    else 
+        setStatus("Error: "..tostring(err))
+        notify("Call VIPUGCMethod","Error sending call")
+    end
     lastCall=now
 end
 
@@ -247,27 +218,10 @@ local function makeButton(name,color,callback)
     return btn
 end
 
--- Tambahkan tombol
-local tetherBtn = makeButton("PLAYER TETHER: OFF", Color3.fromRGB(150,0,0), function(btn)
-    if isTetherActive then deactivateTether(btn)
-    else activateTether(btn) end
-end)
-
+-- Tambahkan tombol admin
 makeButton("Scan Remotes", Color3.fromRGB(0,120,200), scanRemotes)
 makeButton("Attach Logger", Color3.fromRGB(0,200,120), attachLogger)
 makeButton("Call VIPUGCMethod", Color3.fromRGB(200,120,0), callVIPUGC)
 
--- =================================
--- 🔽 MAINTAIN STATUS CHARACTER ADDED 🔽
--- =================================
-LocalPlayer.CharacterAdded:Connect(function(char)
-    releaseAllTethers()
-    if isTetherActive then
-        char:WaitForChild("HumanoidRootPart",5)
-        local btn=scrollFrame:FindFirstChild("PLAYER TETHERButton")
-        if btn then activateTether(btn) end
-    end
-end)
-
--- =================================
--- 🔽 TOGGLE GUI
+setStatus("Ready")
+notify("Core Features GUI", "Ready. Use the buttons to test features.")
