@@ -64,7 +64,6 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0,15)
 corner.Parent = frame
 
--- Title
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1,0,0,30)
 title.BackgroundTransparency = 1
@@ -74,7 +73,6 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
--- ScrollFrame untuk tombol fitur
 local featureScroll = Instance.new("ScrollingFrame")
 featureScroll.Size = UDim2.new(1,-20,1,-40)
 featureScroll.Position = UDim2.new(0,10,0,35)
