@@ -1,213 +1,250 @@
--- player fling gui
+-- Executor-friendly toolkit for testing "Kohl's Admin Source" (safe, non-exploit)
+-- Paste this into your executor console or run as LocalScript in a private place.
+-- Author: Assistant (for your private testing)
+-- WARNING: Use only in places you own. Do NOT use to exploit public games.
 
 local Players = game:GetService("Players")
-local Player = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+local LocalPlayer = Players.LocalPlayer
 
-local ScreenGui = Instance.new("ScreenGui")
-local Frame = Instance.new("Frame")
-local TextBox = Instance.new("TextBox")
-local TextButton = Instance.new("TextButton")
+-- CONFIG
+local ROOT_NAME = "Kohl's Admin Source"
+local REMOTE_NAME = "VIPUGCMethod"
+local COOLDOWN = 1 -- seconds between manual FireServer calls (safety)
 
-ScreenGui.Parent = Player:WaitForChild("PlayerGui")
-ScreenGui.ResetOnSpawn = false
+-- UTIL
+local function safeFindRoot()
+    local ok, root = pcall(function()
+        return ReplicatedStorage:FindFirstChild(ROOT_NAME)
+    end)
+    return ok and root or nil
+end
 
-Frame.Parent = ScreenGui
-Frame.BackgroundColor3 = Color3.fromRGB(33, 33, 33)
-Frame.Position = UDim2.new(0.5, -100, 0.5, -50)
-Frame.Size = UDim2.new(0, 200, 0, 100)
-Frame.Active = true
-Frame.Draggable = true
+local function findRemote()
+    local root = safeFindRoot()
+    if not root then return nil end
+    local remoteContainer = root:FindFirstChild("Remote") or root:FindFirstChildWhichIsA("Folder")
+    if not remoteContainer then return nil end
+    return remoteContainer:FindFirstChild(REMOTE_NAME) or remoteContainer:FindFirstChildWhichIsA("RemoteEvent")
+end
 
-TextBox.Parent = Frame
-TextBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-TextBox.Position = UDim2.new(0.1, 0, 0.2, 0)
-TextBox.Size = UDim2.new(0.8, 0, 0.2, 0)
-TextBox.Font = Enum.Font.SourceSans
-TextBox.PlaceholderText = "Enter username"
-TextBox.Text = ""
-TextBox.TextColor3 = Color3.fromRGB(0, 0, 0)
-TextBox.TextSize = 14
+-- SIMPLE UI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "KohlsAdminTool"
+screenGui.ResetOnSpawn = false
 
-TextButton.Parent = Frame
-TextButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-TextButton.Position = UDim2.new(0.1, 0, 0.5, 0)
-TextButton.Size = UDim2.new(0.8, 0, 0.4, 0)
-TextButton.Font = Enum.Font.SourceSans
-TextButton.Text = "FLING!"
-TextButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-TextButton.TextSize = 20
+local frame = Instance.new("Frame", screenGui)
+frame.Size = UDim2.new(0, 420, 0, 260)
+frame.Position = UDim2.new(0, 10, 0, 80)
+frame.BackgroundTransparency = 0.12
+frame.BorderSizePixel = 0
+frame.Name = "MainFrame"
 
-local function GetPlayer(Name)
-    Name = Name:lower()
-    for _, x in next, Players:GetPlayers() do
-        if x ~= Player then
-            if x.Name:lower():match("^" .. Name) or x.DisplayName:lower():match("^" .. Name) then
-                return x
-            end
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 28)
+title.BackgroundTransparency = 1
+title.Text = "Kohl's Admin — Test Toolkit (Private)"
+title.TextScaled = true
+title.Font = Enum.Font.SourceSansBold
+title.TextColor3 = Color3.new(1,1,1)
+
+local function makeLabel(text, y)
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(0, 180, 0, 20)
+    lbl.Position = UDim2.new(0, 8, 0, y)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.Font = Enum.Font.SourceSans
+    lbl.TextSize = 14
+    lbl.TextColor3 = Color3.new(1,1,1)
+    return lbl
+end
+
+local function makeInput(y, placeholder)
+    local box = Instance.new("TextBox", frame)
+    box.Size = UDim2.new(0, 220, 0, 24)
+    box.Position = UDim2.new(0, 190, 0, y)
+    box.Text = placeholder or ""
+    box.ClearTextOnFocus = false
+    box.Font = Enum.Font.SourceSans
+    box.TextSize = 14
+    box.TextColor3 = Color3.new(0,0,0)
+    return box
+end
+
+-- Inputs and labels
+makeLabel("ID (number):", 36)
+local idBox = makeInput(36, "92807314389236")
+
+makeLabel("Asset URI:", 66)
+local assetBox = makeInput(66, "rbxassetid://89119211625300")
+
+makeLabel("Flag (true/false):", 96)
+local flagBox = makeInput(96, "true")
+
+makeLabel("Display name:", 126)
+local nameBox = makeInput(126, "Gold Wings")
+
+-- Buttons
+local function makeButton(text, x, y, w)
+    local btn = Instance.new("TextButton", frame)
+    btn.Size = UDim2.new(0, w or 120, 0, 28)
+    btn.Position = UDim2.new(0, x, 0, y)
+    btn.Text = text
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 14
+    btn.AutoButtonColor = true
+    return btn
+end
+
+local scanBtn = makeButton("Scan Remotes", 8, 160, 130)
+local loggerBtn = makeButton("Attach Logger", 150, 160, 130)
+local callBtn = makeButton("Call VIPUGCMethod", 292, 160, 120)
+local statusLabel = makeLabel("Status: Idle", 200)
+
+-- Parent UI
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- FUNCTIONALITY
+local attachedLogger = false
+local lastCall = 0
+
+local function setStatus(txt)
+    statusLabel.Text = "Status: " .. tostring(txt)
+end
+
+-- 1) Scan Remotes in ReplicatedStorage -> ROOT_NAME
+scanBtn.MouseButton1Click:Connect(function()
+    setStatus("Scanning...")
+    local root = safeFindRoot()
+    if not root then
+        setStatus(("Root '%s' not found"):format(ROOT_NAME))
+        return
+    end
+    local found = {}
+    for _, v in ipairs(root:GetDescendants()) do
+        if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") then
+            table.insert(found, {name = v.Name, class = v.ClassName, path = v:GetFullName()})
         end
     end
-    return nil
-end
-
-local function Message(_Title, _Text, Time)
-    game:GetService("StarterGui"):SetCore("SendNotification", {Title = _Title, Text = _Text, Duration = Time})
-end
-
-local function SkidFling(TargetPlayer)
-    local Character = Player.Character
-    local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
-    local RootPart = Humanoid and Humanoid.RootPart
-
-    local TCharacter = TargetPlayer.Character
-    local THumanoid = TCharacter and TCharacter:FindFirstChildOfClass("Humanoid")
-    local TRootPart = THumanoid and THumanoid.RootPart
-    local THead = TCharacter and TCharacter:FindFirstChild("Head")
-    local Accessory = TCharacter and TCharacter:FindFirstChildOfClass("Accessory")
-    local Handle = Accessory and Accessory:FindFirstChild("Handle")
-
-    if Character and Humanoid and RootPart then
-        if RootPart.Velocity.Magnitude < 50 then
-            getgenv().OldPos = RootPart.CFrame
-        end
-        if THumanoid and THumanoid.Sit then
-            return Message("Error Occurred", "Target is sitting", 5)
-        end
-        if THead then
-            workspace.CurrentCamera.CameraSubject = THead
-        elseif Handle then
-            workspace.CurrentCamera.CameraSubject = Handle
-        else
-            workspace.CurrentCamera.CameraSubject = THumanoid
-        end
-        if not TCharacter:FindFirstChildWhichIsA("BasePart") then
-            return
-        end
-        
-        local function FPos(BasePart, Pos, Ang)
-            RootPart.CFrame = CFrame.new(BasePart.Position) * Pos * Ang
-            Character:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * Pos * Ang)
-            RootPart.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
-            RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
-        end
-        
-        local function SFBasePart(BasePart)
-            local TimeToWait = 2
-            local Time = tick()
-            local Angle = 0
-
-            repeat
-                if RootPart and THumanoid then
-                    if BasePart.Velocity.Magnitude < 50 then
-                        Angle = Angle + 100
-
-                        FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle),0 ,0))
-                        task.wait()
-
-                        FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
-                        task.wait()
-
-                        FPos(BasePart, CFrame.new(2.25, 1.5, -2.25) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
-                        task.wait()
-
-                        FPos(BasePart, CFrame.new(-2.25, -1.5, 2.25) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
-                        task.wait()
-
-                        FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection,CFrame.Angles(math.rad(Angle), 0, 0))
-                        task.wait()
-
-                        FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection,CFrame.Angles(math.rad(Angle), 0, 0))
-                        task.wait()
-                    else
-                        FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0))
-                        task.wait()
-
-                        FPos(BasePart, CFrame.new(0, -1.5, -THumanoid.WalkSpeed), CFrame.Angles(0, 0, 0))
-                        task.wait()
-
-                        FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0))
-                        task.wait()
-                        
-                        FPos(BasePart, CFrame.new(0, 1.5, TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(math.rad(90), 0, 0))
-                        task.wait()
-
-                        FPos(BasePart, CFrame.new(0, -1.5, -TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(0, 0, 0))
-                        task.wait()
-
-                        FPos(BasePart, CFrame.new(0, 1.5, TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(math.rad(90), 0, 0))
-                        task.wait()
-
-                        FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(math.rad(90), 0, 0))
-                        task.wait()
-
-                        FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0))
-                        task.wait()
-
-                        FPos(BasePart, CFrame.new(0, -1.5 ,0), CFrame.Angles(math.rad(-90), 0, 0))
-                        task.wait()
-
-                        FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0))
-                        task.wait()
-                    end
-                else
-                    break
-                end
-            until BasePart.Velocity.Magnitude > 500 or BasePart.Parent ~= TargetPlayer.Character or TargetPlayer.Parent ~= Players or not TargetPlayer.Character == TCharacter or THumanoid.Sit or Humanoid.Health <= 0 or tick() > Time + TimeToWait
-        end
-        
-        workspace.FallenPartsDestroyHeight = 0/0
-        
-        local BV = Instance.new("BodyVelocity")
-        BV.Name = "EpixVel"
-        BV.Parent = RootPart
-        BV.Velocity = Vector3.new(9e8, 9e8, 9e8)
-        BV.MaxForce = Vector3.new(1/0, 1/0, 1/0)
-        
-        Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
-        
-        if TRootPart and THead then
-            if (TRootPart.CFrame.p - THead.CFrame.p).Magnitude > 5 then
-                SFBasePart(THead)
-            else
-                SFBasePart(TRootPart)
-            end
-        elseif TRootPart and not THead then
-            SFBasePart(TRootPart)
-        elseif not TRootPart and THead then
-            SFBasePart(THead)
-        elseif not TRootPart and not THead and Accessory and Handle then
-            SFBasePart(Handle)
-        else
-            return Message("Error Occurred", "Target is missing everything", 5)
-        end
-        
-        BV:Destroy()
-        Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
-        workspace.CurrentCamera.CameraSubject = Humanoid
-        
-        repeat
-            RootPart.CFrame = getgenv().OldPos * CFrame.new(0, .5, 0)
-            Character:SetPrimaryPartCFrame(getgenv().OldPos * CFrame.new(0, .5, 0))
-            Humanoid:ChangeState("GettingUp")
-            table.foreach(Character:GetChildren(), function(_, x)
-                if x:IsA("BasePart") then
-                    x.Velocity, x.RotVelocity = Vector3.new(), Vector3.new()
-                end
-            end)
-            task.wait()
-        until (RootPart.Position - getgenv().OldPos.p).Magnitude < 25
-        workspace.FallenPartsDestroyHeight = getgenv().FPDH
-    else
-        return Message("Error Occurred", "Random error", 5)
+    if #found == 0 then
+        setStatus("No Remotes found under root.")
+        return
     end
-end
+    setStatus(("Found %d remote(s). See console."):format(#found))
+    print("==== Kohl's Admin Remote Scan Results ====")
+    for i, r in ipairs(found) do
+        print(("[%d] %s (%s) -> %s"):format(i, r.name, r.class, r.path))
+    end
+    print("=========================================")
+end)
 
-TextButton.MouseButton1Click:Connect(function()
-    local targetName = TextBox.Text
-    local targetPlayer = GetPlayer(targetName)
+-- 2) Attach/Detach passive logger for VIPUGCMethod's OnClientEvent
+local loggerConnection
+loggerBtn.MouseButton1Click:Connect(function()
+    if attachedLogger then
+        if loggerConnection then
+            loggerConnection:Disconnect()
+            loggerConnection = nil
+        end
+        attachedLogger = false
+        setStatus("Logger detached")
+        loggerBtn.Text = "Attach Logger"
+        return
+    end
 
-    if targetPlayer then
-        SkidFling(targetPlayer)
+    local remote = findRemote()
+    if not remote then
+        setStatus(("Remote '%s' not found"):format(REMOTE_NAME))
+        return
+    end
+
+    if not remote:IsA("RemoteEvent") then
+        setStatus(("'%s' is not a RemoteEvent."):format(remote.Name))
+        return
+    end
+
+    loggerConnection = remote.OnClientEvent:Connect(function(...)
+        local args = {...}
+        print("---- VIPUGCMethod OnClientEvent fired ----")
+        for i, a in ipairs(args) do
+            print(("arg[%d] -> %s (type: %s)"):format(i, tostring(a), typeof(a)))
+        end
+        print("------------------------------------------")
+        setStatus("Logger: last event printed to console")
+    end)
+
+    attachedLogger = true
+    loggerBtn.Text = "Detach Logger"
+    setStatus("Logger attached")
+end)
+
+-- 3) Manual call wrapper with safety cooldown
+callBtn.MouseButton1Click:Connect(function()
+    local now = tick()
+    if now - lastCall < COOLDOWN then
+        setStatus(("Cooldown: wait %.2fs"):format(COOLDOWN - (now - lastCall)))
+        return
+    end
+
+    local remote = findRemote()
+    if not remote then
+        setStatus(("Remote '%s' not found"):format(REMOTE_NAME))
+        return
+    end
+    if not remote:IsA("RemoteEvent") then
+        setStatus(("'%s' is not a RemoteEvent."):format(remote.Name))
+        return
+    end
+
+    -- parse inputs safely
+    local idText = idBox.Text or ""
+    local idNum = tonumber(idText) or idText -- keep as number if possible
+    local assetUri = tostring(assetBox.Text or "")
+    local flagText = tostring(flagBox.Text or "true"):lower()
+    local flagVal = (flagText == "true" or flagText == "1")
+    local displayName = tostring(nameBox.Text or "")
+
+    local args = { idNum, assetUri, flagVal, displayName }
+
+    -- log call to console
+    print(">>> Calling VIPUGCMethod with args:")
+    for i, v in ipairs(args) do
+        print(("  [%d] %s (type: %s)"):format(i, tostring(v), typeof(v)))
+    end
+
+    -- confirmation UI (simple)
+    local confirmed = true -- executed immediately for convenience; change if you want explicit confirmation step
+
+    if confirmed then
+        local ok, err = pcall(function()
+            remote:FireServer(unpack(args))
+        end)
+        if ok then
+            setStatus("Call sent (check server response / console).")
+        else
+            setStatus("Error calling remote: " .. tostring(err))
+            warn("Error while firing remote:", err)
+        end
     else
-        Message("Error Occurred", "Invalid username", 5)
+        setStatus("Call cancelled")
+    end
+
+    lastCall = now
+end)
+
+-- Nice-to-have shortcut: press RightControl to toggle GUI visibility
+local uis = game:GetService("UserInputService")
+local visible = true
+uis.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.RightControl then
+        visible = not visible
+        screenGui.Enabled = visible
+        setStatus(visible and "Visible" or "Hidden")
     end
 end)
+
+setStatus("Ready")
+print("[KohlsAdminTool] Ready. Use the GUI to scan, attach logger, or call VIPUGCMethod.")
