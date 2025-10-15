@@ -1,17 +1,18 @@
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 
 -- ** ⬇️ STATUS FITUR FLYFLING PART ⬇️ **
 local isFlyflingActive = false
 local flyflingConnection = nil
-local isFlyflingRadiusOn = true -- Default: Radius aktif
+local isFlyflingRadiusOn = true -- Default: Radius aktif (30 stud)
 local isFlyflingSpeedOn = true -- Default: Speed aktif
+local isPartFollowActive = false -- FITUR BARU: Mengikuti Part
 local flyflingSpeedMultiplier = 30 -- Default Speed
-local flyflingRadius = 30 -- Radius pencarian pemain
-local flyflingPartsToUse = {"Left Arm", "Right Arm", "Left Leg", "Right Leg", "Head"} -- Bagian yang akan di-fling
+local flyflingRadius = 30 -- Radius pencarian Part
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -96,8 +97,7 @@ featureListLayout.Parent = featureScrollFrame
 
 featureListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, featureListLayout.AbsoluteContentSize.Y + 10)
-    -- Perbarui ukuran frame utama jika perlu
-    local newHeight = math.min(featureListLayout.AbsoluteContentSize.Y + 40 + 30, 600) -- min 600
+    local newHeight = math.min(featureListLayout.AbsoluteContentSize.Y + 40 + 30, 600)
     frame.Size = UDim2.new(0, 220, 0, newHeight)
 end)
 
@@ -128,7 +128,7 @@ local function updateButtonStatus(button, isActive, featureName, isToggle)
 end
 
 
--- 🔽 FUNGSI FLYFLING PART 🔽
+-- 🔽 FUNGSI FLYFLING PART (MENARGETKAN PART UNANCHORED/BERGULIR) 🔽
 
 local function doFlyfling()
     if not isFlyflingActive or not player.Character then return end
@@ -136,30 +136,44 @@ local function doFlyfling()
     local myRoot = player.Character:FindFirstChild("HumanoidRootPart")
     if not myRoot then return end
 
-    for _, targetPlayer in ipairs(Players:GetPlayers()) do
-        if targetPlayer ~= player and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+    local myVelocity = myRoot.Velocity
+    local speed = isFlyflingSpeedOn and flyflingSpeedMultiplier or 0
+    local targetParts = {}
+
+    -- Ambil semua part di Workspace
+    for _, obj in ipairs(game.Workspace:GetDescendants()) do
+        -- Cek kriteria: BasePart, tidak ditambatkan (Unanchored), bukan Baseplate, bukan bagian karakter/Humanoid
+        if obj:IsA("BasePart") and obj.Name ~= "Baseplate" and obj.Anchored == false then
+            -- Lewati jika part tersebut adalah bagian dari karakter pemain lain atau NPC
+            if Players:GetPlayerFromCharacter(obj.Parent) or obj.Parent:FindFirstChildOfClass("Humanoid") then
+                continue
+            end
             
-            local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if not targetRoot then continue end
-            
-            local distance = (myRoot.Position - targetRoot.Position).Magnitude
+            local distance = (myRoot.Position - obj.Position).Magnitude
             
             -- Cek Radius
             if isFlyflingRadiusOn and distance > flyflingRadius then continue end
             
-            local direction = (targetRoot.Position - myRoot.Position).Unit
-            
-            -- Terapkan Gaya ke Bagian Tubuh Pemain Target
-            for _, partName in ipairs(flyflingPartsToUse) do
-                local part = targetPlayer.Character:FindFirstChild(partName)
-                if part and part:IsA("BasePart") then
-                    local speed = isFlyflingSpeedOn and flyflingSpeedMultiplier or 0
-                    local force = direction * part:GetMass() * speed * 10 
-                    
-                    -- Memberikan dorongan (velocity)
-                    part.Velocity = part.Velocity + (force / part:GetMass())
-                end
+            -- Batasi massa part
+            if obj:GetMass() < 1000 then 
+                 table.insert(targetParts, obj)
             end
+        end
+    end
+
+    -- Terapkan Gaya
+    for _, part in ipairs(targetParts) do
+        local direction = (part.Position - myRoot.Position).Unit
+        local force = direction * part:GetMass() * speed * 10 
+        
+        -- Menerapkan gaya agar part terlempar menjauhi pemain (Fling)
+        part.Velocity = part.Velocity + (force / part:GetMass())
+        
+        -- ** LOGIKA BARU: PART FOLLOW (Membawa Part) **
+        if isPartFollowActive then
+            -- Part diatur untuk mengikuti kecepatan pemain, meniru "membawa" part tersebut
+            -- Penyesuaian kecepatan agar part mengikuti pergerakan karakter.
+            part.AssemblyLinearVelocity = Vector3.new(myVelocity.X, part.AssemblyLinearVelocity.Y, myVelocity.Z) 
         end
     end
 end
@@ -170,16 +184,16 @@ local function toggleFlyfling(button)
     if isFlyflingActive then
         updateButtonStatus(button, true, "FLYFLING PART")
         flyflingConnection = RunService.Heartbeat:Connect(doFlyfling)
-        FlyflingFrame.Visible = true -- Tampilkan submenu
-        print("Flyfling Part AKTIF.")
+        FlyflingFrame.Visible = true 
+        print("Flyfling Part (Unanchored Items) AKTIF.")
     else
         updateButtonStatus(button, false, "FLYFLING PART")
         if flyflingConnection then
             flyflingConnection:Disconnect()
             flyflingConnection = nil
         end
-        FlyflingFrame.Visible = false -- Sembunyikan submenu
-        print("Flyfling Part NONAKTIF.")
+        FlyflingFrame.Visible = false 
+        print("Flyfling Part (Unanchored Items) NONAKTIF.")
     end
 end
 
@@ -218,10 +232,11 @@ local flyflingButton = makeFeatureButton("FLYFLING PART: OFF", Color3.fromRGB(12
 
 local FlyflingFrame = Instance.new("Frame")
 FlyflingFrame.Name = "FlyflingSettings"
-FlyflingFrame.Size = UDim2.new(1, -20, 0, 220) 
+-- Ukuran Frame disesuaikan untuk menampung Part Follow
+FlyflingFrame.Size = UDim2.new(1, -20, 0, 270) 
 FlyflingFrame.Position = UDim2.new(0, 10, 0, 0)
 FlyflingFrame.BackgroundTransparency = 1
-FlyflingFrame.Visible = false -- Awalnya tersembunyi
+FlyflingFrame.Visible = false 
 FlyflingFrame.Parent = featureScrollFrame
 
 local FlyflingLayout = Instance.new("UIListLayout")
@@ -229,6 +244,13 @@ FlyflingLayout.Padding = UDim.new(0, 5)
 FlyflingLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 FlyflingLayout.SortOrder = Enum.SortOrder.LayoutOrder
 FlyflingLayout.Parent = FlyflingFrame
+
+-- Button Part Follow (Fitur Baru)
+local partFollowButton = makeFeatureButton("PART FOLLOW: OFF", Color3.fromRGB(150, 0, 0), function(button)
+    isPartFollowActive = not isPartFollowActive
+    updateButtonStatus(button, isPartFollowActive, "PART FOLLOW", true)
+end, FlyflingFrame)
+
 
 -- Button Radius ON/OFF
 local radiusButton = makeFeatureButton("RADIUS ON/OFF", Color3.fromRGB(0, 180, 0), function(button)
@@ -241,7 +263,6 @@ local speedToggleButton = makeFeatureButton("SPEED ON/OFF", Color3.fromRGB(0, 18
     isFlyflingSpeedOn = not isFlyflingSpeedOn
     updateButtonStatus(button, isFlyflingSpeedOn, "SPEED", true)
     
-    -- Perbarui teks input jumlah speed
     local speedInput = FlyflingFrame:FindFirstChild("SpeedInput")
     if speedInput then
         speedInput.PlaceholderText = "Speed: " .. tostring(flyflingSpeedMultiplier)
@@ -266,7 +287,7 @@ speedInput.FocusLost:Connect(function(enterPressed)
         if newSpeed and newSpeed >= 0 then
             flyflingSpeedMultiplier = newSpeed
             speedInput.PlaceholderText = "Speed: " .. tostring(flyflingSpeedMultiplier)
-            speedInput.Text = "" -- Hapus teks setelah diatur
+            speedInput.Text = "" 
         else
             speedInput.Text = "Invalid Number!"
             task.wait(1)
@@ -290,7 +311,7 @@ speedListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 speedListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 speedListLayout.Parent = speedListFrame
 
-local speedOptions = {10, 30, 50, 80, 150} -- Daftar nilai kecepatan
+local speedOptions = {10, 30, 50, 80, 150} 
 
 for i, speedValue in ipairs(speedOptions) do
     local speedListItem = Instance.new("TextButton")
@@ -338,5 +359,6 @@ end)
 
 -- Atur status awal tombol
 updateButtonStatus(flyflingButton, isFlyflingActive, "FLYFLING PART")
+updateButtonStatus(partFollowButton, isPartFollowActive, "PART FOLLOW", true) -- Set status Part Follow
 updateButtonStatus(radiusButton, isFlyflingRadiusOn, "RADIUS", true)
 updateButtonStatus(speedToggleButton, isFlyflingSpeedOn, "SPEED", true)
