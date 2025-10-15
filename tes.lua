@@ -1,19 +1,39 @@
--- Executor-friendly toolkit for testing "Kohl's Admin Source" (safe, non-exploit)
--- Paste this into your executor console or run as LocalScript in a private place.
--- Author: Assistant (for your private testing)
--- WARNING: Use only in places you own. Do NOT use to exploit public games.
-
+local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
 local LocalPlayer = Players.LocalPlayer
 
--- CONFIG
-local ROOT_NAME = "Kohl's Admin Source"
-local REMOTE_NAME = "VIPUGCMethod"
-local COOLDOWN = 1 -- seconds between manual FireServer calls (safety)
+-- GUI Utama
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "KohlAdminGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 420, 0, 260)
+frame.Position = UDim2.new(0, 10, 0, 80)
+frame.BackgroundTransparency = 0.12
+frame.BorderSizePixel = 0
+frame.Name = "MainFrame"
+frame.Parent = screenGui
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 28)
+title.BackgroundTransparency = 1
+title.Text = "Kohl's Admin — Test Toolkit (Private)"
+title.TextScaled = true
+title.Font = Enum.Font.SourceSansBold
+title.TextColor3 = Color3.new(1,1,1)
 
 -- UTIL
+local ROOT_NAME = "Kohl's Admin Source"
+local REMOTE_NAME = "VIPUGCMethod"
+local COOLDOWN = 1
+local attachedLogger = false
+local lastCall = 0
+local loggerConnection
+
 local function safeFindRoot()
     local ok, root = pcall(function()
         return ReplicatedStorage:FindFirstChild(ROOT_NAME)
@@ -29,26 +49,7 @@ local function findRemote()
     return remoteContainer:FindFirstChild(REMOTE_NAME) or remoteContainer:FindFirstChildWhichIsA("RemoteEvent")
 end
 
--- SIMPLE UI
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "KohlsAdminTool"
-screenGui.ResetOnSpawn = false
-
-local frame = Instance.new("Frame", screenGui)
-frame.Size = UDim2.new(0, 420, 0, 260)
-frame.Position = UDim2.new(0, 10, 0, 80)
-frame.BackgroundTransparency = 0.12
-frame.BorderSizePixel = 0
-frame.Name = "MainFrame"
-
-local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1, 0, 0, 28)
-title.BackgroundTransparency = 1
-title.Text = "Kohl's Admin — Test Toolkit (Private)"
-title.TextScaled = true
-title.Font = Enum.Font.SourceSansBold
-title.TextColor3 = Color3.new(1,1,1)
-
+-- Label & Input
 local function makeLabel(text, y)
     local lbl = Instance.new("TextLabel", frame)
     lbl.Size = UDim2.new(0, 180, 0, 20)
@@ -73,16 +74,12 @@ local function makeInput(y, placeholder)
     return box
 end
 
--- Inputs and labels
 makeLabel("ID (number):", 36)
 local idBox = makeInput(36, "92807314389236")
-
 makeLabel("Asset URI:", 66)
 local assetBox = makeInput(66, "rbxassetid://89119211625300")
-
 makeLabel("Flag (true/false):", 96)
 local flagBox = makeInput(96, "true")
-
 makeLabel("Display name:", 126)
 local nameBox = makeInput(126, "Gold Wings")
 
@@ -103,18 +100,11 @@ local loggerBtn = makeButton("Attach Logger", 150, 160, 130)
 local callBtn = makeButton("Call VIPUGCMethod", 292, 160, 120)
 local statusLabel = makeLabel("Status: Idle", 200)
 
--- Parent UI
-screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
--- FUNCTIONALITY
-local attachedLogger = false
-local lastCall = 0
-
+-- Functions
 local function setStatus(txt)
     statusLabel.Text = "Status: " .. tostring(txt)
 end
 
--- 1) Scan Remotes in ReplicatedStorage -> ROOT_NAME
 scanBtn.MouseButton1Click:Connect(function()
     setStatus("Scanning...")
     local root = safeFindRoot()
@@ -140,8 +130,6 @@ scanBtn.MouseButton1Click:Connect(function()
     print("=========================================")
 end)
 
--- 2) Attach/Detach passive logger for VIPUGCMethod's OnClientEvent
-local loggerConnection
 loggerBtn.MouseButton1Click:Connect(function()
     if attachedLogger then
         if loggerConnection then
@@ -155,13 +143,8 @@ loggerBtn.MouseButton1Click:Connect(function()
     end
 
     local remote = findRemote()
-    if not remote then
-        setStatus(("Remote '%s' not found"):format(REMOTE_NAME))
-        return
-    end
-
-    if not remote:IsA("RemoteEvent") then
-        setStatus(("'%s' is not a RemoteEvent."):format(remote.Name))
+    if not remote or not remote:IsA("RemoteEvent") then
+        setStatus("RemoteEvent not found!")
         return
     end
 
@@ -180,7 +163,6 @@ loggerBtn.MouseButton1Click:Connect(function()
     setStatus("Logger attached")
 end)
 
--- 3) Manual call wrapper with safety cooldown
 callBtn.MouseButton1Click:Connect(function()
     local now = tick()
     if now - lastCall < COOLDOWN then
@@ -189,52 +171,30 @@ callBtn.MouseButton1Click:Connect(function()
     end
 
     local remote = findRemote()
-    if not remote then
-        setStatus(("Remote '%s' not found"):format(REMOTE_NAME))
-        return
-    end
-    if not remote:IsA("RemoteEvent") then
-        setStatus(("'%s' is not a RemoteEvent."):format(remote.Name))
+    if not remote or not remote:IsA("RemoteEvent") then
+        setStatus("RemoteEvent not found!")
         return
     end
 
-    -- parse inputs safely
-    local idText = idBox.Text or ""
-    local idNum = tonumber(idText) or idText -- keep as number if possible
+    local idNum = tonumber(idBox.Text) or idBox.Text
     local assetUri = tostring(assetBox.Text or "")
-    local flagText = tostring(flagBox.Text or "true"):lower()
-    local flagVal = (flagText == "true" or flagText == "1")
+    local flagVal = (tostring(flagBox.Text or "true"):lower() == "true")
     local displayName = tostring(nameBox.Text or "")
-
     local args = { idNum, assetUri, flagVal, displayName }
 
-    -- log call to console
-    print(">>> Calling VIPUGCMethod with args:")
-    for i, v in ipairs(args) do
-        print(("  [%d] %s (type: %s)"):format(i, tostring(v), typeof(v)))
-    end
-
-    -- confirmation UI (simple)
-    local confirmed = true -- executed immediately for convenience; change if you want explicit confirmation step
-
-    if confirmed then
-        local ok, err = pcall(function()
-            remote:FireServer(unpack(args))
-        end)
-        if ok then
-            setStatus("Call sent (check server response / console).")
-        else
-            setStatus("Error calling remote: " .. tostring(err))
-            warn("Error while firing remote:", err)
-        end
+    local ok, err = pcall(function()
+        remote:FireServer(unpack(args))
+    end)
+    if ok then
+        setStatus("Call sent (check server / console).")
     else
-        setStatus("Call cancelled")
+        setStatus("Error calling remote: " .. tostring(err))
     end
 
     lastCall = now
 end)
 
--- Nice-to-have shortcut: press RightControl to toggle GUI visibility
+-- Shortcut toggle GUI
 local uis = game:GetService("UserInputService")
 local visible = true
 uis.InputBegan:Connect(function(input, gameProcessed)
@@ -247,4 +207,4 @@ uis.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 setStatus("Ready")
-print("[KohlsAdminTool] Ready. Use the GUI to scan, attach logger, or call VIPUGCMethod.")
+print("[KohlAdminTool] Ready.")
