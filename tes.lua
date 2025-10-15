@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
 
 -- Kohl's Admin Config
 local ROOT_NAME = "Kohl's Admin Source"
@@ -14,7 +15,7 @@ local attachedLogger = false
 local loggerConnection
 
 -- =================================
--- 🔽 FUNCTION NOTIFIKASI 🔽
+-- 🔽 FUNCTION NOTIFIKASI BIASA 🔽
 -- =================================
 local function notify(title, text, duration)
     pcall(function()
@@ -24,6 +25,37 @@ local function notify(title, text, duration)
             Duration = duration or 3,
         })
     end)
+end
+
+-- =================================
+-- 🔽 FUNCTION NOTIFIKASI ANIMASI 🔽
+-- =================================
+local function animatedNotify(text)
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "AnimatedNotify"
+    gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0,300,0,50)
+    label.Position = UDim2.new(0.5,-150,0.1,0)
+    label.BackgroundTransparency = 0.3
+    label.BackgroundColor3 = Color3.fromRGB(0,0,0)
+    label.TextColor3 = Color3.new(1,1,1)
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBold
+    label.Text = text
+    label.Parent = gui
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0,10)
+    corner.Parent = label
+
+    -- Tween slide up & fade
+    local tween = TweenService:Create(label,TweenInfo.new(0.5,Enum.EasingStyle.Sine,Enum.EasingDirection.Out),{Position=UDim2.new(0.5,-150,0.05,0)})
+    tween:Play()
+    tween.Completed:Wait()
+    task.wait(2)
+    TweenService:Create(label,TweenInfo.new(0.5),{TextTransparency=1,BackgroundTransparency=1}):Play()
+    task.wait(0.5)
+    gui:Destroy()
 end
 
 -- =================================
@@ -212,17 +244,17 @@ local function makeButton(name,color,callback)
 end
 
 -- =================================
--- 🔽 VIP BOOMBOX SPATIAL + REAL-TIME 🔽
+-- 🔽 VIP BOOMBOX GLOBAL SOUND + NOTIFIKASI ANIMASI 🔽
 -- =================================
 local function VIPBoomboxFeature()
-    local isVIP = true -- ganti dengan check GamePass/whitelist
+    local isVIP = true -- ganti check GamePass/whitelist
     if not isVIP then
         setStatus("VIP required")
         notify("VIP Required","Fitur ini hanya untuk VIP!",4)
         return
     end
 
-    -- GUI input musik
+    -- GUI Input
     local inputGui = Instance.new("ScreenGui")
     inputGui.Name = "BoomboxInputGUI"
     inputGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
@@ -273,35 +305,25 @@ local function VIPBoomboxFeature()
     stopCorner.CornerRadius = UDim.new(0,10)
     stopCorner.Parent = stopBtn
 
-    -- buat Tool boombox
-    local tool = LocalPlayer.Backpack:FindFirstChild("VIP Boombox")
-    if not tool then
-        tool = Instance.new("Tool")
-        tool.Name = "VIP Boombox"
-        tool.RequiresHandle = true
-        tool.Parent = LocalPlayer.Backpack
-        local handle = Instance.new("Part")
-        handle.Name = "Handle"
-        handle.Size = Vector3.new(1,1,1)
-        handle.Transparency = 1
-        handle.Parent = tool
-        local sound = Instance.new("Sound")
-        sound.Name = "BoomboxSound"
+    -- Buat Sound di Workspace supaya semua pemain bisa dengar
+    local sound = Workspace:FindFirstChild("VIPBoomboxSound")
+    if not sound then
+        sound = Instance.new("Sound")
+        sound.Name = "VIPBoomboxSound"
         sound.Looped = true
         sound.Volume = 1
-        sound.PlaybackSpeed = 1
         sound.RollOffMode = Enum.RollOffMode.Linear
         sound.MaxDistance = 100
-        sound.Parent = handle
+        sound.Parent = Workspace
+        sound.Position = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and
+                         LocalPlayer.Character.HumanoidRootPart.Position or Vector3.new(0,5,0)
     end
-    local sound = tool.Handle:FindFirstChild("BoomboxSound")
 
-    local updateVolume
-    updateVolume = RunService.RenderStepped:Connect(function()
-        if sound and sound.IsPlaying then
-            local dist = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and
-                (sound.Parent.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude) or 0
-            sound.Volume = math.clamp(1 - dist/100,0,1)
+    -- Update posisi sound di karakter lokal
+    RunService.RenderStepped:Connect(function()
+        if LocalPlayer.Character and sound then
+            sound.Position = LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and 
+                             LocalPlayer.Character.HumanoidRootPart.Position or sound.Position
         end
     end)
 
@@ -310,7 +332,8 @@ local function VIPBoomboxFeature()
         if id then
             sound.SoundId = "rbxassetid://"..id
             sound:Play()
-            notify("VIP Boombox","Musik diputar, semua pemain mendengar!",3)
+            setStatus("Now Playing ID: "..id)
+            animatedNotify("Now Playing Music!")
         else
             notify("VIP Boombox","Masukkan ID musik yang valid!",3)
         end
@@ -319,12 +342,13 @@ local function VIPBoomboxFeature()
     stopBtn.MouseButton1Click:Connect(function()
         if sound.IsPlaying then
             sound:Stop()
-            notify("VIP Boombox","Musik dihentikan!",2)
+            setStatus("Music Stopped")
+            animatedNotify("Music Stopped!")
         end
     end)
 end
 
--- Tambahkan tombol VIP Boombox ke GUI
+-- Tambahkan tombol VIP Boombox
 makeButton("VIP Boombox", Color3.fromRGB(255,50,50), VIPBoomboxFeature)
 
 -- Tambahkan tombol admin lainnya
