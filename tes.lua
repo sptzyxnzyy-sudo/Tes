@@ -2,7 +2,6 @@
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local StarterGui = game:GetService("StarterGui")
 local LocalPlayer = Players.LocalPlayer
 
 -- =================================
@@ -42,7 +41,7 @@ do
 end
 
 -- =================================
--- 🔽 GUI UTAMA (List-based Menu) 🔽
+-- 🔽 GUI UTAMA LIST-BASED 🔽
 -- =================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "KohlAdminListGUI"
@@ -50,8 +49,8 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 260)
-frame.Position = UDim2.new(0.4, -110, 0.5, -130)
+frame.Size = UDim2.new(0, 280, 0, 360)
+frame.Position = UDim2.new(0.4, -140, 0.5, -180)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -71,23 +70,23 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
-local featureScrollFrame = Instance.new("ScrollingFrame")
-featureScrollFrame.Name = "FeatureList"
-featureScrollFrame.Size = UDim2.new(1, -20, 1, -40)
-featureScrollFrame.Position = UDim2.new(0.5, -100, 0, 35)
-featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-featureScrollFrame.ScrollBarThickness = 6
-featureScrollFrame.BackgroundTransparency = 1
-featureScrollFrame.Parent = frame
+-- Scrolling frame untuk tombol dan input
+local scrollFrame = Instance.new("ScrollingFrame")
+scrollFrame.Size = UDim2.new(1, -20, 1, -50)
+scrollFrame.Position = UDim2.new(0, 10, 0, 40)
+scrollFrame.CanvasSize = UDim2.new(0,0,0,0)
+scrollFrame.ScrollBarThickness = 6
+scrollFrame.BackgroundTransparency = 1
+scrollFrame.Parent = frame
 
-local featureListLayout = Instance.new("UIListLayout")
-featureListLayout.Padding = UDim.new(0, 5)
-featureListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-featureListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-featureListLayout.Parent = featureScrollFrame
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0,5)
+listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Parent = scrollFrame
 
-featureListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, featureListLayout.AbsoluteContentSize.Y + 10)
+listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    scrollFrame.CanvasSize = UDim2.new(0,0,0,listLayout.AbsoluteContentSize.Y + 10)
 end)
 
 -- =================================
@@ -115,19 +114,19 @@ local function findRemote()
     return remoteContainer:FindFirstChild(REMOTE_NAME) or remoteContainer:FindFirstChildWhichIsA("RemoteEvent")
 end
 
--- Fungsi buat tombol fitur
+-- Fungsi tombol fitur
 local function makeFeatureButton(name, color, callback)
     local featButton = Instance.new("TextButton")
-    featButton.Size = UDim2.new(0, 180, 0, 40)
+    featButton.Size = UDim2.new(0, 220, 0, 40)
     featButton.BackgroundColor3 = color
     featButton.Text = name
     featButton.TextColor3 = Color3.new(1,1,1)
     featButton.Font = Enum.Font.GothamBold
-    featButton.TextSize = 12
-    featButton.Parent = featureScrollFrame
+    featButton.TextSize = 14
+    featButton.Parent = scrollFrame
 
     local featCorner = Instance.new("UICorner")
-    featCorner.CornerRadius = UDim.new(0, 10)
+    featCorner.CornerRadius = UDim.new(0,10)
     featCorner.Parent = featButton
 
     featButton.MouseButton1Click:Connect(function()
@@ -135,65 +134,65 @@ local function makeFeatureButton(name, color, callback)
     end)
 end
 
--- STATUS LABEL
+-- Fungsi input + label
+local function makeLabelInput(labelText, defaultText)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1,0,0,50)
+    container.BackgroundTransparency = 1
+    container.Parent = scrollFrame
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0, 120,0,20)
+    lbl.Position = UDim2.new(0,10,0,5)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = labelText
+    lbl.TextColor3 = Color3.new(1,1,1)
+    lbl.Font = Enum.Font.SourceSans
+    lbl.TextSize = 14
+    lbl.Parent = container
+
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(0, 140,0,24)
+    box.Position = UDim2.new(0, 10,0,25)
+    box.Text = defaultText or ""
+    box.ClearTextOnFocus = false
+    box.Font = Enum.Font.SourceSans
+    box.TextSize = 14
+    box.TextColor3 = Color3.new(0,0,0)
+    box.Parent = container
+
+    return box
+end
+
+-- Inputs
+local idBox = makeLabelInput("ID:", "92807314389236")
+local assetBox = makeLabelInput("Asset URI:", "rbxassetid://89119211625300")
+local flagBox = makeLabelInput("Flag:", "true")
+local nameBox = makeLabelInput("Display:", "Gold Wings")
+
+-- Status label
 local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, -10, 0, 24)
-statusLabel.Position = UDim2.new(0, 5, 1, -28)
+statusLabel.Size = UDim2.new(1,0,0,24)
 statusLabel.BackgroundTransparency = 0.3
 statusLabel.BackgroundColor3 = Color3.fromRGB(30,30,30)
 statusLabel.Text = "Status: Idle"
 statusLabel.TextColor3 = Color3.new(1,1,1)
 statusLabel.Font = Enum.Font.SourceSansBold
 statusLabel.TextSize = 14
-statusLabel.Parent = frame
+statusLabel.Parent = scrollFrame
 
 local function setStatus(txt)
     statusLabel.Text = "Status: "..tostring(txt)
 end
 
--- Inputs
-local function makeLabelInput(text, y, default)
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(0, 80, 0, 20)
-    lbl.Position = UDim2.new(0, 5, 0, y)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = Color3.new(1,1,1)
-    lbl.Font = Enum.Font.SourceSans
-    lbl.TextSize = 14
-    lbl.Parent = frame
-
-    local box = Instance.new("TextBox")
-    box.Size = UDim2.new(0, 120, 0, 20)
-    box.Position = UDim2.new(0, 90, 0, y)
-    box.Text = default or ""
-    box.ClearTextOnFocus = false
-    box.Font = Enum.Font.SourceSans
-    box.TextSize = 14
-    box.TextColor3 = Color3.new(0,0,0)
-    box.Parent = frame
-
-    return box
-end
-
-local idBox = makeLabelInput("ID:", 40, "92807314389236")
-local assetBox = makeLabelInput("Asset URI:", 70, "rbxassetid://89119211625300")
-local flagBox = makeLabelInput("Flag:", 100, "true")
-local nameBox = makeLabelInput("Display:", 130, "Gold Wings")
-
 -- Tombol fitur
 makeFeatureButton("Scan Remotes", Color3.fromRGB(0,120,200), function()
     setStatus("Scanning...")
     local root = safeFindRoot()
-    if not root then
-        setStatus("Root not found")
-        return
-    end
+    if not root then setStatus("Root not found"); return end
     local found = {}
     for _,v in ipairs(root:GetDescendants()) do
-        if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") then
-            table.insert(found, v)
-        end
+        if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") then table.insert(found,v) end
     end
     setStatus(("Found %d remote(s). Check console"):format(#found))
     print("==== Scan Results ====")
@@ -238,3 +237,18 @@ makeFeatureButton("Call VIPUGCMethod", Color3.fromRGB(200,120,0), function()
     else setStatus("Error: "..tostring(err)) end
     lastCall = now
 end)
+
+-- Shortcut toggle GUI
+local uis = game:GetService("UserInputService")
+local visible = true
+uis.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.RightControl then
+        visible = not visible
+        screenGui.Enabled = visible
+        setStatus(visible and "Visible" or "Hidden")
+    end
+end)
+
+setStatus("Ready")
+print("[KohlAdminListGUI] Ready.")
