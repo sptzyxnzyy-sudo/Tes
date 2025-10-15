@@ -1,17 +1,26 @@
--- Services
+-- credit: Xraxor1 (Original GUI/Intro structure)
+-- Modification for Core Features Only (DESTROYER & PHANTOM TOUCH): [AI Assistant]
+
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
 
--- =================================
+local player = Players.LocalPlayer
+
+-- ** ⬇️ STATUS FITUR CORE ⬇️ **
+local isDestroyerActive = false 
+local destroyerTouchConnection = nil 
+local isPhantomTouchActive = false
+local touchConnection = nil
+local partsTouched = {} 
+
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
--- =================================
 do
     local introGui = Instance.new("ScreenGui")
     introGui.Name = "IntroAnimation"
     introGui.ResetOnSpawn = false
-    introGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    introGui.Parent = player:WaitForChild("PlayerGui")
 
     local introLabel = Instance.new("TextLabel")
     introLabel.Size = UDim2.new(0, 300, 0, 50)
@@ -40,17 +49,25 @@ do
     end)
 end
 
--- =================================
--- 🔽 GUI UTAMA LIST-BASED 🔽
--- =================================
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "KohlAdminListGUI"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+-- 🔽 Status AutoFarm (Dipertahankan) 🔽
+local statusValue = ReplicatedStorage:FindFirstChild("AutoFarmStatus")
+if not statusValue then
+    statusValue = Instance.new("BoolValue")
+    statusValue.Name = "AutoFarmStatus"
+    statusValue.Value = false
+    statusValue.Parent = ReplicatedStorage
+end
 
+-- 🔽 GUI Utama (Hanya Core Features List) 🔽
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CoreFeaturesGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- Frame utama (ukuran disesuaikan karena hanya 2 fitur)
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 380)
-frame.Position = UDim2.new(0.4, -140, 0.5, -190)
+frame.Size = UDim2.new(0, 220, 0, 140) -- Ukuran diperkecil untuk 2 tombol
+frame.Position = UDim2.new(0.4, -110, 0.5, -70)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -61,195 +78,222 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 15)
 corner.Parent = frame
 
+-- Judul GUI
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
-title.Text = "KOHL'S ADMIN TOOLKIT"
+title.Text = "CORE FEATURES"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
--- Scrollable frame untuk tombol & input
-local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(1, -20, 1, -70)
-scrollFrame.Position = UDim2.new(0, 10, 0, 40)
-scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-scrollFrame.ScrollBarThickness = 6
-scrollFrame.BackgroundTransparency = 1
-scrollFrame.Parent = frame
+-- ScrollingFrame untuk Daftar Pilihan Fitur
+local featureScrollFrame = Instance.new("ScrollingFrame")
+featureScrollFrame.Name = "FeatureList"
+featureScrollFrame.Size = UDim2.new(1, -20, 1, -40)
+featureScrollFrame.Position = UDim2.new(0.5, -100, 0, 35)
+featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+featureScrollFrame.ScrollBarThickness = 6
+featureScrollFrame.BackgroundTransparency = 1
+featureScrollFrame.Parent = frame
 
-local listLayout = Instance.new("UIListLayout")
-listLayout.Padding = UDim.new(0, 5)
-listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-listLayout.Parent = scrollFrame
+local featureListLayout = Instance.new("UIListLayout")
+featureListLayout.Padding = UDim.new(0, 5)
+featureListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+featureListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+featureListLayout.Parent = featureScrollFrame
 
-listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    scrollFrame.CanvasSize = UDim2.new(0,0,0,listLayout.AbsoluteContentSize.Y + 10)
+-- Sesuaikan CanvasSize saat item ditambahkan
+featureListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, featureListLayout.AbsoluteContentSize.Y + 10)
 end)
 
--- =================================
--- 🔽 KOHL'S ADMIN TOOL FEATURES 🔽
--- =================================
-local ROOT_NAME = "Kohl's Admin Source"
-local REMOTE_NAME = "VIPUGCMethod"
-local COOLDOWN = 1
-local attachedLogger = false
-local lastCall = 0
-local loggerConnection
 
-local function safeFindRoot()
-    local ok, root = pcall(function()
-        return ReplicatedStorage:FindFirstChild(ROOT_NAME)
-    end)
-    return ok and root or nil
+-- 🔽 FUNGSI UTILITY GLOBAL 🔽
+
+local function updateButtonStatus(button, isActive, featureName)
+    if not button or not button.Parent then return end
+    local name = featureName or button.Name:gsub("Button", ""):gsub("_", " "):upper()
+    if isActive then
+        button.Text = name .. ": ON"
+        button.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Hijau
+    else
+        button.Text = name .. ": OFF"
+        button.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Merah
+    end
 end
 
-local function findRemote()
-    local root = safeFindRoot()
-    if not root then return nil end
-    local remoteContainer = root:FindFirstChild("Remote") or root:FindFirstChildWhichIsA("Folder")
-    if not remoteContainer then return nil end
-    return remoteContainer:FindFirstChild(REMOTE_NAME) or remoteContainer:FindFirstChildWhichIsA("RemoteEvent")
+
+-- 🔽 1. FUNGSI AGGRESSIVE LOCAL DESTROYER 🔽
+
+local function destroyerTouch(otherPart)
+    if not isDestroyerActive or not otherPart or not otherPart.Parent then return end
+    
+    local parentModel = otherPart.Parent
+    local hitHumanoid = parentModel:FindFirstChildOfClass("Humanoid")
+    
+    if parentModel == player.Character then return end
+    
+    if otherPart:IsA("BasePart") or otherPart:IsA("MeshPart") or otherPart:IsA("UnionOperation") then
+        
+        if hitHumanoid and parentModel:FindFirstChild("HumanoidRootPart") then
+            hitHumanoid.Health = 0 -- Pembunuhan LOKAL
+        end
+        
+        pcall(function() otherPart:Destroy() end) -- Penghancuran Bagian LOKAL
+    end
 end
 
--- Fungsi buat tombol fitur
+local function activatePartDestroyer(button)
+    if isDestroyerActive then return end
+    isDestroyerActive = true
+    
+    local character = player.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    
+    if not rootPart then 
+        warn("HumanoidRootPart tidak ditemukan.")
+        isDestroyerActive = false
+        updateButtonStatus(button, false, "DESTROYER")
+        return 
+    end
+
+    updateButtonStatus(button, true, "DESTROYER")
+    
+    if destroyerTouchConnection then destroyerTouchConnection:Disconnect() end
+    destroyerTouchConnection = rootPart.Touched:Connect(destroyerTouch)
+    
+    print("Aggressive Local Destroyer AKTIF.")
+end
+
+local function deactivatePartDestroyer(button)
+    if not isDestroyerActive then return end
+    isDestroyerActive = false
+    updateButtonStatus(button, false, "DESTROYER")
+    
+    if destroyerTouchConnection then
+        destroyerTouchConnection:Disconnect()
+        destroyerTouchConnection = nil
+    end
+    print("Aggressive Local Destroyer NONAKTIF.")
+end
+
+
+-- 🔽 2. FUNGSI PHANTOM TOUCH 🔽
+
+local function onPartTouched(otherPart)
+    if not isPhantomTouchActive or not otherPart or not otherPart:IsA("BasePart") then return end
+    if otherPart:IsDescendantOf(player.Character) or otherPart.Parent:IsA("Accessory") or partsTouched[otherPart] then return end
+
+    otherPart.Transparency = 1
+    otherPart.CanCollide = false
+    
+    partsTouched[otherPart] = true
+    print("Phantom Touched: " .. otherPart.Name .. " menghilang.")
+end
+
+local function updatePhantomButton(button)
+    if not button or not button.Parent then return end
+    updateButtonStatus(button, isPhantomTouchActive, "PHANTOM TOUCH")
+end
+
+local function enablePhantomTouch(button)
+    isPhantomTouchActive = true
+    updatePhantomButton(button)
+    
+    local char = player.Character or player.CharacterAdded:Wait()
+    local root = char:WaitForChild("HumanoidRootPart")
+    
+    if touchConnection then touchConnection:Disconnect() end
+    touchConnection = root.Touched:Connect(onPartTouched)
+    
+    print("Phantom Touch Dinyalakan.")
+end
+
+local function disablePhantomTouch(button)
+    isPhantomTouchActive = false
+    updatePhantomButton(button)
+    
+    if touchConnection then
+        touchConnection:Disconnect()
+        touchConnection = nil
+    end
+    
+    for part, _ in pairs(partsTouched) do
+        if part and part.Parent then 
+             part.Transparency = 0 
+             part.CanCollide = true
+        end
+    end
+    partsTouched = {}
+    print("Phantom Touch Dimatikan.")
+end
+
+-- 🔽 FUNGSI PEMBUAT TOMBOL FITUR 🔽
+
 local function makeFeatureButton(name, color, callback)
     local featButton = Instance.new("TextButton")
-    featButton.Size = UDim2.new(0, 240, 0, 40)
+    featButton.Name = name:gsub(" ", "") .. "Button"
+    featButton.Size = UDim2.new(0, 180, 0, 40)
     featButton.BackgroundColor3 = color
     featButton.Text = name
-    featButton.TextColor3 = Color3.new(1,1,1)
+    featButton.TextColor3 = Color3.new(1, 1, 1)
     featButton.Font = Enum.Font.GothamBold
-    featButton.TextSize = 14
-    featButton.Parent = scrollFrame
+    featButton.TextSize = 12
+    featButton.Parent = featureScrollFrame
 
     local featCorner = Instance.new("UICorner")
-    featCorner.CornerRadius = UDim.new(0,10)
+    featCorner.CornerRadius = UDim.new(0, 10)
     featCorner.Parent = featButton
 
     featButton.MouseButton1Click:Connect(function()
         callback(featButton)
     end)
+    return featButton
 end
 
--- Fungsi input + label
-local function makeLabelInput(labelText, defaultText)
-    local container = Instance.new("Frame")
-    container.Size = UDim2.new(1,0,0,50)
-    container.BackgroundTransparency = 1
-    container.Parent = scrollFrame
+-- 🔽 PENAMBAHAN TOMBOL KE FEATURE LIST 🔽
 
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(0, 120,0,20)
-    lbl.Position = UDim2.new(0,10,0,5)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = labelText
-    lbl.TextColor3 = Color3.new(1,1,1)
-    lbl.Font = Enum.Font.SourceSans
-    lbl.TextSize = 14
-    lbl.Parent = container
-
-    local box = Instance.new("TextBox")
-    box.Size = UDim2.new(0, 140,0,24)
-    box.Position = UDim2.new(0, 10,0,25)
-    box.Text = defaultText or ""
-    box.ClearTextOnFocus = false
-    box.Font = Enum.Font.SourceSans
-    box.TextSize = 14
-    box.TextColor3 = Color3.new(0,0,0)
-    box.Parent = container
-
-    return box
-end
-
--- Inputs
-local idBox = makeLabelInput("ID:", "92807314389236")
-local assetBox = makeLabelInput("Asset URI:", "rbxassetid://89119211625300")
-local flagBox = makeLabelInput("Flag:", "true")
-local nameBox = makeLabelInput("Display:", "Gold Wings")
-
--- Status label
-local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1,0,0,24)
-statusLabel.Position = UDim2.new(0,0,1,-24)
-statusLabel.BackgroundTransparency = 0.3
-statusLabel.BackgroundColor3 = Color3.fromRGB(30,30,30)
-statusLabel.Text = "Status: Idle"
-statusLabel.TextColor3 = Color3.new(1,1,1)
-statusLabel.Font = Enum.Font.SourceSansBold
-statusLabel.TextSize = 14
-statusLabel.Parent = frame
-
-local function setStatus(txt)
-    statusLabel.Text = "Status: "..tostring(txt)
-end
-
--- Tombol fitur
-makeFeatureButton("Scan Remotes", Color3.fromRGB(0,120,200), function()
-    setStatus("Scanning...")
-    local root = safeFindRoot()
-    if not root then setStatus("Root not found"); return end
-    local found = {}
-    for _,v in ipairs(root:GetDescendants()) do
-        if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") then table.insert(found,v) end
-    end
-    setStatus(("Found %d remote(s). Check console"):format(#found))
-    print("==== Scan Results ====")
-    for i,v in ipairs(found) do
-        print(i,v:GetFullName(),v.ClassName)
+-- 1. Tombol DESTROYER
+local destroyerButton = makeFeatureButton("DESTROYER: OFF", Color3.fromRGB(150, 0, 0), function(button)
+    if isDestroyerActive then
+        deactivatePartDestroyer(button)
+    else
+        activatePartDestroyer(button)
     end
 end)
 
-makeFeatureButton("Attach Logger", Color3.fromRGB(0,200,120), function()
-    if attachedLogger then
-        if loggerConnection then loggerConnection:Disconnect() end
-        attachedLogger = false
-        setStatus("Logger detached")
-        return
-    end
-    local remote = findRemote()
-    if not remote then setStatus("Remote not found"); return end
-    loggerConnection = remote.OnClientEvent:Connect(function(...)
-        print("VIPUGCMethod OnClientEvent fired", ...)
-        setStatus("Event printed to console")
-    end)
-    attachedLogger = true
-    setStatus("Logger attached")
-end)
-
-makeFeatureButton("Call VIPUGCMethod", Color3.fromRGB(200,120,0), function()
-    local now = tick()
-    if now - lastCall < COOLDOWN then
-        setStatus(("Cooldown: wait %.1fs"):format(COOLDOWN-(now-lastCall)))
-        return
-    end
-    local remote = findRemote()
-    if not remote then setStatus("Remote not found"); return end
-    local args = {
-        tonumber(idBox.Text) or idBox.Text,
-        assetBox.Text,
-        (flagBox.Text:lower()=="true"),
-        nameBox.Text
-    }
-    local ok,err = pcall(function() remote:FireServer(unpack(args)) end)
-    if ok then setStatus("Call sent")
-    else setStatus("Error: "..tostring(err)) end
-    lastCall = now
-end)
-
--- Shortcut toggle GUI
-local uis = game:GetService("UserInputService")
-local visible = true
-uis.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.RightControl then
-        visible = not visible
-        screenGui.Enabled = visible
-        setStatus(visible and "Visible" or "Hidden")
+-- 2. Tombol PHANTOM TOUCH
+local phantomButton = makeFeatureButton("PHANTOM TOUCH: OFF", Color3.fromRGB(150, 0, 0), function(button)
+    if isPhantomTouchActive then
+        disablePhantomTouch(button)
+    else
+        enablePhantomTouch(button)
     end
 end)
 
-setStatus("Ready")
-print("[KohlAdminListGUI] Ready.")
+
+-- 🔽 LOGIKA CHARACTER ADDED (PENTING UNTUK MEMPERTAHANKAN STATUS) 🔽
+player.CharacterAdded:Connect(function(char)
+    -- Pertahankan status Destroyer
+    if isDestroyerActive then
+        local button = featureScrollFrame:FindFirstChild("DestroyerButton")
+        -- Periksa kembali tombol sudah dibuat sebelum memanggil activatePartDestroyer
+        if button then activatePartDestroyer(button) end
+    end
+    
+    -- Pertahankan status Phantom Touch
+    if isPhantomTouchActive then
+        local button = featureScrollFrame:FindFirstChild("PhantomTouchButton")
+        -- Periksa kembali tombol sudah dibuat sebelum memanggil enablePhantomTouch
+        if button then enablePhantomTouch(button) end
+    end
+    
+    -- Tidak perlu reset stat default (WalkSpeed/JumpPower) karena fitur reset sudah dihapus.
+end)
+
+
+-- Atur status awal tombol
+updateButtonStatus(destroyerButton, isDestroyerActive, "DESTROYER")
+updatePhantomButton(phantomButton)
