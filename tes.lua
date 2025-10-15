@@ -1,7 +1,6 @@
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
--- local UserInputService = game:GetService("UserInputService") -- Tidak digunakan
 
 local player = Players.LocalPlayer
 
@@ -169,9 +168,8 @@ local function doFlyfling()
         -- Fling: Dorongan menjauhi pemain
         part.Velocity = part.Velocity + (force / part:GetMass())
         
-        -- Part Follow: Membuat part mengikuti pemain
+        -- Part Follow: Membuat part mengikuti pemain (Hanya sumbu X dan Z)
         if isPartFollowActive then
-            -- Set kecepatan Part pada sumbu X dan Z agar sama dengan kecepatan pemain
             part.AssemblyLinearVelocity = Vector3.new(myVelocity.X, part.AssemblyLinearVelocity.Y, myVelocity.Z) 
         end
     end
@@ -231,7 +229,7 @@ local flyflingButton = makeFeatureButton("FLYFLING PART: OFF", Color3.fromRGB(12
 
 local FlyflingFrame = Instance.new("Frame")
 FlyflingFrame.Name = "FlyflingSettings"
-FlyflingFrame.Size = UDim2.new(1, -20, 0, 270) -- Ukuran disesuaikan
+FlyflingFrame.Size = UDim2.new(1, -20, 0, 270) 
 FlyflingFrame.Position = UDim2.new(0, 10, 0, 0)
 FlyflingFrame.BackgroundTransparency = 1
 FlyflingFrame.Visible = false 
@@ -263,7 +261,7 @@ local speedToggleButton = makeFeatureButton("SPEED ON/OFF", Color3.fromRGB(0, 18
     
     local speedInput = FlyflingFrame:FindFirstChild("SpeedInput")
     if speedInput then
-        speedInput.PlaceholderText = "Speed: " .. tostring(flyflingSpeedMultiplier)
+        speedInput.PlaceholderText = "Atur Speed: " .. tostring(flyflingSpeedMultiplier)
     end
 end, FlyflingFrame)
 
@@ -272,7 +270,7 @@ local speedInput = Instance.new("TextBox")
 speedInput.Name = "SpeedInput"
 speedInput.Size = UDim2.new(0, 180, 0, 40)
 speedInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-speedInput.PlaceholderText = "Atur Speed: " .. tostring(flyflingSpeedMultiplier) -- Text diperbarui
+speedInput.PlaceholderText = "Atur Speed: " .. tostring(flyflingSpeedMultiplier) 
 speedInput.Text = ""
 speedInput.TextColor3 = Color3.new(1, 1, 1)
 speedInput.Font = Enum.Font.Gotham
