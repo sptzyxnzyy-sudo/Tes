@@ -229,7 +229,7 @@ local flyflingButton = makeFeatureButton("FLYFLING PART: OFF", Color3.fromRGB(12
 
 local FlyflingFrame = Instance.new("Frame")
 FlyflingFrame.Name = "FlyflingSettings"
-FlyflingFrame.Size = UDim2.new(1, -20, 0, 270) 
+FlyflingFrame.Size = UDim2.new(1, -20, 0, 320) -- Ukuran disesuaikan untuk input baru
 FlyflingFrame.Position = UDim2.new(0, 10, 0, 0)
 FlyflingFrame.BackgroundTransparency = 1
 FlyflingFrame.Visible = false 
@@ -241,31 +241,55 @@ FlyflingLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 FlyflingLayout.SortOrder = Enum.SortOrder.LayoutOrder
 FlyflingLayout.Parent = FlyflingFrame
 
--- Tombol PART FOLLOW
+-- [1] Tombol PART FOLLOW
 local partFollowButton = makeFeatureButton("PART FOLLOW: OFF", Color3.fromRGB(150, 0, 0), function(button)
     isPartFollowActive = not isPartFollowActive
     updateButtonStatus(button, isPartFollowActive, "PART FOLLOW", true)
 end, FlyflingFrame)
 
 
--- Tombol Radius ON/OFF
+-- [2] Tombol Radius ON/OFF
 local radiusButton = makeFeatureButton("RADIUS ON/OFF", Color3.fromRGB(0, 180, 0), function(button)
     isFlyflingRadiusOn = not isFlyflingRadiusOn
     updateButtonStatus(button, isFlyflingRadiusOn, "RADIUS", true)
 end, FlyflingFrame)
 
--- Tombol Speed ON/OFF
+-- [3] Input Jumlah Radius (BARU)
+local radiusValueInput = Instance.new("TextBox")
+radiusValueInput.Name = "RadiusValueInput"
+radiusValueInput.Size = UDim2.new(0, 180, 0, 40)
+radiusValueInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+radiusValueInput.PlaceholderText = "Atur Radius: " .. tostring(flyflingRadius)
+radiusValueInput.Text = ""
+radiusValueInput.TextColor3 = Color3.new(1, 1, 1)
+radiusValueInput.Font = Enum.Font.Gotham
+radiusValueInput.TextSize = 12
+radiusValueInput.Parent = FlyflingFrame
+
+radiusValueInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local newRadius = tonumber(radiusValueInput.Text)
+        if newRadius and newRadius >= 0 then
+            flyflingRadius = newRadius
+            radiusValueInput.PlaceholderText = "Atur Radius: " .. tostring(flyflingRadius)
+            radiusValueInput.Text = "" 
+            print("Flyfling Radius diatur ke: " .. tostring(flyflingRadius))
+        else
+            radiusValueInput.Text = "Invalid Number!"
+            task.wait(1)
+            radiusValueInput.Text = ""
+        end
+    end
+end)
+
+
+-- [4] Tombol Speed ON/OFF
 local speedToggleButton = makeFeatureButton("SPEED ON/OFF", Color3.fromRGB(0, 180, 0), function(button)
     isFlyflingSpeedOn = not isFlyflingSpeedOn
     updateButtonStatus(button, isFlyflingSpeedOn, "SPEED", true)
-    
-    local speedInput = FlyflingFrame:FindFirstChild("SpeedInput")
-    if speedInput then
-        speedInput.PlaceholderText = "Atur Speed: " .. tostring(flyflingSpeedMultiplier)
-    end
 end, FlyflingFrame)
 
--- Input Jumlah Speed
+-- [5] Input Jumlah Speed
 local speedInput = Instance.new("TextBox")
 speedInput.Name = "SpeedInput"
 speedInput.Size = UDim2.new(0, 180, 0, 40)
@@ -284,6 +308,7 @@ speedInput.FocusLost:Connect(function(enterPressed)
             flyflingSpeedMultiplier = newSpeed
             speedInput.PlaceholderText = "Atur Speed: " .. tostring(flyflingSpeedMultiplier)
             speedInput.Text = "" 
+            print("Flyfling Speed diatur ke: " .. tostring(flyflingSpeedMultiplier))
         else
             speedInput.Text = "Invalid Number!"
             task.wait(1)
@@ -293,7 +318,7 @@ speedInput.FocusLost:Connect(function(enterPressed)
 end)
 
 
--- Button Speed List (Jumlah x)
+-- [6] Button Speed List (Jumlah x)
 local speedListFrame = Instance.new("Frame")
 speedListFrame.Name = "SpeedListFrame"
 speedListFrame.Size = UDim2.new(0, 180, 0, 40) 
