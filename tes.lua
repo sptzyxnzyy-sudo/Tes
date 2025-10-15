@@ -1,18 +1,18 @@
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+-- local UserInputService = game:GetService("UserInputService") -- Tidak digunakan
 
 local player = Players.LocalPlayer
 
 -- ** ⬇️ STATUS FITUR FLYFLING PART ⬇️ **
 local isFlyflingActive = false
 local flyflingConnection = nil
-local isFlyflingRadiusOn = true -- Default: Radius aktif (30 stud)
-local isFlyflingSpeedOn = true -- Default: Speed aktif
-local isPartFollowActive = false -- FITUR BARU: Mengikuti Part
-local flyflingSpeedMultiplier = 30 -- Default Speed
-local flyflingRadius = 30 -- Radius pencarian Part
+local isFlyflingRadiusOn = true 
+local isFlyflingSpeedOn = true 
+local isPartFollowActive = false 
+local flyflingSpeedMultiplier = 30 
+local flyflingRadius = 30 
 
 -- 🔽 ANIMASI "BY : Xraxor" 🔽
 do
@@ -108,15 +108,15 @@ local function updateButtonStatus(button, isActive, featureName, isToggle)
     if not button or not button.Parent then return end
     local name = featureName or button.Name:gsub("Button", ""):gsub("_", " "):upper()
     
-    if isToggle then -- Untuk toggle seperti Radius/Speed
+    if isToggle then 
         if isActive then
             button.Text = name .. ": ON"
-            button.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Hijau
+            button.BackgroundColor3 = Color3.fromRGB(0, 180, 0) 
         else
             button.Text = name .. ": OFF"
-            button.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Merah
+            button.BackgroundColor3 = Color3.fromRGB(150, 0, 0) 
         end
-    else -- Untuk tombol fitur utama
+    else 
         if isActive then
             button.Text = name .. ": ON"
             button.BackgroundColor3 = Color3.fromRGB(0, 150, 0) 
@@ -128,7 +128,7 @@ local function updateButtonStatus(button, isActive, featureName, isToggle)
 end
 
 
--- 🔽 FUNGSI FLYFLING PART (MENARGETKAN PART UNANCHORED/BERGULIR) 🔽
+-- 🔽 FUNGSI FLYFLING PART 🔽
 
 local function doFlyfling()
     if not isFlyflingActive or not player.Character then return end
@@ -166,13 +166,12 @@ local function doFlyfling()
         local direction = (part.Position - myRoot.Position).Unit
         local force = direction * part:GetMass() * speed * 10 
         
-        -- Menerapkan gaya agar part terlempar menjauhi pemain (Fling)
+        -- Fling: Dorongan menjauhi pemain
         part.Velocity = part.Velocity + (force / part:GetMass())
         
-        -- ** LOGIKA BARU: PART FOLLOW (Membawa Part) **
+        -- Part Follow: Membuat part mengikuti pemain
         if isPartFollowActive then
-            -- Part diatur untuk mengikuti kecepatan pemain, meniru "membawa" part tersebut
-            -- Penyesuaian kecepatan agar part mengikuti pergerakan karakter.
+            -- Set kecepatan Part pada sumbu X dan Z agar sama dengan kecepatan pemain
             part.AssemblyLinearVelocity = Vector3.new(myVelocity.X, part.AssemblyLinearVelocity.Y, myVelocity.Z) 
         end
     end
@@ -185,7 +184,7 @@ local function toggleFlyfling(button)
         updateButtonStatus(button, true, "FLYFLING PART")
         flyflingConnection = RunService.Heartbeat:Connect(doFlyfling)
         FlyflingFrame.Visible = true 
-        print("Flyfling Part (Unanchored Items) AKTIF.")
+        print("Flyfling Part AKTIF.")
     else
         updateButtonStatus(button, false, "FLYFLING PART")
         if flyflingConnection then
@@ -193,7 +192,7 @@ local function toggleFlyfling(button)
             flyflingConnection = nil
         end
         FlyflingFrame.Visible = false 
-        print("Flyfling Part (Unanchored Items) NONAKTIF.")
+        print("Flyfling Part NONAKTIF.")
     end
 end
 
@@ -232,8 +231,7 @@ local flyflingButton = makeFeatureButton("FLYFLING PART: OFF", Color3.fromRGB(12
 
 local FlyflingFrame = Instance.new("Frame")
 FlyflingFrame.Name = "FlyflingSettings"
--- Ukuran Frame disesuaikan untuk menampung Part Follow
-FlyflingFrame.Size = UDim2.new(1, -20, 0, 270) 
+FlyflingFrame.Size = UDim2.new(1, -20, 0, 270) -- Ukuran disesuaikan
 FlyflingFrame.Position = UDim2.new(0, 10, 0, 0)
 FlyflingFrame.BackgroundTransparency = 1
 FlyflingFrame.Visible = false 
@@ -245,20 +243,20 @@ FlyflingLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 FlyflingLayout.SortOrder = Enum.SortOrder.LayoutOrder
 FlyflingLayout.Parent = FlyflingFrame
 
--- Button Part Follow (Fitur Baru)
+-- Tombol PART FOLLOW
 local partFollowButton = makeFeatureButton("PART FOLLOW: OFF", Color3.fromRGB(150, 0, 0), function(button)
     isPartFollowActive = not isPartFollowActive
     updateButtonStatus(button, isPartFollowActive, "PART FOLLOW", true)
 end, FlyflingFrame)
 
 
--- Button Radius ON/OFF
+-- Tombol Radius ON/OFF
 local radiusButton = makeFeatureButton("RADIUS ON/OFF", Color3.fromRGB(0, 180, 0), function(button)
     isFlyflingRadiusOn = not isFlyflingRadiusOn
     updateButtonStatus(button, isFlyflingRadiusOn, "RADIUS", true)
 end, FlyflingFrame)
 
--- Button Speed ON/OFF
+-- Tombol Speed ON/OFF
 local speedToggleButton = makeFeatureButton("SPEED ON/OFF", Color3.fromRGB(0, 180, 0), function(button)
     isFlyflingSpeedOn = not isFlyflingSpeedOn
     updateButtonStatus(button, isFlyflingSpeedOn, "SPEED", true)
@@ -274,7 +272,7 @@ local speedInput = Instance.new("TextBox")
 speedInput.Name = "SpeedInput"
 speedInput.Size = UDim2.new(0, 180, 0, 40)
 speedInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-speedInput.PlaceholderText = "Speed: " .. tostring(flyflingSpeedMultiplier)
+speedInput.PlaceholderText = "Atur Speed: " .. tostring(flyflingSpeedMultiplier) -- Text diperbarui
 speedInput.Text = ""
 speedInput.TextColor3 = Color3.new(1, 1, 1)
 speedInput.Font = Enum.Font.Gotham
@@ -286,7 +284,7 @@ speedInput.FocusLost:Connect(function(enterPressed)
         local newSpeed = tonumber(speedInput.Text)
         if newSpeed and newSpeed >= 0 then
             flyflingSpeedMultiplier = newSpeed
-            speedInput.PlaceholderText = "Speed: " .. tostring(flyflingSpeedMultiplier)
+            speedInput.PlaceholderText = "Atur Speed: " .. tostring(flyflingSpeedMultiplier)
             speedInput.Text = "" 
         else
             speedInput.Text = "Invalid Number!"
@@ -330,7 +328,7 @@ for i, speedValue in ipairs(speedOptions) do
 
     speedListItem.MouseButton1Click:Connect(function()
         flyflingSpeedMultiplier = speedValue
-        speedInput.PlaceholderText = "Speed: " .. tostring(flyflingSpeedMultiplier)
+        speedInput.PlaceholderText = "Atur Speed: " .. tostring(flyflingSpeedMultiplier)
         speedInput.Text = "" 
         print("Flyfling Speed diatur ke: " .. tostring(speedValue))
     end)
@@ -359,6 +357,6 @@ end)
 
 -- Atur status awal tombol
 updateButtonStatus(flyflingButton, isFlyflingActive, "FLYFLING PART")
-updateButtonStatus(partFollowButton, isPartFollowActive, "PART FOLLOW", true) -- Set status Part Follow
+updateButtonStatus(partFollowButton, isPartFollowActive, "PART FOLLOW", true)
 updateButtonStatus(radiusButton, isFlyflingRadiusOn, "RADIUS", true)
 updateButtonStatus(speedToggleButton, isFlyflingSpeedOn, "SPEED", true)
