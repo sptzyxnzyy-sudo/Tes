@@ -1,4 +1,4 @@
-Tambahkan fitur bring part uanchord untuk mengambil/membawa part nya tambahkan buton on/off
+
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
