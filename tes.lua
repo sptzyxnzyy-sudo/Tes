@@ -8,6 +8,7 @@ local ICON_SIZE = UDim2.new(0, 50, 0, 50)
 local DRAG_THRESHOLD = 5 -- Batas pixel untuk membedakan click dari drag
 local LOOP_INTERVAL = 0.5 -- Interval pengecekan audio (detik)
 local SCAN_INTERVAL = 0.05 -- Interval tampilan animasi scan (detik)
+local CONSOLE_PADDING = UDim.new(0, 5) -- Padding untuk teks konsol
 
 -- Status
 local IS_AUDIO_ENABLED = false    -- Status Tombol Audio UI
@@ -26,6 +27,7 @@ local COLOR_OFF = Color3.fromRGB(50, 50, 50)
 local COLOR_SCAN = Color3.fromRGB(255, 165, 0)   -- Warna untuk Scan
 local COLOR_WARN = Color3.fromRGB(255, 50, 50)   -- Warna untuk Warning
 
+-- Services
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
@@ -33,7 +35,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-local task = task or coroutine
+local task = task -- Pastikan task ada dan berfungsi
 
 -- === 1. Fungsi Notifikasi ===
 local function notify(title, text, duration, iconOverride)
@@ -45,7 +47,7 @@ local function notify(title, text, duration, iconOverride)
     })
 end
 
--- ---
+---
 
 -- === 2. Logika Inti Loop Audio ===
 local function enforceAudioState()
@@ -73,7 +75,10 @@ end
 
 local function stopAudioAndLoop()
     IsAudioLoopActive = false 
-    AudioLoopThread = nil
+    if AudioLoopThread then
+        task.cancel(AudioLoopThread) -- Pastikan thread dihentikan
+        AudioLoopThread = nil
+    end
 
     for _, part in Workspace:GetDescendants() do
         if part:IsA("BasePart") then
@@ -85,7 +90,7 @@ local function stopAudioAndLoop()
     end
 end
 
--- ---
+---
 
 -- === 3. Logika Inti RemoteEvent Scanner ===
 local function checkRemoteEventVulnerability(remote)
@@ -109,7 +114,8 @@ local function checkRemoteEventVulnerability(remote)
         vulnerability = "MEDIUM (Item/Currency Giver)"
     else
         for _, pattern in ipairs(commonExploits) do
-            if remoteName:match(pattern) then
+            -- Case-insensitive match (tambahan perbaikan)
+            if remoteName:lower():match(pattern:lower()) then 
                 vulnerability = "MEDIUM (Common Exploit Pattern: " .. pattern .. ")"
                 break
             end
@@ -119,7 +125,7 @@ local function checkRemoteEventVulnerability(remote)
     return vulnerability
 end
 
-local function startScanLoop(console)
+local function startScanLoop(console, scanButton, cancelButton)
     if IsScanActive then return end
     
     IsScanActive = true
@@ -131,14 +137,12 @@ local function startScanLoop(console)
         local remotesToScan = {}
         
         -- Kumpulkan semua RemoteEvent dan RemoteFunction
-        for _, obj in ReplicatedStorage:GetDescendants() do
-            if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-                table.insert(remotesToScan, obj)
-            end
-        end
-        for _, obj in Workspace:GetDescendants() do
-            if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-                table.insert(remotesToScan, obj)
+        local searchAreas = {ReplicatedStorage, Workspace}
+        for _, area in ipairs(searchAreas) do
+            for _, obj in area:GetDescendants() do
+                if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+                    table.insert(remotesToScan, obj)
+                end
             end
         end
         
@@ -146,7 +150,7 @@ local function startScanLoop(console)
         local totalScanned = 0
         
         for _, remote in ipairs(remotesToScan) do
-            if not IsScanActive then break end -- Cek jika dibatalkan
+            if not IsScanActive then break end 
             
             totalScanned = totalScanned + 1
             local vulnerability = checkRemoteEventVulnerability(remote)
@@ -161,7 +165,7 @@ local function startScanLoop(console)
                 local warningText = "⚠️ KELEMAHAN DITEMUKAN: " .. remotePath .. " - " .. vulnerability
                 console.Text = warningText 
                 notify("🚨 KELEMAHAN DITEMUKAN!", warningText, 10, ICON_ID)
-                task.wait(0.5) -- Jeda agar user sempat melihat
+                task.wait(0.5) 
             end
         end
         
@@ -172,23 +176,37 @@ local function startScanLoop(console)
 
         IsScanActive = false
         IS_SCAN_ENABLED = false
-        ScanButton.Text = "🛡️ REMOTE SCANNER: OFF"
-        ScanButton.BackgroundColor3 = COLOR_OFF
-        ConsoleCancelButton.Visible = false
+        scanButton.Text = "🛡️ REMOTE SCANNER: OFF"
+        scanButton.BackgroundColor3 = COLOR_OFF
+        cancelButton.Visible = false
     end)
 end
 
-local function stopScanLoop(console)
+local function stopScanLoop(console, scanButton, cancelButton)
     if not IsScanActive then return end
     
     IsScanActive = false
     IS_SCAN_ENABLED = false
-    ScanLoopThread = nil
+    
+    if ScanLoopThread then
+        task.cancel(ScanLoopThread) -- Pastikan thread dihentikan
+        ScanLoopThread = nil
+    end
+
     console.Text = "SCANNER: DIBATALKAN/DIHENTIKAN."
     notify("🚫 Pemindaian Dibatalkan", "Pemindaian RemoteEvent dihentikan oleh pengguna.", 3)
-}
 
--- ---
+    scanButton.Text = "🛡️ REMOTE SCANNER: OFF"
+    scanButton.BackgroundColor3 = COLOR_OFF
+    cancelButton.Visible = false
+    
+    -- Sembunyikan konsol jika MainFrame tidak terlihat
+    if not IS_GUI_VISIBLE then
+        ConsoleFrame.Visible = false
+    end
+end
+
+---
 
 -- === 4. Fungsi Drag GUI (Optimized) ===
 local function makeDraggable(frame)
@@ -234,7 +252,7 @@ local function makeDraggable(frame)
     end
 end
 
--- ---
+---
 
 -- === 5. Pembuatan GUI Utama (Panel Kontrol) ===
 local ScreenGui = Instance.new("ScreenGui")
@@ -297,8 +315,8 @@ CornerScan.Parent = ScanButton
 -- Console GUI Frame (untuk Tampilan Scan)
 local ConsoleFrame = Instance.new("Frame")
 ConsoleFrame.Name = "ScannerConsole"
-ConsoleFrame.Size = UDim2.new(0, 250, 0, 40)
-ConsoleFrame.Position = UDim2.new(0.5, -125, 0.5, -200) -- Di atas MainFrame
+ConsoleFrame.Size = UDim2.new(0, 250, 0, 30) -- Dikecilkan agar lebih ringkas
+ConsoleFrame.Position = UDim2.new(0.5, -125, 0.5, -200) 
 ConsoleFrame.BackgroundColor3 = COLOR_BG
 ConsoleFrame.BorderSizePixel = 0
 ConsoleFrame.Visible = false
@@ -310,7 +328,8 @@ CornerConsole.Parent = ConsoleFrame
 
 local ConsoleDragHandle = Instance.new("TextLabel")
 ConsoleDragHandle.Name = "DragHandle"
-ConsoleDragHandle.Size = UDim2.new(1, -50, 1, 0) -- Beri ruang untuk Cancel Button
+ConsoleDragHandle.Size = UDim2.new(1, -50, 1, 0) 
+ConsoleDragHandle.Position = UDim2.new(0, CONSOLE_PADDING.Offset, 0, 0) -- Tambahkan padding
 ConsoleDragHandle.BackgroundColor3 = COLOR_BG
 ConsoleDragHandle.BackgroundTransparency = 0
 ConsoleDragHandle.Text = "CONSOLE: Siap memindai..."
@@ -323,8 +342,8 @@ ConsoleDragHandle.Active = true
 ConsoleDragHandle.Parent = ConsoleFrame
 
 local ConsoleCancelButton = Instance.new("TextButton")
-ConsoleCancelButton.Size = UDim2.new(0, 50, 1, 0)
-ConsoleCancelButton.Position = UDim2.new(1, -50, 0, 0)
+ConsoleCancelButton.Size = UDim2.new(0, 30, 1, 0) -- Dikecilkan
+ConsoleCancelButton.Position = UDim2.new(1, -30, 0, 0)
 ConsoleCancelButton.BackgroundColor3 = COLOR_WARN
 ConsoleCancelButton.Text = "❌"
 ConsoleCancelButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -340,6 +359,8 @@ CornerCancel.Parent = ConsoleCancelButton
 -- Terapkan drag
 local isMainFrameDragging = makeDraggable(MainFrame)
 local isConsoleDragging = makeDraggable(ConsoleFrame)
+
+---
 
 -- === 6. Koneksi Tombol Utama ===
 
@@ -369,14 +390,9 @@ ScanButton.MouseButton1Click:Connect(function()
         ConsoleCancelButton.Visible = true
         ScanButton.BackgroundColor3 = COLOR_SCAN
         ScanButton.Text = "🛡️ REMOTE SCANNER: RUNNING"
-        startScanLoop(ConsoleDragHandle)
+        startScanLoop(ConsoleDragHandle, ScanButton, ConsoleCancelButton)
     else
-        -- Tombol ini juga berfungsi sebagai stop/cancel
-        stopScanLoop(ConsoleDragHandle)
-        ConsoleFrame.Visible = false
-        ConsoleCancelButton.Visible = false
-        ScanButton.BackgroundColor3 = COLOR_OFF
-        ScanButton.Text = "🛡️ REMOTE SCANNER: OFF"
+        stopScanLoop(ConsoleDragHandle, ScanButton, ConsoleCancelButton)
     end
 end)
 
@@ -385,16 +401,11 @@ ConsoleCancelButton.MouseButton1Click:Connect(function()
     if isConsoleDragging() then return end
     
     if IsScanActive then
-        stopScanLoop(ConsoleDragHandle)
-        ConsoleFrame.Visible = false
-        ConsoleCancelButton.Visible = false
-        ScanButton.BackgroundColor3 = COLOR_OFF
-        ScanButton.Text = "🛡️ REMOTE SCANNER: OFF"
+        stopScanLoop(ConsoleDragHandle, ScanButton, ConsoleCancelButton)
     end
 end)
 
-
--- ---
+---
 
 -- === 7. Icon Floating dan Koneksi Toggle ===
 local FloatingIcon = Instance.new("TextButton") 
@@ -424,16 +435,13 @@ FloatingIcon.MouseButton1Click:Connect(function()
         IS_GUI_VISIBLE = not IS_GUI_VISIBLE
         MainFrame.Visible = IS_GUI_VISIBLE 
         
-        -- Console hanya terlihat jika panel utama terlihat ATAU sedang dalam proses scan
+        -- Logika Visibilitas Konsol yang Diperbaiki
         if IS_GUI_VISIBLE or IsScanActive then
             ConsoleFrame.Visible = true
+            -- Tombol Cancel hanya terlihat jika scan aktif
+            ConsoleCancelButton.Visible = IsScanActive
         else
             ConsoleFrame.Visible = false
-        end
-
-        -- Jika Console tidak sedang scan dan MainFrame ditutup, sembunyikan ConsoleCancelButton
-        if not IsScanActive then
-            ConsoleCancelButton.Visible = false
         end
 
         notify("⚙️ GUI Status", "Panel Eksekutor: " .. (IS_GUI_VISIBLE and "Terlihat" or "Tersembunyi"), 2)
