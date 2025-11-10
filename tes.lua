@@ -35,9 +35,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-local task = task
+local task = task -- Pastikan task ada dan berfungsi
 
--- === 1. Fungsi Notifikasi ===
+-- === 1. Fungsi Notifikasi (Tidak Berubah) ===
 local function notify(title, text, duration, iconOverride)
     StarterGui:SetCore("SendNotification", {
         Title = title,
@@ -76,7 +76,7 @@ end
 local function stopAudioAndLoop()
     IsAudioLoopActive = false 
     if AudioLoopThread then
-        task.cancel(AudioLoopThread)
+        task.cancel(AudioLoopThread) -- Pastikan thread dihentikan
         AudioLoopThread = nil
     end
 
@@ -97,6 +97,7 @@ local function checkRemoteEventVulnerability(remote)
     local remoteName = remote.Name
     local vulnerability = "NONE"
     
+    -- Heuristik Deteksi Kelemahan Sederhana:
     local commonExploits = {
         "GiveAll", "TeleportPlayer", "ChangeValue", "FireServer", 
         "ExecuteCommand", "KickPlayer", "BanPlayer", "AdminEvent",
@@ -113,6 +114,7 @@ local function checkRemoteEventVulnerability(remote)
         vulnerability = "MEDIUM (Item/Currency Giver)"
     else
         for _, pattern in ipairs(commonExploits) do
+            -- Case-insensitive match (tambahan perbaikan)
             if remoteName:lower():match(pattern:lower()) then 
                 vulnerability = "MEDIUM (Common Exploit Pattern: " .. pattern .. ")"
                 break
@@ -134,6 +136,7 @@ local function startScanLoop(console, scanButton, cancelButton)
     ScanLoopThread = task.spawn(function()
         local remotesToScan = {}
         
+        -- Kumpulkan semua RemoteEvent dan RemoteFunction
         local searchAreas = {ReplicatedStorage, Workspace}
         for _, area in ipairs(searchAreas) do
             for _, obj in area:GetDescendants() do
@@ -153,6 +156,7 @@ local function startScanLoop(console, scanButton, cancelButton)
             local vulnerability = checkRemoteEventVulnerability(remote)
             local remotePath = remote:GetFullName()
             
+            -- Tampilkan loop animasi di console
             console.Text = "SCANNING: " .. remote.Name .. " (" .. totalScanned .. "/" .. #remotesToScan .. ")"
             task.wait(SCAN_INTERVAL)
             
@@ -165,6 +169,7 @@ local function startScanLoop(console, scanButton, cancelButton)
             end
         end
         
+        -- Selesai
         local statusText = "SCANNER: Selesai. Ditemukan **" .. vulnerableFound .. "** kelemahan dari **" .. totalScanned .. "** Remote."
         console.Text = statusText
         notify("✅ Pemindaian Selesai", statusText, 5)
@@ -184,7 +189,7 @@ local function stopScanLoop(console, scanButton, cancelButton)
     IS_SCAN_ENABLED = false
     
     if ScanLoopThread then
-        task.cancel(ScanLoopThread)
+        task.cancel(ScanLoopThread) -- Pastikan thread dihentikan
         ScanLoopThread = nil
     end
 
@@ -195,6 +200,7 @@ local function stopScanLoop(console, scanButton, cancelButton)
     scanButton.BackgroundColor3 = COLOR_OFF
     cancelButton.Visible = false
     
+    -- Sembunyikan konsol jika MainFrame tidak terlihat
     if not IS_GUI_VISIBLE then
         ConsoleFrame.Visible = false
     end
@@ -248,12 +254,18 @@ end
 
 ---
 
--- === 5. Logika Clone Avatar ===
+-- === 5. FUNGSI BARU: Logika Clone Avatar ===
+-- *Penting: Ini adalah metode lokal/klien-saja. Untuk mereplikasi ke SEMUA pemain, 
+--  Anda harus memiliki akses ke fungsi server yang sah (misalnya, FireServer RemoteEvent
+--  yang ada) yang mengizinkan pembaruan karakter.*
+
+-- Simulasi RemoteEvent (Jika ada RemoteEvent yang dapat digunakan di ReplicatedStorage)
+-- Karena kita tidak bisa membuat RemoteEvent dari executor, ini hanya klien-saja kecuali Anda sudah memilikinya.
+-- Kita akan berasumsi ada RemoteEvent bernama "_REPLICATE_AVATAR" untuk tujuan demonstrasi.
 local REPLICATE_EVENT_NAME = "_REPLICATE_AVATAR"
 local ReplicateEvent = ReplicatedStorage:FindFirstChild(REPLICATE_EVENT_NAME) 
 
 local function cloneAvatar(targetPlayer)
-    local PlayerListFrame = PlayerGui:FindFirstChild(GUI_NAME):FindFirstChild("PlayerListFrame")
     if not targetPlayer or not targetPlayer.Character then
         notify("❌ Gagal Clone", "Karakter target tidak ditemukan.", 3)
         return
@@ -265,6 +277,7 @@ local function cloneAvatar(targetPlayer)
         return
     end
 
+    -- 1. Ambil HumanoidDescription dari target
     local description = Players:GetHumanoidDescriptionFromUserId(targetPlayer.UserId)
     
     if not description then
@@ -272,19 +285,34 @@ local function cloneAvatar(targetPlayer)
         return
     end
 
+    -- 2. Terapkan deskripsi ke karakter lokal (memuat body, pakaian, aksesoris)
+    -- Ini otomatis mendukung animasi karena Humanoid:ApplyDescription menjaga Humanoid dan Animator.
     task.spawn(function()
         LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ApplyDescription(description)
     end)
 
-    -- **Penting:** Menutup GUI List setelah berhasil meng-clone
+    -- 3. Broadcast/Replikasi ke semua pemain (SIMULASI)
+    -- Jika Anda memiliki RemoteEvent yang valid, gunakan ini:
+    -- if ReplicateEvent and ReplicateEvent:IsA("RemoteEvent") then
+    --     ReplicateEvent:FireServer(description) 
+    -- end
+    
+    -- Karena kita hanya di sisi klien (executor), ini hanya akan terlihat oleh Anda,
+    -- *KECUALI* game memiliki sistem yang mereplikasi perubahan avatar pemain lokal 
+    -- kepada pemain lain secara otomatis (misalnya, melalui update HumanoidDescription).
+    -- Untuk game modern, biasanya perubahan ini akan direplikasi.
+
+    notify("✅ Avatar Cloned", "Anda sekarang terlihat seperti **" .. targetPlayer.Name .. "**!", 5)
+    
+    -- Sembunyikan daftar pemain setelah kloning
+    local PlayerListFrame = PlayerGui:FindFirstChild(GUI_NAME):FindFirstChild("PlayerListFrame")
     if PlayerListFrame then
         PlayerListFrame.Visible = false
     end
-    
-    notify("✅ Avatar Cloned", "Anda sekarang terlihat seperti **" .. targetPlayer.Name .. "**!", 5)
 end
 
 local function populatePlayerList(scrollingFrame)
+    -- Hapus entri lama
     for _, child in ipairs(scrollingFrame:GetChildren()) do
         if child:IsA("TextButton") then
             child:Destroy()
@@ -311,6 +339,7 @@ local function populatePlayerList(scrollingFrame)
             Corner.Parent = Button
 
             Button.MouseButton1Click:Connect(function()
+                -- Panggil fungsi kloning
                 cloneAvatar(player)
             end)
 
@@ -318,19 +347,20 @@ local function populatePlayerList(scrollingFrame)
         end
     end
     
+    -- Sesuaikan ukuran CanvasSize berdasarkan jumlah pemain
     scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, count * (30 + (listLayout.Padding.Offset or 0)))
 end
 
 ---
 
--- === 6. Pembuatan GUI Utama (Panel Kontrol) (Diperluas) ===
+-- === 6. Pembuatan GUI Utama (Panel Kontrol) ===
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = GUI_NAME
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
-ScreenGui.Parent = PlayerGui
+ScreenGui.Parent = PlayerGui -- Pindahkan parent ke sini agar bisa diakses Players Gui
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 250, 0, 190)
+MainFrame.Size = UDim2.new(0, 250, 0, 190) -- Diperluas
 MainFrame.Position = UDim2.new(0.5, -125, 0.5, -95)
 MainFrame.BackgroundColor3 = COLOR_BG
 MainFrame.BorderSizePixel = 0
@@ -352,6 +382,7 @@ TitleLabel.TextSize = 18
 TitleLabel.Active = true 
 TitleLabel.Parent = MainFrame
 
+-- Audio Switch Button
 local AudioButton = Instance.new("TextButton") 
 AudioButton.Size = UDim2.new(0.9, 0, 0, 30)
 AudioButton.Position = UDim2.new(0.05, 0, 0, 40)
@@ -366,6 +397,7 @@ local CornerAudio = Instance.new("UICorner")
 CornerAudio.CornerRadius = UDim.new(0, 6)
 CornerAudio.Parent = AudioButton
 
+-- Scan Switch Button
 local ScanButton = Instance.new("TextButton") 
 ScanButton.Size = UDim2.new(0.9, 0, 0, 30)
 ScanButton.Position = UDim2.new(0.05, 0, 0, 75)
@@ -380,6 +412,7 @@ local CornerScan = Instance.new("UICorner")
 CornerScan.CornerRadius = UDim.new(0, 6)
 CornerScan.Parent = ScanButton
 
+-- TOMBOL BARU: Clone Avatar
 local CloneButton = Instance.new("TextButton") 
 CloneButton.Size = UDim2.new(0.9, 0, 0, 30)
 CloneButton.Position = UDim2.new(0.05, 0, 0, 110)
@@ -395,7 +428,7 @@ CornerClone.CornerRadius = UDim.new(0, 6)
 CornerClone.Parent = CloneButton
 
 
--- Console GUI Frame (Tidak Berubah)
+-- Console GUI Frame (untuk Tampilan Scan)
 local ConsoleFrame = Instance.new("Frame")
 ConsoleFrame.Name = "ScannerConsole"
 ConsoleFrame.Size = UDim2.new(0, 250, 0, 30) 
@@ -412,7 +445,7 @@ CornerConsole.Parent = ConsoleFrame
 local ConsoleDragHandle = Instance.new("TextLabel")
 ConsoleDragHandle.Name = "DragHandle"
 ConsoleDragHandle.Size = UDim2.new(1, -50, 1, 0) 
-ConsoleDragHandle.Position = UDim2.new(0, CONSOLE_PADDING.Offset, 0, 0)
+ConsoleDragHandle.Position = UDim2.new(0, CONSOLE_PADDING.Offset, 0, 0) 
 ConsoleDragHandle.BackgroundColor3 = COLOR_BG
 ConsoleDragHandle.BackgroundTransparency = 0
 ConsoleDragHandle.Text = "CONSOLE: Siap memindai..."
@@ -443,7 +476,7 @@ CornerCancel.Parent = ConsoleCancelButton
 local PlayerListFrame = Instance.new("Frame")
 PlayerListFrame.Name = "PlayerListFrame"
 PlayerListFrame.Size = UDim2.new(0, 250, 0, PLAYER_LIST_SIZE_Y) 
-PlayerListFrame.Position = UDim2.new(0.5, -125, 0.5, 100) 
+PlayerListFrame.Position = UDim2.new(0.5, -125, 0.5, 100) -- Tepat di bawah MainFrame
 PlayerListFrame.BackgroundColor3 = COLOR_BG
 PlayerListFrame.BorderSizePixel = 0
 PlayerListFrame.Visible = false 
@@ -461,27 +494,8 @@ ListTitle.Text = "👥 PILIH TARGET CLONE"
 ListTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
 ListTitle.Font = Enum.Font.SourceSansSemibold
 ListTitle.TextSize = 16
-ListTitle.TextXAlignment = Enum.TextXAlignment.Left
-ListTitle.TextScaled = false
-ListTitle.TextLabel:SetTextBounds(UDim2.new(0, 5, 0, 0)) -- Tambahkan sedikit padding visual
 ListTitle.Active = true
 ListTitle.Parent = PlayerListFrame
-
--- **TOMBOL CLOSE BARU UNTUK LIST PEMAIN**
-local ListCloseButton = Instance.new("TextButton")
-ListCloseButton.Name = "CloseButton"
-ListCloseButton.Size = UDim2.new(0, 30, 1, 0)
-ListCloseButton.Position = UDim2.new(1, -30, 0, 0)
-ListCloseButton.BackgroundColor3 = COLOR_WARN
-ListCloseButton.Text = "❌"
-ListCloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ListCloseButton.Font = Enum.Font.SourceSansBold
-ListCloseButton.TextSize = 20
-ListCloseButton.Parent = ListTitle -- Ditempatkan di dalam Title Bar
-
-local CornerListClose = Instance.new("UICorner")
-CornerListClose.CornerRadius = UDim.new(0, 6)
-CornerListClose.Parent = ListCloseButton
 
 local PlayerListScroll = Instance.new("ScrollingFrame")
 PlayerListScroll.Name = "PlayerListScroll"
@@ -490,7 +504,7 @@ PlayerListScroll.Position = UDim2.new(0, 0, 0, 30)
 PlayerListScroll.BackgroundColor3 = COLOR_BG
 PlayerListScroll.BorderSizePixel = 0
 PlayerListScroll.ScrollBarImageColor3 = COLOR_ACCENT
-PlayerListScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+PlayerListScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y -- Diperlukan untuk list yang dinamis
 PlayerListScroll.Parent = PlayerListFrame
 
 local ListLayout = Instance.new("UIListLayout")
@@ -503,7 +517,7 @@ ListLayout.Parent = PlayerListScroll
 -- Terapkan drag
 local isMainFrameDragging = makeDraggable(MainFrame)
 local isConsoleDragging = makeDraggable(ConsoleFrame)
-local isPlayerListDragging = makeDraggable(PlayerListFrame) 
+local isPlayerListDragging = makeDraggable(PlayerListFrame) -- Drag untuk list juga
 
 ---
 
@@ -541,10 +555,11 @@ ScanButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Koneksi Tombol Clone Avatar (Toggle)
+-- Koneksi Tombol Clone Avatar (BARU)
 CloneButton.MouseButton1Click:Connect(function()
     if isMainFrameDragging() then return end
     
+    -- Toggle visibility PlayerListFrame
     PlayerListFrame.Visible = not PlayerListFrame.Visible
     
     if PlayerListFrame.Visible then
@@ -553,14 +568,6 @@ CloneButton.MouseButton1Click:Connect(function()
     else
         notify("🎭 Avatar Clone", "Daftar Pemain ditutup.", 2)
     end
-end)
-
--- **KONEKSI BARU: Tombol Close List Pemain**
-ListCloseButton.MouseButton1Click:Connect(function()
-    if isPlayerListDragging() then return end
-    
-    PlayerListFrame.Visible = false
-    notify("🎭 Avatar Clone", "Daftar Pemain ditutup.", 2)
 end)
 
 
@@ -575,7 +582,7 @@ end)
 
 ---
 
--- === 8. Icon Floating dan Koneksi Toggle (Tidak Berubah) ===
+-- === 8. Icon Floating dan Koneksi Toggle (Diperbarui) ===
 local FloatingIcon = Instance.new("TextButton") 
 FloatingIcon.Name = "AudioToggleIcon"
 FloatingIcon.Size = ICON_SIZE
@@ -594,19 +601,24 @@ local CornerIcon = Instance.new("UICorner")
 CornerIcon.CornerRadius = UDim.new(0.5, 0) 
 CornerIcon.Parent = FloatingIcon
 
+-- Terapkan drag pada Icon Floating
 local isIconDragging = makeDraggable(FloatingIcon)
 
+-- Fungsi Tombol Icon (Toggle Panel)
 FloatingIcon.MouseButton1Click:Connect(function()
     if not isIconDragging() then
         IS_GUI_VISIBLE = not IS_GUI_VISIBLE
         MainFrame.Visible = IS_GUI_VISIBLE 
         
+        -- Sembunyikan Player List Frame saat MainFrame ditutup
         if not IS_GUI_VISIBLE then
-            PlayerListFrame.Visible = false -- Pastikan list pemain tertutup
+            PlayerListFrame.Visible = false
         end
 
+        -- Logika Visibilitas Konsol yang Diperbaiki
         if IS_GUI_VISIBLE or IsScanActive then
             ConsoleFrame.Visible = true
+            -- Tombol Cancel hanya terlihat jika scan aktif
             ConsoleCancelButton.Visible = IsScanActive
         else
             ConsoleFrame.Visible = false
