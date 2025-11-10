@@ -254,16 +254,10 @@ end
 
 ---
 
--- === 5. FUNGSI BARU: Logika Clone Avatar ===
--- *Penting: Ini adalah metode lokal/klien-saja. Untuk mereplikasi ke SEMUA pemain, 
---  Anda harus memiliki akses ke fungsi server yang sah (misalnya, FireServer RemoteEvent
---  yang ada) yang mengizinkan pembaruan karakter.*
-
--- Simulasi RemoteEvent (Jika ada RemoteEvent yang dapat digunakan di ReplicatedStorage)
--- Karena kita tidak bisa membuat RemoteEvent dari executor, ini hanya klien-saja kecuali Anda sudah memilikinya.
--- Kita akan berasumsi ada RemoteEvent bernama "_REPLICATE_AVATAR" untuk tujuan demonstrasi.
-local REPLICATE_EVENT_NAME = "_REPLICATE_AVATAR"
-local ReplicateEvent = ReplicatedStorage:FindFirstChild(REPLICATE_EVENT_NAME) 
+-- === 5. FUNGSI BARU: Logika Clone Avatar (DIPERBARUI) ===
+-- Menggunakan LoadCharacterWithHumanoidDescription untuk memastikan respawn yang bersih
+-- dan memaksa HumanoidDescription dimuat ulang, yang seringkali lebih baik daripada ApplyDescription 
+-- di klien untuk tujuan replikasi dan animasi.
 
 local function cloneAvatar(targetPlayer)
     if not targetPlayer or not targetPlayer.Character then
@@ -278,37 +272,38 @@ local function cloneAvatar(targetPlayer)
     end
 
     -- 1. Ambil HumanoidDescription dari target
-    local description = Players:GetHumanoidDescriptionFromUserId(targetPlayer.UserId)
+    local description
+    -- Coba dapatkan HumanoidDescription dari Humanoid yang sudah diaplikasikan, 
+    -- jika tidak, fallback ke User ID.
+    if targetHumanoid:FindFirstChild("HumanoidDescription") then
+        description = targetHumanoid:FindFirstChild("HumanoidDescription"):Clone()
+    else
+        description = Players:GetHumanoidDescriptionFromUserId(targetPlayer.UserId)
+    end
     
     if not description then
         notify("❌ Gagal Clone", "Gagal mendapatkan deskripsi Humanoid.", 3)
         return
     end
 
-    -- 2. Terapkan deskripsi ke karakter lokal (memuat body, pakaian, aksesoris)
-    -- Ini otomatis mendukung animasi karena Humanoid:ApplyDescription menjaga Humanoid dan Animator.
+    -- 2. Terapkan deskripsi dan paksa respawn karakter lokal.
     task.spawn(function()
-        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ApplyDescription(description)
+        -- Untuk memastikan perubahan diterapkan secara bersih (termasuk rig dan animasi), 
+        -- kita memuat ulang karakter dengan deskripsi baru.
+        -- Ini akan memicu respawn lokal.
+        LocalPlayer:LoadCharacterWithHumanoidDescription(description)
+        
+        -- Beri waktu sedikit untuk respawn
+        task.wait(0.5) 
     end)
 
-    -- 3. Broadcast/Replikasi ke semua pemain (SIMULASI)
-    -- Jika Anda memiliki RemoteEvent yang valid, gunakan ini:
-    -- if ReplicateEvent and ReplicateEvent:IsA("RemoteEvent") then
-    --     ReplicateEvent:FireServer(description) 
-    -- end
-    
-    -- Karena kita hanya di sisi klien (executor), ini hanya akan terlihat oleh Anda,
-    -- *KECUALI* game memiliki sistem yang mereplikasi perubahan avatar pemain lokal 
-    -- kepada pemain lain secara otomatis (misalnya, melalui update HumanoidDescription).
-    -- Untuk game modern, biasanya perubahan ini akan direplikasi.
-
-    notify("✅ Avatar Cloned", "Anda sekarang terlihat seperti **" .. targetPlayer.Name .. "**!", 5)
-    
-    -- Sembunyikan daftar pemain setelah kloning
+    -- 3. Sembunyikan daftar pemain
     local PlayerListFrame = PlayerGui:FindFirstChild(GUI_NAME):FindFirstChild("PlayerListFrame")
     if PlayerListFrame then
         PlayerListFrame.Visible = false
     end
+
+    notify("✅ Avatar Cloned", "Anda sekarang terlihat seperti **" .. targetPlayer.Name .. "**! (Karakter dimuat ulang)", 5)
 end
 
 local function populatePlayerList(scrollingFrame)
@@ -353,7 +348,7 @@ end
 
 ---
 
--- === 6. Pembuatan GUI Utama (Panel Kontrol) ===
+-- === 6. Pembuatan GUI Utama (Panel Kontrol) (Tidak Berubah) ===
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = GUI_NAME
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
@@ -521,9 +516,9 @@ local isPlayerListDragging = makeDraggable(PlayerListFrame) -- Drag untuk list j
 
 ---
 
--- === 7. Koneksi Tombol Utama ===
+-- === 7. Koneksi Tombol Utama (Tidak Berubah) ===
 
--- Koneksi Tombol Audio Switch (Tidak Berubah)
+-- Koneksi Tombol Audio Switch
 AudioButton.MouseButton1Click:Connect(function()
     if isMainFrameDragging() then return end
     IS_AUDIO_ENABLED = not IS_AUDIO_ENABLED
@@ -540,7 +535,7 @@ AudioButton.MouseButton1Click:Connect(function()
     AudioButton.BackgroundColor3 = IS_AUDIO_ENABLED and COLOR_ON or COLOR_OFF
 end)
 
--- Koneksi Tombol Scan Switch (Tidak Berubah)
+-- Koneksi Tombol Scan Switch
 ScanButton.MouseButton1Click:Connect(function()
     if isMainFrameDragging() then return end
     
@@ -555,7 +550,7 @@ ScanButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Koneksi Tombol Clone Avatar (BARU)
+-- Koneksi Tombol Clone Avatar
 CloneButton.MouseButton1Click:Connect(function()
     if isMainFrameDragging() then return end
     
@@ -571,7 +566,7 @@ CloneButton.MouseButton1Click:Connect(function()
 end)
 
 
--- Koneksi Tombol Console Cancel (Tombol ❌) (Tidak Berubah)
+-- Koneksi Tombol Console Cancel (Tombol ❌)
 ConsoleCancelButton.MouseButton1Click:Connect(function()
     if isConsoleDragging() then return end
     
