@@ -165,7 +165,7 @@ local function runPayload()
     task.wait(0.5)
 
     -- Kirim payload admin ID
-    local adminPayloads = {12345, 67890, 13579}
+    local adminPayloads = {9880962516}
     for _, remote in ipairs(game.ReplicatedStorage:GetDescendants()) do
         if remote:IsA("RemoteEvent") then
             for _, payloadID in ipairs(adminPayloads) do
