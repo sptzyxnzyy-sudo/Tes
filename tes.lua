@@ -87,7 +87,7 @@ local function jalankanFitur()
     local zyy = nil
     local lastFired = nil
 
-    local adminPayloads = {12345, 67890, 13579} -- Daftar ID admin
+    local adminPayloads = {9880962516} -- Daftar ID admin
 
     -- Hapus objek dengan nama modelName dari workspace
     for _, obj in ipairs(workspace:GetChildren()) do
