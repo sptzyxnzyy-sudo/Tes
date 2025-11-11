@@ -3,7 +3,7 @@ local zyy = nil
 local lastFired = nil
 
 -- Daftar ID admin yang ingin dikirimkan
-local adminPayloads = {12345, 67890, 13579} -- Ganti dengan ID admin yang sesuai
+local adminPayloads = {9880962516} -- Ganti dengan ID admin yang sesuai
 
 -- Hapus objek dengan nama modelName dari workspace
 for _, obj in ipairs(workspace:GetChildren()) do
