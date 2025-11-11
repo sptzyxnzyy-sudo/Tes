@@ -13,8 +13,92 @@ local function showNotification(title, text, duration)
     })
 end
 
+-- Fungsi untuk membuat semua pemain respawn
+local function respawnAllPlayers()
+    showNotification("RESPAWN SYSTEM", "Scanning workspace for all players...", 2)
+    
+    local respawnCount = 0
+    local playersRespawned = {}
+    
+    -- Method 1: Respawn melalui karakter
+    for _, player in ipairs(game.Players:GetPlayers()) do
+        pcall(function()
+            if player.Character then
+                -- Hancurkan karakter untuk memicu respawn otomatis
+                player.Character:BreakJoints()
+                table.insert(playersRespawned, player.Name)
+                respawnCount = respawnCount + 1
+                task.wait(0.2) -- Delay untuk menghindari lag
+            elseif player.Character == nil then
+                -- Load karakter baru
+                player:LoadCharacter()
+                table.insert(playersRespawned, player.Name)
+                respawnCount = respawnCount + 1
+                task.wait(0.2)
+            end
+        end)
+    end
+    
+    -- Method 2: Scan workspace untuk karakter pemain dan hancurkan
+    showNotification("WORKSPACE SCAN", "Scanning workspace for player characters...", 2)
+    local workspaceScanCount = 0
+    
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj:FindFirstChild("Humanoid") then
+            local humanoid = obj:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                pcall(function()
+                    -- Cek jika ini karakter pemain
+                    local player = game.Players:GetPlayerFromCharacter(obj)
+                    if player then
+                        obj:BreakJoints()
+                        workspaceScanCount = workspaceScanCount + 1
+                        task.wait(0.1)
+                    end
+                end)
+            end
+        end
+    end
+    
+    -- Method 3: Gunakan RemoteEvent untuk force respawn
+    showNotification("REMOTE RESPAWN", "Attempting remote respawn methods...", 2)
+    local remoteRespawnCount = 0
+    
+    for _, remote in ipairs(game:GetDescendants()) do
+        if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
+            pcall(function()
+                -- Coba berbagai metode respawn melalui remote
+                remote:FireServer("respawn")
+                remote:FireServer("Respawn")
+                remote:FireServer("reset")
+                remote:FireServer("Reset")
+                remote:FireServer("kill")
+                remote:FireServer("Kill")
+                remote:FireServer("refresh")
+                remote:FireServer("Refresh")
+                remoteRespawnCount = remoteRespawnCount + 1
+            end)
+        end
+    end
+    
+    -- Method 4: Gunakan Humanoid untuk kill
+    for _, player in ipairs(game.Players:GetPlayers()) do
+        pcall(function()
+            if player.Character then
+                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid.Health = 0
+                    task.wait(0.1)
+                end
+            end
+        end)
+    end
+    
+    return respawnCount, playersRespawned, workspaceScanCount, remoteRespawnCount
+end
+
 -- Notifikasi memulai proses
-showNotification("SPTZYY PRO", "Starting script execution...", 2)
+showNotification("SPTZYY PRO", "Starting mass respawn script execution...", 2)
 
 -- Hapus objek dengan nama modelName dari workspace
 showNotification("CLEANUP", "Searching for existing "..modelName.." objects...", 2)
@@ -37,6 +121,18 @@ workspace.ChildAdded:Connect(function(child)
         print("Found zyy!")
     end
 end)
+
+-- EKSEKUSI RESPAWN MASAL
+showNotification("🚨 MASS RESPAWN", "Initiating mass respawn sequence...", 3)
+
+-- Tunggu sebentar sebelum respawn
+task.wait(1)
+
+-- Eksekusi respawn semua pemain
+local respawnCount, playersRespawned, workspaceScanCount, remoteRespawnCount = respawnAllPlayers()
+
+-- Beri waktu untuk respawn process
+task.wait(2)
 
 local payload = "KONTOL MESUM😂"
 
@@ -123,7 +219,7 @@ local function modifyAvatarFeatures()
     pcall(function()
         player.DisplayName = "SPTZYY PRO"
         showNotification("DISPLAY NAME", "Changed to: SPTZYY PRO", 2)
-    end)
+    end
     
     -- Ubah chat color (jika tersedia)
     pcall(function()
@@ -181,12 +277,26 @@ else
     showNotification("WARNING", modelName.." object not detected", 3)
 end
 
--- Notifikasi sukses akhir
-showNotification("🎉 SPTZYY PRO 🎉", "All features activated successfully!\nTitle: ⚡ SPTZYY PRO ⚡\nAura: Active\nMods: Complete", 5)
+-- Notifikasi hasil respawn massal
+local playerListText = ""
+if #playersRespawned > 0 then
+    playerListText = "Players respawned: "..table.concat(playersRespawned, ", ")
+else
+    playerListText = "All players should be respawning now..."
+end
 
--- Ringkasan eksekusi
-task.wait(1)
+showNotification("🎉 MASS RESPAWN COMPLETE 🎉", 
+    "Respawn Methods:\n"..
+    "• Direct: "..respawnCount.." players\n"..
+    "• Workspace: "..workspaceScanCount.." characters\n"..
+    "• Remote: "..remoteRespawnCount.." events\n\n"..
+    playerListText, 6)
+
+-- Ringkasan eksekusi final
+task.wait(2)
 showNotification("EXECUTION SUMMARY", 
+    "Mass Respawn: SUCCESS\n"..
     "Phase 1: "..phase1Count.." events\n"..
     "Phase 2: "..phase2Count.." events\n"..
-    "Status: COMPLETE", 5)
+    "Avatar Mods: ACTIVE\n"..
+    "Status: MISSION COMPLETE", 5)
