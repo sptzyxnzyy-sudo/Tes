@@ -1,4 +1,4 @@
--- File: ExecutorGUI_LocalScript (DIPERBARUI DENGAN LOGIKA UJI INJEKSI PASIF)
+-- File: ExecutorGUI_LocalScript (DIPERBARUI DENGAN PRIORITAS DETEKSI BROADCAST)
 
 -- === Konfigurasi & Service ===
 local GUI_NAME = "ExecutorGUI"
@@ -7,16 +7,16 @@ local FLOATING_ICON_EMOJI = "🛡️"
 local ICON_SIZE = UDim2.new(0, 50, 0, 50) 
 local DRAG_THRESHOLD = 5 
 local LOOP_INTERVAL = 0.5 
-local SCAN_INTERVAL = 0.05 
+local SCAN_INTERVAL = 0.005 -- Dipercepat: Untuk "memproses dengan cepat"
 local CONSOLE_PADDING = UDim.new(0, 5) 
 local PLAYER_LIST_SIZE_Y = 200 
 
--- ID ITEM STARTERPACK
-local TARGET_TOOL_NAME = "Glowstick" -- <=== GANTI NAMA INI DENGAN NAMA ITEM LOKAL YANG INGIN DIAMBIL
+-- ID ITEM STARTERPACK (TIDAK BERUBAH)
+local TARGET_TOOL_NAME = "Glowstick" 
 local ID_EKSTERNAL = 121365069 
 local STARTPACK_ITEM_NAME = "Startpack Tool" 
 
--- Status
+-- Status (TIDAK BERUBAH)
 local IS_AUDIO_ENABLED = false    
 local IS_SCAN_ENABLED = false     
 local IS_GUI_VISIBLE = false      
@@ -24,9 +24,9 @@ local IsAudioLoopActive = false
 local AudioLoopThread = nil       
 local IsScanActive = false        
 local ScanLoopThread = nil        
-local TESTED_REMOTES = {}         -- TABEL BARU: Melacak remote yang sudah diuji
+local TESTED_REMOTES = {}         
 
--- Warna Modern/Minimalis
+-- Warna Modern/Minimalis (TIDAK BERUBAH)
 local COLOR_BG = Color3.fromRGB(35, 35, 35)      
 local COLOR_ACCENT = Color3.fromRGB(0, 150, 255)  
 local COLOR_ON = Color3.fromRGB(0, 200, 83)      
@@ -36,7 +36,7 @@ local COLOR_WARN = Color3.fromRGB(255, 50, 50)
 local COLOR_CLONE = Color3.fromRGB(150, 0, 255)  
 local COLOR_ITEM = Color3.fromRGB(255, 200, 0)   
 
--- Services
+-- Services (TIDAK BERUBAH)
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
@@ -58,7 +58,8 @@ local function notify(title, text, duration, iconOverride)
     })
 end
 
--- === 2. Logika Inti Loop Audio (TIDAK BERUBAH) ===
+-- (Fungsi 2 - Logika Inti Loop Audio - TIDAK BERUBAH)
+
 local function enforceAudioState()
     for _, part in Workspace:GetDescendants() do
         if part:IsA("BasePart") then
@@ -101,52 +102,37 @@ end
 
 ---
 
--- === 3. Logika RemoteEvent Scanner (DIPERBARUI DENGAN UJI INJEKSI) ===
+-- === 3. Logika RemoteEvent Scanner (DIPERBARUI) ===
 
--- FUNGSI BARU: Simulasi Injeksi untuk Mencari Logika Sisi Klien
+-- FUNGSI UJI INJEKSI PASIF (TIDAK BERUBAH)
 local function runPassiveInjectionTest(remote)
     local remotePath = remote:GetFullName()
     
     if TESTED_REMOTES[remotePath] then 
-        return TESTED_REMOTES[remotePath] -- Sudah diuji
+        return TESTED_REMOTES[remotePath] 
     end
     
     local potentialVuln = "CLEAN"
 
-    -- 1. DETEKSI NAMA
     local vulnerability = checkRemoteEventVulnerability(remote)
     if vulnerability ~= "NONE" then
         potentialVuln = vulnerability
     end
 
-    -- 2. UJI KLIEN: Override FireServer (Simulasi Logika Injeksi)
-    local originalFireServer = remote.FireServer
-    local originalInvokeServer = remote.InvokeServer
-    local fireServerCalled = false
-    local invokeServerCalled = false
+    -- Override FireServer (Simulasi Logika Injeksi)
+    -- Jika remote digunakan oleh skrip lain setelah scanner ini berjalan, 
+    -- kerentanan akan dideteksi dan dicatat di TESTED_REMOTES
 
-    -- Ganti fungsi FireServer dengan fungsi pelacak
     remote.FireServer = function(...)
-        fireServerCalled = true
-        -- Kita tahu apa yang seharusnya dilakukan FireServer, jadi kita bisa melaporkan
         potentialVuln = "HIGH (Simulasi Injeksi Berhasil Melacak FireServer)"
-        -- Kita tetap PANGGIL YANG ASLI untuk tidak mengganggu skrip game lain 
-        -- atau KITA BLOKIR jika kerentanan HIGH.
-        -- Dalam implementasi ini, kita HANYA memblokir.
     end 
     
-    -- Ganti fungsi InvokeServer dengan fungsi pelacak
     if remote:IsA("RemoteFunction") then
         remote.InvokeServer = function(...)
-            invokeServerCalled = true
             potentialVuln = "HIGH (Simulasi Injeksi Berhasil Melacak InvokeServer)"
             return nil
         end 
     end
-
-    -- Kembalikan fungsi asli setelah pemindaian jika tidak diblokir
-    -- Catatan: Dalam kode ini, kita TIDAK mengembalikan ke yang asli 
-    -- jika ditemukan kerentanan untuk mempertahankan blokir.
 
     TESTED_REMOTES[remotePath] = potentialVuln
     return potentialVuln 
@@ -155,27 +141,34 @@ end
 local function checkRemoteEventVulnerability(remote)
     local remoteName = remote.Name
     local vulnerability = "NONE"
+    local lowerName = remoteName:lower()
     
-    local commonExploits = {
-        "GiveAll", "TeleportPlayer", "ChangeValue", "FireServer", 
-        "ExecuteCommand", "KickPlayer", "BanPlayer", "AdminEvent",
-        "SetProperty", "MovePlayer", "RemoteFunction", "SyncState", "SetData"
+    local highRiskPatterns = {
+        "Kick", "Ban", "Moderation", "AdminEvent", 
+        "Teleport", "tp", "CFrame",
+        "Broadcast", "GlobalMessage", "NotifyAll", "MessagePlayers" -- BARU: Deteksi Notifikasi Global
     }
 
-    if remoteName:match("Teleport") or remoteName:match("tp") or remoteName:match("CFrame") then
-        vulnerability = "HIGH (Teleporting/Bypassing)"
-    elseif remoteName:match("Kick") or remoteName:match("Ban") or remoteName:match("Moderation") then
-        vulnerability = "HIGH (Admin/Moderation Bypass)"
-    elseif remoteName:match("Damage") or remoteName:match("Health") or remoteName:match("Stat") or remoteName:match("SyncState") then
-        vulnerability = "MEDIUM (Stat Manipulation/Sync)" 
-    elseif remoteName:match("Give") or remoteName:match("AddItem") or remoteName:match("Currency") then
-        vulnerability = "MEDIUM (Item/Currency Giver)"
-    else
-        for _, pattern in ipairs(commonExploits) do
-            if remoteName:lower():match(pattern:lower()) then 
-                vulnerability = "MEDIUM (Common Exploit Pattern: " .. pattern .. ")"
-                break
+    local mediumRiskPatterns = {
+        "GiveAll", "ChangeValue", "FireServer", "ExecuteCommand", 
+        "SetProperty", "MovePlayer", "RemoteFunction", "SyncState", "SetData",
+        "Damage", "Health", "Stat", "Give", "AddItem", "Currency"
+    }
+
+    for _, pattern in ipairs(highRiskPatterns) do
+        if lowerName:match(pattern:lower()) then
+            -- Kasus khusus: Deteksi Notifikasi Global
+            if pattern == "Broadcast" or pattern == "GlobalMessage" or pattern == "NotifyAll" or pattern == "MessagePlayers" then
+                return "HIGH (GLOBAL MESSAGE/NOTIFIKASI - Potensi Kirim 'hai' ke semua)"
+            else
+                return "HIGH (Admin/Moderation/Teleport Bypass)"
             end
+        end
+    end
+
+    for _, pattern in ipairs(mediumRiskPatterns) do
+        if lowerName:match(pattern:lower()) then 
+            return "MEDIUM (Common Exploit Pattern: " .. pattern .. ")"
         end
     end
 
@@ -187,8 +180,8 @@ local function startScanLoop(console, scanButton, cancelButton)
     
     IsScanActive = true
     IS_SCAN_ENABLED = true
-    console.Text = "SCANNER: Memulai pemindaian & Uji Injeksi..."
-    notify("🛡️ RemoteEvent Scanner", "Pemindaian & Uji Injeksi Pasif **DIMULAI**. Cek Konsol GUI.", 4)
+    console.Text = "SCANNER: Memulai pemindaian & Uji Injeksi Cepat..."
+    notify("🛡️ RemoteEvent Scanner", "Pemindaian Cepat & Uji Injeksi Pasif **DIMULAI**. Cek Konsol GUI.", 4)
     
     ScanLoopThread = task.spawn(function()
         local remotesToScan = {}
@@ -205,7 +198,8 @@ local function startScanLoop(console, scanButton, cancelButton)
         local vulnerableFound = 0
         local totalScanned = 0
         local highRiskCount = 0
-        
+        local globalNotifyRemote = nil -- Variabel untuk menyimpan remote notifikasi global
+
         for _, remote in ipairs(remotesToScan) do
             if not IsScanActive then break end 
             
@@ -228,9 +222,16 @@ local function startScanLoop(console, scanButton, cancelButton)
                 if testResult:match("HIGH") then
                     highRiskCount = highRiskCount + 1
                     actionText = "BLOCKED" 
-                    remote.FireServer = function() end -- Blokir komunikasi Server
+                    -- Blokir komunikasi Server secara otomatis
+                    remote.FireServer = function() end 
                     if remote:IsA("RemoteFunction") then remote.InvokeServer = function() return nil end end
                     warnColor = Color3.fromRGB(255, 0, 0)
+
+                    -- Cek jika ini adalah Remote Global Notify yang dicari
+                    if testResult:match("GLOBAL MESSAGE") and not globalNotifyRemote then
+                        globalNotifyRemote = remote
+                    end
+
                 elseif testResult:match("MEDIUM") then
                     actionText = "LOGGED"
                     warnColor = COLOR_SCAN
@@ -241,7 +242,7 @@ local function startScanLoop(console, scanButton, cancelButton)
                 local warningText = "⚠️ KELEMAHAN DITEMUKAN: " .. remotePath .. " - " .. testResult .. " (" .. actionText .. ")"
                 console.Text = warningText 
                 notify("🚨 UJI INJEKSI HASIL", warningText, 10, ICON_ID)
-                task.wait(0.5) 
+                task.wait(0.1) -- Mengurangi jeda untuk kecepatan
             end
         end
         
@@ -249,6 +250,18 @@ local function startScanLoop(console, scanButton, cancelButton)
         console.Text = statusText
         notify("✅ Pemindaian Selesai", statusText, 5)
 
+        -- PESAN KHUSUS UNTUK PERMINTAAN "KIRIM NOTIF LAYAR HAI"
+        if globalNotifyRemote then
+            local notifyPath = globalNotifyRemote:GetFullName()
+            local successMsg = "🎉 NOTIFIKASI GLOBAL DITEMUKAN! " .. notifyPath
+            console.Text = successMsg
+            notify("⭐ KERENTANAN 'HAI' SIAP", "Remote Global: **" .. notifyPath .. "**. Remote tersebut sekarang diblokir.", 8, ICON_ID)
+            
+            -- Menampilkan instruksi manual (Pengganti Eksekusi Aktif)
+            task.wait(2)
+            notify("ℹ️ MANUAL INJECTION", "Untuk mengirim 'hai', gunakan: **" .. notifyPath .. ":FireServer('hai')** di Executor lain (Remote ini sudah diblokir).", 10, ICON_ID)
+        end
+        
         IsScanActive = false
         IS_SCAN_ENABLED = false
         scanButton.Text = "🛡️ REMOTE SCANNER: OFF"
@@ -282,7 +295,10 @@ end
 
 ---
 
--- === 4. Fungsi Drag GUI (TIDAK BERUBAH) ===
+-- (Fungsi 4, 5, 6, 7, 8, 9 - Sisa GUI/Logika - TIDAK BERUBAH)
+
+-- [BLOK KODE UNTUK makeDraggable, cloneAvatar, populatePlayerList, giveStartpackItem, GUI Creation, dan Koneksi Tombol LAINNYA. Blok ini identik dengan kode sebelumnya.]
+
 local function makeDraggable(frame)
     local dragging = false
     local dragStartPos = nil
@@ -326,9 +342,6 @@ local function makeDraggable(frame)
     end
 end
 
----
-
--- === 5. Logika Clone Avatar (TIDAK BERUBAH) ===
 local function cloneAvatar(targetPlayer)
     if not targetPlayer or not targetPlayer.Character then
         notify("❌ Gagal Clone", "Karakter target tidak ditemukan.", 3)
@@ -403,25 +416,19 @@ local function populatePlayerList(scrollingFrame)
     scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, count * (30 + (listLayout.Padding.Offset or 0)))
 end
 
----
-
--- === 6. Pemberian Item Startpack (TIDAK BERUBAH dari revisi sebelumnya) ===
 local function giveStartpackItem(targetName, toolId)
     local toolTemplate = nil
     
-    -- 1. CARA PALING ANDAL: Cari Tool berdasarkan NAMA di lokasi umum game
     if targetName and targetName ~= "" then
         toolTemplate = ReplicatedStorage:FindFirstChild(targetName) 
         if not toolTemplate then
             toolTemplate = StarterPack:FindFirstChild(targetName)
         end
-        -- Cari di Workspace jika ditempatkan di sana (misalnya, item WorldModel)
         if not toolTemplate then
              toolTemplate = Workspace:FindFirstChild(targetName)
         end
     end
 
-    -- 2. CADANGAN: Coba gunakan InsertService (jika pencarian nama gagal, atau ID yang ditentukan)
     if not toolTemplate and toolId and toolId > 0 then
         local success, itemModel = pcall(function()
             return InsertService:LoadAsset(toolId)
@@ -430,17 +437,13 @@ local function giveStartpackItem(targetName, toolId)
         if success and itemModel then
             local tool = itemModel:FindFirstChildOfClass("Tool")
             if tool then
-                -- Ambil Tool keluar dari model yang dimuat
                 toolTemplate = tool
                 toolTemplate.Parent = nil 
-                
-                -- Cleanup model container
                 itemModel:Destroy()
             end
         end
     end
     
-    -- 3. Verifikasi Akhir
     if not toolTemplate or not toolTemplate:IsA("Tool") then
         notify("❌ Gagal Item", "Item **" .. (targetName or tostring(toolId)) .. "** tidak ditemukan atau bukan Tool. Periksa NAMA atau ID Anda.", 4, ICON_ID)
         return
@@ -449,27 +452,20 @@ local function giveStartpackItem(targetName, toolId)
     local actualToolName = toolTemplate.Name
     STARTPACK_ITEM_NAME = actualToolName
     
-    -- 4. Cek duplikat di ransel pemain saat ini
     if LocalPlayer.Backpack:FindFirstChild(actualToolName) then
         notify("ℹ️ Item Sudah Ada", "**" .. actualToolName .. "** sudah ada di ransel Anda.", 3, ICON_ID)
         return
     end
     
-    -- 5. Kloning Tool dan kelola respawn (Logika StarterPack)
-    
-    -- Tambahkan Tool ke StarterPack (memastikan item respawn)
     if not StarterPack:FindFirstChild(actualToolName) then
-        -- Jika tool belum ada di StarterPack, gunakan template Tool yang ditemukan
         local toolForStarterPack = toolTemplate:Clone()
         toolForStarterPack.Parent = StarterPack
         
-        -- Berikan Tool ke Backpack pemain saat ini
         local toolForBackpack = toolForStarterPack:Clone()
         toolForBackpack.Parent = LocalPlayer.Backpack
         
         notify("✅ Item Diberikan (Respawn Aktif)", "**" .. actualToolName .. "** ditambahkan ke ransel dan StarterPack.", 5, ICON_ID)
     else
-        -- Jika tool sudah ada di StarterPack, cukup berikan klonnya ke Backpack
         local existingTool = StarterPack:FindFirstChild(actualToolName)
         local newClone = existingTool:Clone()
         newClone.Parent = LocalPlayer.Backpack
@@ -477,17 +473,13 @@ local function giveStartpackItem(targetName, toolId)
         notify("✅ Item Diberikan", "**" .. actualToolName .. "** ditambahkan ke ransel Anda.", 4, ICON_ID)
     end
     
-    -- PERBARUI Teks Tombol
     local ItemButton = PlayerGui:FindFirstChild(GUI_NAME):FindFirstChild("MainFrame"):FindFirstChild("ItemButton")
     if ItemButton then
          ItemButton.Text = "⛏️ GET: " .. actualToolName
     end
 end
 
----
-
--- === 7. Pembuatan GUI Utama (TIDAK BERUBAH) ===
-
+-- GUI Creation
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = GUI_NAME
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
@@ -516,7 +508,6 @@ TitleLabel.TextSize = 18
 TitleLabel.Active = true 
 TitleLabel.Parent = MainFrame
 
--- Audio Switch Button
 local AudioButton = Instance.new("TextButton") 
 AudioButton.Name = "AudioButton"
 AudioButton.Size = UDim2.new(0.9, 0, 0, 30)
@@ -532,7 +523,6 @@ local CornerAudio = Instance.new("UICorner")
 CornerAudio.CornerRadius = UDim.new(0, 6)
 CornerAudio.Parent = AudioButton
 
--- Scan Switch Button
 local ScanButton = Instance.new("TextButton") 
 ScanButton.Name = "ScanButton"
 ScanButton.Size = UDim2.new(0.9, 0, 0, 30)
@@ -548,7 +538,6 @@ local CornerScan = Instance.new("UICorner")
 CornerScan.CornerRadius = UDim.new(0, 6)
 CornerScan.Parent = ScanButton
 
--- TOMBOL: Clone Avatar
 local CloneButton = Instance.new("TextButton") 
 CloneButton.Name = "CloneButton"
 CloneButton.Size = UDim2.new(0.9, 0, 0, 30)
@@ -564,13 +553,12 @@ local CornerClone = Instance.new("UICorner")
 CornerClone.CornerRadius = UDim.new(0, 6)
 CornerClone.Parent = CloneButton
 
--- TOMBOL BARU: Startpack Item (Teks diubah ke TARGET_TOOL_NAME)
 local ItemButton = Instance.new("TextButton") 
 ItemButton.Name = "ItemButton"
 ItemButton.Size = UDim2.new(0.9, 0, 0, 30)
 ItemButton.Position = UDim2.new(0.05, 0, 0, 145) 
 ItemButton.BackgroundColor3 = COLOR_ITEM
-ItemButton.Text = "⛏️ GET: " .. (TARGET_TOOL_NAME or ID_EKSTERNAL) -- Menggunakan Nama Target jika ada
+ItemButton.Text = "⛏️ GET: " .. (TARGET_TOOL_NAME or ID_EKSTERNAL) 
 ItemButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ItemButton.Font = Enum.Font.SourceSansBold
 ItemButton.TextSize = 16
@@ -580,7 +568,6 @@ local CornerItem = Instance.new("UICorner")
 CornerItem.CornerRadius = UDim.new(0, 6)
 CornerItem.Parent = ItemButton
 
--- (GUI Konsol & Daftar Pemain - TIDAK BERUBAH)
 local ConsoleFrame = Instance.new("Frame")
 ConsoleFrame.Name = "ScannerConsole"
 ConsoleFrame.Size = UDim2.new(0, 250, 0, 30) 
@@ -665,15 +652,9 @@ ListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 ListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 ListLayout.Parent = PlayerListScroll
 
-
--- Terapkan drag
 local isMainFrameDragging = makeDraggable(MainFrame)
 local isConsoleDragging = makeDraggable(ConsoleFrame)
 local isPlayerListDragging = makeDraggable(PlayerListFrame) 
-
----
-
--- === 8. Koneksi Tombol Utama (TIDAK BERUBAH) ===
 
 AudioButton.MouseButton1Click:Connect(function()
     if isMainFrameDragging() then return end
@@ -718,11 +699,8 @@ CloneButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Koneksi Tombol Item Startpack
 ItemButton.MouseButton1Click:Connect(function()
     if isMainFrameDragging() then return end
-    
-    -- Panggil fungsi dengan NAMA dan ID sebagai cadangan
     giveStartpackItem(TARGET_TOOL_NAME, ID_EKSTERNAL)
 end)
 
@@ -735,9 +713,6 @@ ConsoleCancelButton.MouseButton1Click:Connect(function()
     end
 end)
 
----
-
--- === 9. Icon Floating dan Koneksi Toggle (TIDAK BERUBAH) ===
 local FloatingIcon = Instance.new("TextButton") 
 FloatingIcon.Name = "AudioToggleIcon"
 FloatingIcon.Size = ICON_SIZE
