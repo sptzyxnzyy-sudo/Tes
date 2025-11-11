@@ -1,4 +1,4 @@
--- File: ExecutorGUI_LocalScript (VERSI FOKUS PAYLOAD SERVER & TAG KEPALA)
+-- File: ExecutorGUI_LocalScript (VERSI FOKUS PAYLOAD SERVER & TAG KEPALA - DEBUGGED)
 
 -- === Konfigurasi & Service ===
 local GUI_NAME = "ExecutorGUI"
@@ -10,12 +10,11 @@ local LOOP_INTERVAL = 0.5
 local SCAN_INTERVAL = 0.005 
 local CONSOLE_PADDING = UDim.new(0, 5) 
 local PLAYER_LIST_SIZE_Y = 200 
-local TITLE_INJECT_SIZE_Y_NEW = 280 -- Ukuran baru untuk 4 tombol Title Inject
+local TITLE_INJECT_SIZE_Y_NEW = 280 -- Ukuran untuk 4 tombol Title Inject
 local BUTTON_HEIGHT = 30 
 local BUTTON_SPACING = 5  
 
--- TARGET REMOTE INJEKSI GENERIC: Asumsi adanya Remote Broadcast Global
--- Ganti dengan nama RemoteEvent yang ditargetkan (misalnya, yang digunakan di script Server-Side Anda: GlobalTitleTagInjector)
+-- TARGET REMOTE INJEKSI GLOBAL (HARUS SAMA DENGAN NAMA DI SERVER SCRIPT)
 local GENERIC_GLOBAL_REMOTE_NAME = "GlobalTitleTagInjector" 
 
 -- ID ITEM STARTERPACK
@@ -56,7 +55,7 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local StarterPack = game:GetService("StarterPack") 
 local task = task 
 
--- === 1. Fungsi Notifikasi (TIDAK BERUBAH) ===
+-- === 1. Fungsi Notifikasi (OK) ===
 local function notify(title, text, duration, iconOverride)
     StarterGui:SetCore("SendNotification", {
         Title = title,
@@ -66,7 +65,7 @@ local function notify(title, text, duration, iconOverride)
     })
 end
 
--- === 2. Logika Inti Loop Audio (TIDAK BERUBAH) ===
+-- === 2. Logika Inti Loop Audio (OK) ===
 local function enforceAudioState()
     for _, part in Workspace:GetDescendants() do
         if part:IsA("BasePart") then
@@ -106,13 +105,13 @@ local function stopAudioAndLoop()
     end
 end
 
--- === 3. Logika RemoteEvent Scanner (TIDAK BERUBAH) ===
+-- === 3. Logika RemoteEvent Scanner (OK) ===
 local function checkRemoteEventVulnerability(remote)
     local lowerName = remote.Name:lower()
     local highRiskPatterns = {
         "Kick", "Ban", "Moderation", "AdminEvent", 
         "Teleport", "tp", "CFrame",
-        "Broadcast", "GlobalMessage", "NotifyAll", "MessagePlayers" 
+        "Broadcast", "GlobalMessage", "NotifyAll", "MessagePlayers", "Inject" 
     }
     for _, pattern in ipairs(highRiskPatterns) do
         if lowerName:match(pattern:lower()) then
@@ -245,6 +244,7 @@ local function createLocalTitleTag(player, title, color)
     TextLabel.BackgroundTransparency = 1
     TextLabel.Parent = Tag
 
+    -- Pastikan tag tetap ada setelah respawn
     local tagConnection
     tagConnection = player.CharacterAdded:Connect(function(newCharacter)
         newCharacter:WaitForChild("Head", 5)
@@ -269,10 +269,8 @@ local function clearLocalTitleTag(player)
 end
 
 
-local function sendCustomTitle(title, colorName, colorCodeInput, mode)
+local function sendCustomTitle(title, colorName, colorCodeInput, mode, OutputLabel) -- Tambahkan OutputLabel sebagai argumen
     -- Mode: 'GENERATE_CHAT', 'LOCAL_TAG', 'GLOBAL_TAG'
-    local TitleInjectFrame = PlayerGui:FindFirstChild(GUI_NAME):FindFirstChild("TitleInjectFrame")
-    local OutputLabel = TitleInjectFrame and TitleInjectFrame:FindFirstChild("OutputLabel")
 
     if not title or title == "" then
         notify("❌ Gagal Kirim", "Judul tidak boleh kosong.", 3)
@@ -294,7 +292,7 @@ local function sendCustomTitle(title, colorName, colorCodeInput, mode)
         return
     end
     
-    -- OPSI 2: TAG KEPALA GLOBAL (Generate Kode C&P Payload Server)
+    -- OPSI 2 & 3: PAYLOAD SERVER (Generate Kode C&P)
     local payloadFormat, action, notificationTitle, notificationText
     
     if mode == 'GLOBAL_TAG' then
@@ -307,7 +305,7 @@ local function sendCustomTitle(title, colorName, colorCodeInput, mode)
         notificationTitle = "⚠️ KODE INJEKSI TAG SIAP"
         notificationText = "Salin & Jalankan kode di Executor. Tag lokal Anda sudah aktif."
         
-        -- Aktifkan Tag Lokal di Anda dulu, agar Anda segera melihat hasilnya.
+        -- Aktifkan Tag Lokal di Anda dulu
         clearLocalTitleTag(LocalPlayer)
         createLocalTitleTag(LocalPlayer, title, color)
 
@@ -336,7 +334,7 @@ local function sendCustomTitle(title, colorName, colorCodeInput, mode)
     notify(notificationTitle, notificationText, 5)
 end
 
--- === 5. Logika Clone & Item (TIDAK BERUBAH) ===
+-- === 5. Logika Clone & Item (OK) ===
 local function cloneAvatar(targetPlayer)
     if not targetPlayer or not targetPlayer.Character then
         notify("❌ Gagal Clone", "Karakter target tidak ditemukan.", 3)
@@ -386,7 +384,7 @@ local function giveStartpackItem(targetName, toolId)
     notify("✅ Item Diberikan", "**" .. targetName .. "** ditambahkan ke ransel Anda.", 4, ICON_ID)
 end
 
--- === 6. Fungsi Drag GUI (TIDAK BERUBAH) ===
+-- === 6. Fungsi Drag GUI (OK) ===
 local function makeDraggable(frame)
     local dragging = false
     local dragStartPos = nil
@@ -430,7 +428,7 @@ local function makeDraggable(frame)
     end
 end
 
--- === 7. Pembuatan GUI Utama (TIDAK BERUBAH STRUKTUR) ===
+-- === 7. Pembuatan GUI Utama & Sub-Frame (DIOPTIMALKAN) ===
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = GUI_NAME
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
@@ -511,7 +509,7 @@ TitleInjectButton.BackgroundColor3 = COLOR_TITLE
 TitleInjectButton.Text = "👑 5. TITLE INJECTOR: OPEN PANEL"
 TitleInjectButton.Parent = MainFrame
 
--- *Setelah membuat MainFrame, buat semua tombol lain untuk tampilan yang lebih bersih*
+-- Styling untuk tombol MainFrame
 for _, btn in ipairs(MainFrame:GetChildren()) do
     if btn:IsA("TextButton") then
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -523,7 +521,7 @@ for _, btn in ipairs(MainFrame:GetChildren()) do
     end
 end
 
--- Console Frame (TIDAK BERUBAH)
+-- Console Frame 
 local ConsoleFrame = Instance.new("Frame")
 ConsoleFrame.Name = "ScannerConsole"
 ConsoleFrame.Size = UDim2.new(0, 250, 0, 30) 
@@ -555,7 +553,7 @@ ConsoleCancelButton.BackgroundColor3 = COLOR_WARN
 ConsoleCancelButton.Text = "❌"
 ConsoleCancelButton.Parent = ConsoleFrame
 
--- Title Inject Frame (STRUKTUR DIUBAH DENGAN 4 TOMBOL TAG)
+-- Title Inject Frame (PEMBUATAN KOMPONEN BERGANTUNG PADA VARIABEL LOKAL)
 local TitleInjectFrame = Instance.new("Frame")
 TitleInjectFrame.Name = "TitleInjectFrame"
 TitleInjectFrame.Size = UDim2.new(0, 280, 0, TITLE_INJECT_SIZE_Y_NEW) 
@@ -607,7 +605,7 @@ ColorCodeInput.PlaceholderText = "RGB (mis: 1, 0, 0)"
 ColorCodeInput.Parent = TitleInjectFrame
 
 -- Tombol 1: Generate Kode Chat Global
-local SendButton = Instance.new("TextButton") -- Dibuat ulang
+local SendButton = Instance.new("TextButton") 
 SendButton.Name = "SendButton"
 SendButton.Size = UDim2.new(0.9, 0, 0, 30)
 SendButton.Position = UDim2.new(0.05, 0, 0, 100)
@@ -640,10 +638,10 @@ ClearTagButton.Size = UDim2.new(0.9, 0, 0, 20)
 ClearTagButton.Position = UDim2.new(0.05, 0, 0, 220) 
 ClearTagButton.BackgroundColor3 = COLOR_WARN
 ClearTagButton.Text = "❌ HAPUS TAG KEPALA LOKAL DI SAYA"
-ClearTagButton.TextSize = 12
+ClearTagButton.TextSize = 14
 ClearTagButton.Parent = TitleInjectFrame
 
--- Memperbarui posisi OutputLabel
+-- OutputLabel untuk menampilkan kode C&P
 local OutputLabel = Instance.new("TextLabel")
 OutputLabel.Name = "OutputLabel"
 OutputLabel.Size = UDim2.new(0.9, 0, 0, 15)
@@ -659,20 +657,18 @@ OutputLabel.TextXAlignment = Enum.TextXAlignment.Left
 OutputLabel.Visible = false
 OutputLabel.Parent = TitleInjectFrame
 
-
--- Tambahkan properti tombol dan UI Corner untuk semua tombol Title Inject
+-- Styling untuk tombol TitleInject
 for _, btn in ipairs({SendButton, GlobalTagButton, LocalTagButton, ClearTagButton}) do
     if btn:IsA("TextButton") then
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         btn.Font = Enum.Font.SourceSansBold
-        btn.TextSize = btn.Name == "ClearTagButton" and 14 or 16 
         local Corner = Instance.new("UICorner", btn)
         Corner.CornerRadius = UDim.new(0, 6)
     end
 end
 
 
--- Player List Frame (TIDAK BERUBAH)
+-- Player List Frame (OK)
 local PlayerListFrame = Instance.new("Frame")
 PlayerListFrame.Name = "PlayerListFrame"
 PlayerListFrame.Size = UDim2.new(0, 250, 0, PLAYER_LIST_SIZE_Y) 
@@ -709,13 +705,13 @@ ListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 ListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 ListLayout.Parent = PlayerListScroll
 
--- Terapkan Drag (TIDAK BERUBAH)
+-- Terapkan Drag (OK)
 local isMainFrameDragging = makeDraggable(MainFrame)
 local isConsoleDragging = makeDraggable(ConsoleFrame)
 local isPlayerListDragging = makeDraggable(PlayerListFrame) 
 local isTitleInjectDragging = makeDraggable(TitleInjectFrame) 
 
--- === 8. Koneksi Tombol Utama & Injector ===
+-- === 8. Koneksi Tombol Utama & Injector (DIPERBAIKI) ===
 
 AudioButton.MouseButton1Click:Connect(function()
     if isMainFrameDragging() then return end
@@ -765,6 +761,7 @@ TitleInjectButton.MouseButton1Click:Connect(function()
     end
 end)
 
+-- Koneksi Tombol Title Injector ke fungsi sendCustomTitle
 SendButton.MouseButton1Click:Connect(function()
     if isTitleInjectDragging() then return end
     
@@ -772,7 +769,7 @@ SendButton.MouseButton1Click:Connect(function()
     local colorName = ColorNameInput.Text
     local colorCode = ColorCodeInput.Text
     
-    sendCustomTitle(title, colorName, colorCode, 'GENERATE_CHAT') 
+    sendCustomTitle(title, colorName, colorCode, 'GENERATE_CHAT', OutputLabel) 
 end)
 
 GlobalTagButton.MouseButton1Click:Connect(function()
@@ -782,7 +779,7 @@ GlobalTagButton.MouseButton1Click:Connect(function()
     local colorName = ColorNameInput.Text 
     local colorCode = ColorCodeInput.Text
     
-    sendCustomTitle(title, colorName, colorCode, 'GLOBAL_TAG') 
+    sendCustomTitle(title, colorName, colorCode, 'GLOBAL_TAG', OutputLabel) 
 end)
 
 LocalTagButton.MouseButton1Click:Connect(function()
@@ -792,7 +789,7 @@ LocalTagButton.MouseButton1Click:Connect(function()
     local colorName = ColorNameInput.Text 
     local colorCode = ColorCodeInput.Text
     
-    sendCustomTitle(title, colorName, colorCode, 'LOCAL_TAG') 
+    sendCustomTitle(title, colorName, colorCode, 'LOCAL_TAG', OutputLabel) 
 end)
 
 ClearTagButton.MouseButton1Click:Connect(function()
@@ -808,7 +805,7 @@ ConsoleCancelButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- === 9. Icon Floating dan Koneksi Toggle (TIDAK BERUBAH) ===
+-- === 9. Icon Floating dan Koneksi Toggle (OK) ===
 local FloatingIcon = Instance.new("TextButton") 
 FloatingIcon.Name = "AudioToggleIcon"
 FloatingIcon.Size = ICON_SIZE
