@@ -1,4 +1,4 @@
--- File: ExecutorGUI_LocalScript
+-- File: ExecutorGUI_LocalScript (Diperbarui untuk Item Giver)
 
 -- === Konfigurasi & Service ===
 local GUI_NAME = "ExecutorGUI"
@@ -12,6 +12,7 @@ local CONSOLE_PADDING = UDim.new(0, 5) -- Padding untuk teks konsol
 local PLAYER_LIST_SIZE_Y = 200 -- Tinggi frame daftar pemain
 
 -- ID ITEM STARTERPACK BARU
+-- Catatan: Pastikan ini adalah ID Asset publik yang dapat dimuat, atau ubah menjadi Nama Tool.
 local STARTPACK_ITEM_ID = 121365069 
 local STARTPACK_ITEM_NAME = "Startpack Tool" -- Nama default, akan diperbarui setelah di-load
 
@@ -44,6 +45,7 @@ local InsertService = game:GetService("InsertService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local task = task -- Pastikan task ada dan berfungsi
+local StarterPack = game:GetService("StarterPack") -- Service StarterPack
 
 -- === 1. Fungsi Notifikasi ===
 local function notify(title, text, duration, iconOverride)
@@ -55,9 +57,9 @@ local function notify(title, text, duration, iconOverride)
     })
 end
 
----
+-- (Fungsi 2, 3, 4, 5 - tidak ada perubahan signifikan pada logika inti)
 
--- === 2. Logika Inti Loop Audio ===
+-- === 2. Logika Inti Loop Audio (TIDAK BERUBAH) ===
 local function enforceAudioState()
     for _, part in Workspace:GetDescendants() do
         if part:IsA("BasePart") then
@@ -100,7 +102,7 @@ end
 
 ---
 
--- === 3. Logika Inti RemoteEvent Scanner ===
+-- === 3. Logika Inti RemoteEvent Scanner (TIDAK BERUBAH) ===
 local function checkRemoteEventVulnerability(remote)
     local remoteName = remote.Name
     local vulnerability = "NONE"
@@ -210,7 +212,7 @@ end
 
 ---
 
--- === 4. Fungsi Drag GUI (Optimized) ===
+-- === 4. Fungsi Drag GUI (Optimized) (TIDAK BERUBAH) ===
 local function makeDraggable(frame)
     local dragging = false
     local dragStartPos = nil
@@ -256,7 +258,7 @@ end
 
 ---
 
--- === 5. Logika Clone Avatar ===
+-- === 5. Logika Clone Avatar (TIDAK BERUBAH) ===
 local function cloneAvatar(targetPlayer)
     if not targetPlayer or not targetPlayer.Character then
         notify("❌ Gagal Clone", "Karakter target tidak ditemukan.", 3)
@@ -333,36 +335,76 @@ end
 
 ---
 
--- === FUNGSI BARU: Pemberian Item Startpack ===
+-- === FUNGSI BARU: Pemberian Item Startpack (DIPERBARUI) ===
 local function giveStartpackItem(toolId)
-    
+    local assetModel
+    local tool
+
+    -- 1. Coba memuat Tool menggunakan InsertService (Jika ID publik valid)
     local success, item = pcall(function()
         return InsertService:LoadAsset(toolId)
     end)
     
-    if not success or not item then
-        notify("❌ Gagal Item", "Gagal memuat asset dengan ID: " .. toolId .. ". Cek ID Asset.", 4, ICON_ID)
+    if success and item then
+        assetModel = item 
+        tool = assetModel:FindFirstChildOfClass("Tool")
+        
+        if not tool then
+            notify("❌ Gagal Item", "Asset ID " .. toolId .. " dimuat, tetapi bukan Tool.", 4, ICON_ID)
+            assetModel:Destroy()
+            return
+        end
+    else
+        notify("❌ Gagal Item", "Gagal memuat asset: Cek ID " .. toolId .. " atau izin.", 4, ICON_ID)
         return
     end
 
-    local tool = item:FindFirstChildOfClass("Tool")
+    -- 2. Dapatkan nama Tool yang sebenarnya
+    STARTPACK_ITEM_NAME = tool.Name
     
-    if tool then
-        STARTPACK_ITEM_NAME = tool.Name
-        tool.Parent = nil 
-        tool.Parent = LocalPlayer.Backpack 
-        
-        notify("✅ Item Diberikan", "**" .. STARTPACK_ITEM_NAME .. "** (" .. toolId .. ") telah ditambahkan ke ransel Anda.", 5, ICON_ID)
-    else
-        notify("❌ Gagal Item", "Asset ID " .. toolId .. " dimuat, tetapi bukan Tool. (Tipe Objek: " .. item.ClassName .. ")", 4, ICON_ID)
+    -- 3. Cek apakah Tool sudah ada di ransel pemain
+    if LocalPlayer.Backpack:FindFirstChild(STARTPACK_ITEM_NAME) then
+        notify("ℹ️ Item Sudah Ada", "**" .. STARTPACK_ITEM_NAME .. "** sudah ada di ransel Anda.", 3, ICON_ID)
+        assetModel:Destroy()
+        return
     end
     
-    item:Destroy()
+    -- 4. Kloning Tool dan berikan ke pemain
+    local clonedTool = tool:Clone()
+    
+    -- 5. Tambahkan Tool ke StarterPack (memastikan item respawn)
+    if not StarterPack:FindFirstChild(STARTPACK_ITEM_NAME) then
+        -- Jika tool belum ada di StarterPack (seperti fungsi Startpack)
+        clonedTool.Parent = StarterPack
+        
+        -- Berikan Tool ke Backpack pemain saat ini
+        local secondClone = clonedTool:Clone()
+        secondClone.Parent = LocalPlayer.Backpack
+        
+        notify("✅ Item Diberikan (Respawn Aktif)", "**" .. STARTPACK_ITEM_NAME .. "** ditambahkan ke ransel dan StarterPack.", 5, ICON_ID)
+    else
+        -- Jika tool sudah ada di StarterPack, cukup berikan klonnya ke Backpack
+        local existingTool = StarterPack:FindFirstChild(STARTPACK_ITEM_NAME)
+        local newClone = existingTool:Clone()
+        newClone.Parent = LocalPlayer.Backpack
+        
+        notify("✅ Item Diberikan", "**" .. STARTPACK_ITEM_NAME .. "** ditambahkan ke ransel Anda. (Respawn sudah aktif)", 4, ICON_ID)
+    end
+    
+    assetModel:Destroy() -- Hapus model asset yang dimuat dari InsertService
+
+    -- PERBARUI Teks Tombol (jika diperlukan setelah mendapatkan nama yang sebenarnya)
+    local ItemButton = PlayerGui:FindFirstChild(GUI_NAME):FindFirstChild("MainFrame"):FindFirstChild("ItemButton")
+    if ItemButton then
+         ItemButton.Text = "⛏️ GET: " .. STARTPACK_ITEM_NAME
+    end
 end
 
 ---
 
--- === 6. Pembuatan GUI Utama (Panel Kontrol) ===
+-- === 6. Pembuatan GUI Utama ===
+-- (TIDAK ADA PERUBAHAN SIGNIFIKAN pada struktur GUI, hanya memastikan ItemButton diperbarui)
+
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = GUI_NAME
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
@@ -393,6 +435,7 @@ TitleLabel.Parent = MainFrame
 
 -- Audio Switch Button
 local AudioButton = Instance.new("TextButton") 
+AudioButton.Name = "AudioButton"
 AudioButton.Size = UDim2.new(0.9, 0, 0, 30)
 AudioButton.Position = UDim2.new(0.05, 0, 0, 40)
 AudioButton.BackgroundColor3 = COLOR_OFF
@@ -408,6 +451,7 @@ CornerAudio.Parent = AudioButton
 
 -- Scan Switch Button
 local ScanButton = Instance.new("TextButton") 
+ScanButton.Name = "ScanButton"
 ScanButton.Size = UDim2.new(0.9, 0, 0, 30)
 ScanButton.Position = UDim2.new(0.05, 0, 0, 75)
 ScanButton.BackgroundColor3 = COLOR_OFF
@@ -423,6 +467,7 @@ CornerScan.Parent = ScanButton
 
 -- TOMBOL: Clone Avatar
 local CloneButton = Instance.new("TextButton") 
+CloneButton.Name = "CloneButton"
 CloneButton.Size = UDim2.new(0.9, 0, 0, 30)
 CloneButton.Position = UDim2.new(0.05, 0, 0, 110)
 CloneButton.BackgroundColor3 = COLOR_CLONE
@@ -438,10 +483,11 @@ CornerClone.Parent = CloneButton
 
 -- TOMBOL BARU: Startpack Item
 local ItemButton = Instance.new("TextButton") 
+ItemButton.Name = "ItemButton"
 ItemButton.Size = UDim2.new(0.9, 0, 0, 30)
 ItemButton.Position = UDim2.new(0.05, 0, 0, 145) 
 ItemButton.BackgroundColor3 = COLOR_ITEM
-ItemButton.Text = "⛏️ GET STARTERPACK (" .. STARTPACK_ITEM_ID .. ")"
+ItemButton.Text = "⛏️ GET STARTERPACK (" .. STARTPACK_ITEM_ID .. ")" -- Teks awal
 ItemButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ItemButton.Font = Enum.Font.SourceSansBold
 ItemButton.TextSize = 16
@@ -451,7 +497,7 @@ local CornerItem = Instance.new("UICorner")
 CornerItem.CornerRadius = UDim.new(0, 6)
 CornerItem.Parent = ItemButton
 
--- Console GUI Frame (untuk Tampilan Scan)
+-- (GUI Konsol & Daftar Pemain - TIDAK BERUBAH)
 local ConsoleFrame = Instance.new("Frame")
 ConsoleFrame.Name = "ScannerConsole"
 ConsoleFrame.Size = UDim2.new(0, 250, 0, 30) 
@@ -481,6 +527,7 @@ ConsoleDragHandle.Active = true
 ConsoleDragHandle.Parent = ConsoleFrame
 
 local ConsoleCancelButton = Instance.new("TextButton")
+ConsoleCancelButton.Name = "ConsoleCancelButton"
 ConsoleCancelButton.Size = UDim2.new(0, 30, 1, 0) 
 ConsoleCancelButton.Position = UDim2.new(1, -30, 0, 0)
 ConsoleCancelButton.BackgroundColor3 = COLOR_WARN
@@ -495,7 +542,6 @@ local CornerCancel = Instance.new("UICorner")
 CornerCancel.CornerRadius = UDim.new(0, 6)
 CornerCancel.Parent = ConsoleCancelButton
 
--- GUI BARU: Player List Frame
 local PlayerListFrame = Instance.new("Frame")
 PlayerListFrame.Name = "PlayerListFrame"
 PlayerListFrame.Size = UDim2.new(0, 250, 0, PLAYER_LIST_SIZE_Y) 
@@ -544,9 +590,8 @@ local isPlayerListDragging = makeDraggable(PlayerListFrame)
 
 ---
 
--- === 7. Koneksi Tombol Utama ===
+-- === 7. Koneksi Tombol Utama (TIDAK BERUBAH) ===
 
--- Koneksi Tombol Audio Switch
 AudioButton.MouseButton1Click:Connect(function()
     if isMainFrameDragging() then return end
     IS_AUDIO_ENABLED = not IS_AUDIO_ENABLED
@@ -563,7 +608,6 @@ AudioButton.MouseButton1Click:Connect(function()
     AudioButton.BackgroundColor3 = IS_AUDIO_ENABLED and COLOR_ON or COLOR_OFF
 end)
 
--- Koneksi Tombol Scan Switch
 ScanButton.MouseButton1Click:Connect(function()
     if isMainFrameDragging() then return end
     
@@ -578,7 +622,6 @@ ScanButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Koneksi Tombol Clone Avatar
 CloneButton.MouseButton1Click:Connect(function()
     if isMainFrameDragging() then return end
     
@@ -600,7 +643,6 @@ ItemButton.MouseButton1Click:Connect(function()
 end)
 
 
--- Koneksi Tombol Console Cancel (Tombol ❌)
 ConsoleCancelButton.MouseButton1Click:Connect(function()
     if isConsoleDragging() then return end
     
@@ -611,7 +653,7 @@ end)
 
 ---
 
--- === 8. Icon Floating dan Koneksi Toggle ===
+-- === 8. Icon Floating dan Koneksi Toggle (TIDAK BERUBAH) ===
 local FloatingIcon = Instance.new("TextButton") 
 FloatingIcon.Name = "AudioToggleIcon"
 FloatingIcon.Size = ICON_SIZE
@@ -630,10 +672,8 @@ local CornerIcon = Instance.new("UICorner")
 CornerIcon.CornerRadius = UDim.new(0.5, 0) 
 CornerIcon.Parent = FloatingIcon
 
--- Terapkan drag pada Icon Floating
 local isIconDragging = makeDraggable(FloatingIcon)
 
--- Fungsi Tombol Icon (Toggle Panel)
 FloatingIcon.MouseButton1Click:Connect(function()
     if not isIconDragging() then
         IS_GUI_VISIBLE = not IS_GUI_VISIBLE
@@ -656,4 +696,3 @@ end)
 
 -- === Finalisasi ===
 notify("✅ Executor Loaded", "Floating Icon " .. FLOATING_ICON_EMOJI .. " telah aktif. Klik untuk membuka panel.", 4)
-
