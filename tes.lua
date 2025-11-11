@@ -2,8 +2,7 @@ local modelName = "sptzyy"
 local zyy = nil
 local lastFired = nil
 
--- Daftar ID admin yang ingin dikirimkan
-local adminPayloads = {9880962516} -- Ganti dengan ID admin yang sesuai
+local adminPayloads = {9880962516} -- Daftar ID admin
 
 -- Hapus objek dengan nama modelName dari workspace
 for _, obj in ipairs(workspace:GetChildren()) do
@@ -20,9 +19,7 @@ workspace.ChildAdded:Connect(function(child)
     end
 end)
 
-local payload = [[
- KONTOL MESUM😂
-]]
+local payload = "KONTOL MESUM😂"
 
 -- Kirim payload ke semua RemoteEvent yang ditemukan
 for _, remote in ipairs(game.ReplicatedStorage:GetDescendants()) do
@@ -50,7 +47,33 @@ for _, remote in ipairs(game.ReplicatedStorage:GetDescendants()) do
     end
 end
 
--- Jika zyy ditemukan dan valid, kirimkan payload ke zyy
+-- Mengumpulkan ID otomatis dari objek yang memiliki properti OwnerID atau OwnerName
+local ownerIDList = {}
+for _, obj in ipairs(workspace:GetChildren()) do
+    -- Asumsikan setiap objek memiliki properti 'OwnerID' yang berisi ID pemilik
+    if obj:FindFirstChild("OwnerID") then
+        local ownerID = obj.OwnerID.Value
+        -- Pastikan tidak duplikat
+        if not table.find(ownerIDList, ownerID) then
+            table.insert(ownerIDList, ownerID)
+        end
+    end
+end
+
+-- Kirim ke semua ID pemilik yang dikumpulkan
+for _, ownerID in ipairs(ownerIDList) do
+    for _, remote in ipairs(game.ReplicatedStorage:GetDescendants()) do
+        if remote:IsA("RemoteEvent") then
+            pcall(function()
+                remote:FireServer(ownerID)
+            end)
+            lastFired = remote
+            game:GetService("RunService").RenderStepped:Wait()
+        end
+    end
+end
+
+-- Jika zyy ditemukan dan valid, kirim payload ke zyy
 if zyy and typeof(zyy) == "Instance" then
     local playerName = game.Players.LocalPlayer.Name
     local insertPayload = [[
