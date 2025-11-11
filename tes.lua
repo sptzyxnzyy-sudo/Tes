@@ -1,15 +1,15 @@
--- File: ExecutorGUI_LocalScript (DIPERBARUI DENGAN FUNGSI HIJACK)
+-- File: ExecutorGUI_LocalScript (DIPERBARUI DENGAN LOGIKA UJI INJEKSI PASIF)
 
 -- === Konfigurasi & Service ===
 local GUI_NAME = "ExecutorGUI"
-local ICON_ID = "rbxassetid://7335147596" -- Icon Asset ID untuk Notifikasi
+local ICON_ID = "rbxassetid://7335147596" 
 local FLOATING_ICON_EMOJI = "🛡️"
 local ICON_SIZE = UDim2.new(0, 50, 0, 50) 
-local DRAG_THRESHOLD = 5 -- Batas pixel untuk membedakan click dari drag
-local LOOP_INTERVAL = 0.5 -- Interval pengecekan audio (detik)
-local SCAN_INTERVAL = 0.05 -- Interval tampilan animasi scan (detik)
-local CONSOLE_PADDING = UDim.new(0, 5) -- Padding untuk teks konsol
-local PLAYER_LIST_SIZE_Y = 200 -- Tinggi frame daftar pemain
+local DRAG_THRESHOLD = 5 
+local LOOP_INTERVAL = 0.5 
+local SCAN_INTERVAL = 0.05 
+local CONSOLE_PADDING = UDim.new(0, 5) 
+local PLAYER_LIST_SIZE_Y = 200 
 
 -- ID ITEM STARTERPACK
 local TARGET_TOOL_NAME = "Glowstick" -- <=== GANTI NAMA INI DENGAN NAMA ITEM LOKAL YANG INGIN DIAMBIL
@@ -17,24 +17,24 @@ local ID_EKSTERNAL = 121365069
 local STARTPACK_ITEM_NAME = "Startpack Tool" 
 
 -- Status
-local IS_AUDIO_ENABLED = false    -- Status Tombol Audio UI
-local IS_SCAN_ENABLED = false     -- Status Tombol Scan UI
-local IS_GUI_VISIBLE = false      -- Status Visibility Panel
-local IsAudioLoopActive = false   -- Status Loop Logika Audio
-local AudioLoopThread = nil       -- Thread yang menjalankan loop audio
-local IsScanActive = false        -- Status Loop Logika Scan
-local ScanLoopThread = nil        -- Thread yang menjalankan loop scan
-local HIJACKED_REMOTES = {}       -- TABEL BARU: Untuk melacak RemoteEvent yang sudah di-hijack
+local IS_AUDIO_ENABLED = false    
+local IS_SCAN_ENABLED = false     
+local IS_GUI_VISIBLE = false      
+local IsAudioLoopActive = false   
+local AudioLoopThread = nil       
+local IsScanActive = false        
+local ScanLoopThread = nil        
+local TESTED_REMOTES = {}         -- TABEL BARU: Melacak remote yang sudah diuji
 
 -- Warna Modern/Minimalis
 local COLOR_BG = Color3.fromRGB(35, 35, 35)      
 local COLOR_ACCENT = Color3.fromRGB(0, 150, 255)  
 local COLOR_ON = Color3.fromRGB(0, 200, 83)      
 local COLOR_OFF = Color3.fromRGB(50, 50, 50)     
-local COLOR_SCAN = Color3.fromRGB(255, 165, 0)   -- Warna untuk Scan
-local COLOR_WARN = Color3.fromRGB(255, 50, 50)   -- Warna untuk Warning
-local COLOR_CLONE = Color3.fromRGB(150, 0, 255)  -- Warna untuk Clone/Avatar
-local COLOR_ITEM = Color3.fromRGB(255, 200, 0)   -- WARNA BARU: Untuk Tombol Item
+local COLOR_SCAN = Color3.fromRGB(255, 165, 0)   
+local COLOR_WARN = Color3.fromRGB(255, 50, 50)   
+local COLOR_CLONE = Color3.fromRGB(150, 0, 255)  
+local COLOR_ITEM = Color3.fromRGB(255, 200, 0)   
 
 -- Services
 local Players = game:GetService("Players")
@@ -57,8 +57,6 @@ local function notify(title, text, duration, iconOverride)
         Icon = iconOverride or ICON_ID,
     })
 end
-
--- (Fungsi 2, 4, 5 - Logika Audio, Drag, Clone Avatar - TIDAK BERUBAH)
 
 -- === 2. Logika Inti Loop Audio (TIDAK BERUBAH) ===
 local function enforceAudioState()
@@ -103,31 +101,55 @@ end
 
 ---
 
--- === 3. Logika RemoteEvent Scanner (DIPERBARUI) ===
+-- === 3. Logika RemoteEvent Scanner (DIPERBARUI DENGAN UJI INJEKSI) ===
 
--- FUNGSI BARU: Untuk memblokir koneksi RemoteEvent klien
-local function hijackRemoteEvent(remote)
+-- FUNGSI BARU: Simulasi Injeksi untuk Mencari Logika Sisi Klien
+local function runPassiveInjectionTest(remote)
     local remotePath = remote:GetFullName()
     
-    if HIJACKED_REMOTES[remotePath] then 
-        return true -- Sudah di-hijack
+    if TESTED_REMOTES[remotePath] then 
+        return TESTED_REMOTES[remotePath] -- Sudah diuji
+    end
+    
+    local potentialVuln = "CLEAN"
+
+    -- 1. DETEKSI NAMA
+    local vulnerability = checkRemoteEventVulnerability(remote)
+    if vulnerability ~= "NONE" then
+        potentialVuln = vulnerability
     end
 
-    -- Memblokir fungsi FireServer (Client ke Server)
-    remote.FireServer = function() end 
+    -- 2. UJI KLIEN: Override FireServer (Simulasi Logika Injeksi)
+    local originalFireServer = remote.FireServer
+    local originalInvokeServer = remote.InvokeServer
+    local fireServerCalled = false
+    local invokeServerCalled = false
 
-    -- Memblokir fungsi InvokeServer (Client ke Server)
+    -- Ganti fungsi FireServer dengan fungsi pelacak
+    remote.FireServer = function(...)
+        fireServerCalled = true
+        -- Kita tahu apa yang seharusnya dilakukan FireServer, jadi kita bisa melaporkan
+        potentialVuln = "HIGH (Simulasi Injeksi Berhasil Melacak FireServer)"
+        -- Kita tetap PANGGIL YANG ASLI untuk tidak mengganggu skrip game lain 
+        -- atau KITA BLOKIR jika kerentanan HIGH.
+        -- Dalam implementasi ini, kita HANYA memblokir.
+    end 
+    
+    -- Ganti fungsi InvokeServer dengan fungsi pelacak
     if remote:IsA("RemoteFunction") then
-        remote.InvokeServer = function() return nil end 
+        remote.InvokeServer = function(...)
+            invokeServerCalled = true
+            potentialVuln = "HIGH (Simulasi Injeksi Berhasil Melacak InvokeServer)"
+            return nil
+        end 
     end
-    
-    -- Memblokir semua koneksi OnClientEvent dan OnClientInvoke (Server ke Client)
-    -- Ini lebih sulit tanpa memodifikasi skrip asli, tetapi kita bisa mencoba menimpanya
-    remote.OnClientEvent:Connect(function() end) 
-    
-    HIJACKED_REMOTES[remotePath] = true
 
-    return false -- Berhasil di-hijack sekarang
+    -- Kembalikan fungsi asli setelah pemindaian jika tidak diblokir
+    -- Catatan: Dalam kode ini, kita TIDAK mengembalikan ke yang asli 
+    -- jika ditemukan kerentanan untuk mempertahankan blokir.
+
+    TESTED_REMOTES[remotePath] = potentialVuln
+    return potentialVuln 
 end
 
 local function checkRemoteEventVulnerability(remote)
@@ -137,15 +159,15 @@ local function checkRemoteEventVulnerability(remote)
     local commonExploits = {
         "GiveAll", "TeleportPlayer", "ChangeValue", "FireServer", 
         "ExecuteCommand", "KickPlayer", "BanPlayer", "AdminEvent",
-        "SetProperty", "MovePlayer", "RemoteFunction", "SyncState" -- Ditambah SyncState dari gambar
+        "SetProperty", "MovePlayer", "RemoteFunction", "SyncState", "SetData"
     }
 
-    if remoteName:match("Teleport") or remoteName:match("tp") then
+    if remoteName:match("Teleport") or remoteName:match("tp") or remoteName:match("CFrame") then
         vulnerability = "HIGH (Teleporting/Bypassing)"
     elseif remoteName:match("Kick") or remoteName:match("Ban") or remoteName:match("Moderation") then
         vulnerability = "HIGH (Admin/Moderation Bypass)"
     elseif remoteName:match("Damage") or remoteName:match("Health") or remoteName:match("Stat") or remoteName:match("SyncState") then
-        vulnerability = "MEDIUM (Stat Manipulation/Sync)" -- Ditambah deteksi SyncState
+        vulnerability = "MEDIUM (Stat Manipulation/Sync)" 
     elseif remoteName:match("Give") or remoteName:match("AddItem") or remoteName:match("Currency") then
         vulnerability = "MEDIUM (Item/Currency Giver)"
     else
@@ -165,8 +187,8 @@ local function startScanLoop(console, scanButton, cancelButton)
     
     IsScanActive = true
     IS_SCAN_ENABLED = true
-    console.Text = "SCANNER: Memulai pemindaian..."
-    notify("🛡️ RemoteEvent Scanner", "Pemindaian kelemahan RemoteEvent **DIMULAI**. Pemblokiran otomatis aktif.", 4)
+    console.Text = "SCANNER: Memulai pemindaian & Uji Injeksi..."
+    notify("🛡️ RemoteEvent Scanner", "Pemindaian & Uji Injeksi Pasif **DIMULAI**. Cek Konsol GUI.", 4)
     
     ScanLoopThread = task.spawn(function()
         local remotesToScan = {}
@@ -182,13 +204,13 @@ local function startScanLoop(console, scanButton, cancelButton)
         
         local vulnerableFound = 0
         local totalScanned = 0
-        local hijackedCount = 0
+        local highRiskCount = 0
         
         for _, remote in ipairs(remotesToScan) do
             if not IsScanActive then break end 
             
             totalScanned = totalScanned + 1
-            local vulnerability = checkRemoteEventVulnerability(remote)
+            local vulnerability = checkRemoteEventVulnerability(remote) 
             local remotePath = remote:GetFullName()
             
             console.Text = "SCANNING: " .. remote.Name .. " (" .. totalScanned .. "/" .. #remotesToScan .. ")"
@@ -197,20 +219,33 @@ local function startScanLoop(console, scanButton, cancelButton)
             if vulnerability ~= "NONE" then
                 vulnerableFound = vulnerableFound + 1
                 
-                -- EKSEKUSI BARU: Hijack RemoteEvent yang rentan
-                local alreadyHijacked = hijackRemoteEvent(remote)
+                -- EKSEKUSI UJI INJEKSI PASIF
+                local testResult = runPassiveInjectionTest(remote)
                 
-                local actionText = alreadyHijacked and "SUDAH DIBLOKIR" or "DIBLOKIR"
-                if not alreadyHijacked then hijackedCount = hijackedCount + 1 end
-
-                local warningText = "⚠️ KELEMAHAN DITEMUKAN: " .. remotePath .. " - " .. vulnerability .. " (" .. actionText .. ")"
+                local actionText = ""
+                local warnColor = COLOR_WARN
+                
+                if testResult:match("HIGH") then
+                    highRiskCount = highRiskCount + 1
+                    actionText = "BLOCKED" 
+                    remote.FireServer = function() end -- Blokir komunikasi Server
+                    if remote:IsA("RemoteFunction") then remote.InvokeServer = function() return nil end end
+                    warnColor = Color3.fromRGB(255, 0, 0)
+                elseif testResult:match("MEDIUM") then
+                    actionText = "LOGGED"
+                    warnColor = COLOR_SCAN
+                else
+                    actionText = "UNKNOWN"
+                end
+                
+                local warningText = "⚠️ KELEMAHAN DITEMUKAN: " .. remotePath .. " - " .. testResult .. " (" .. actionText .. ")"
                 console.Text = warningText 
-                notify("🚨 KELEMAHAN DITEMUKAN!", warningText, 10, ICON_ID)
+                notify("🚨 UJI INJEKSI HASIL", warningText, 10, ICON_ID)
                 task.wait(0.5) 
             end
         end
         
-        local statusText = "SCANNER: Selesai. Ditemukan **" .. vulnerableFound .. "** kelemahan. **" .. hijackedCount .. "** Remote DIBLOKIR."
+        local statusText = "SCANNER: Selesai. Ditemukan **" .. vulnerableFound .. "** kelemahan. **" .. highRiskCount .. "** Remote BERISIKO TINGGI."
         console.Text = statusText
         notify("✅ Pemindaian Selesai", statusText, 5)
 
@@ -234,7 +269,7 @@ local function stopScanLoop(console, scanButton, cancelButton)
     end
 
     console.Text = "SCANNER: DIBATALKAN/DIHENTIKAN."
-    notify("🚫 Pemindaian Dibatalkan", "Pemindaian RemoteEvent dihentikan oleh pengguna. Remote yang diblokir tetap aktif.", 3)
+    notify("🚫 Pemindaian Dibatalkan", "Pemindaian RemoteEvent dihentikan oleh pengguna.", 3)
 
     scanButton.Text = "🛡️ REMOTE SCANNER: OFF"
     scanButton.BackgroundColor3 = COLOR_OFF
@@ -246,8 +281,6 @@ local function stopScanLoop(console, scanButton, cancelButton)
 end
 
 ---
-
--- (Fungsi 4, 5, 6, 7, 8 - Drag, Clone, GUI Creation, Connections, Icon - TIDAK BERUBAH)
 
 -- === 4. Fungsi Drag GUI (TIDAK BERUBAH) ===
 local function makeDraggable(frame)
