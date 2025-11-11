@@ -1,4 +1,4 @@
--- File: ExecutorGUI_LocalScript (Diperbarui untuk Item Giver)
+-- File: ExecutorGUI_LocalScript (DIPERBAIKI AGAR LEBIH ANDAL)
 
 -- === Konfigurasi & Service ===
 local GUI_NAME = "ExecutorGUI"
@@ -12,9 +12,11 @@ local CONSOLE_PADDING = UDim.new(0, 5) -- Padding untuk teks konsol
 local PLAYER_LIST_SIZE_Y = 200 -- Tinggi frame daftar pemain
 
 -- ID ITEM STARTERPACK BARU
--- Catatan: Pastikan ini adalah ID Asset publik yang dapat dimuat, atau ubah menjadi Nama Tool.
-local STARTPACK_ITEM_ID = 121365069 
-local STARTPACK_ITEM_NAME = "Startpack Tool" -- Nama default, akan diperbarui setelah di-load
+-- Catatan: Ganti nilai string ini dengan NAMA Tool yang ingin Anda ambil (contoh: "Glowstick").
+-- Jika ingin menggunakan ID eksternal, biarkan ID_EKSTERNAL = 121365069
+local TARGET_TOOL_NAME = "Glowstick" -- <=== GANTI NAMA INI DENGAN NAMA ITEM YANG ADA DI DALAM GAME (StarterPack/ReplicatedStorage)
+local ID_EKSTERNAL = 121365069 
+local STARTPACK_ITEM_NAME = "Startpack Tool" 
 
 -- Status
 local IS_AUDIO_ENABLED = false    -- Status Tombol Audio UI
@@ -47,7 +49,7 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local task = task -- Pastikan task ada dan berfungsi
 local StarterPack = game:GetService("StarterPack") -- Service StarterPack
 
--- === 1. Fungsi Notifikasi ===
+-- === 1. Fungsi Notifikasi (TIDAK BERUBAH) ===
 local function notify(title, text, duration, iconOverride)
     StarterGui:SetCore("SendNotification", {
         Title = title,
@@ -57,7 +59,7 @@ local function notify(title, text, duration, iconOverride)
     })
 end
 
--- (Fungsi 2, 3, 4, 5 - tidak ada perubahan signifikan pada logika inti)
+-- (Fungsi 2, 3, 4, 5 - TIDAK ADA PERUBAHAN)
 
 -- === 2. Logika Inti Loop Audio (TIDAK BERUBAH) ===
 local function enforceAudioState()
@@ -212,7 +214,7 @@ end
 
 ---
 
--- === 4. Fungsi Drag GUI (Optimized) (TIDAK BERUBAH) ===
+-- === 4. Fungsi Drag GUI (TIDAK BERUBAH) ===
 local function makeDraggable(frame)
     local dragging = false
     local dragStartPos = nil
@@ -335,76 +337,91 @@ end
 
 ---
 
--- === FUNGSI BARU: Pemberian Item Startpack (DIPERBARUI) ===
-local function giveStartpackItem(toolId)
-    local assetModel
-    local tool
-
-    -- 1. Coba memuat Tool menggunakan InsertService (Jika ID publik valid)
-    local success, item = pcall(function()
-        return InsertService:LoadAsset(toolId)
-    end)
+-- === FUNGSI BARU: Pemberian Item Startpack (DIPERBAIKI) ===
+local function giveStartpackItem(targetName, toolId)
+    local toolTemplate = nil
     
-    if success and item then
-        assetModel = item 
-        tool = assetModel:FindFirstChildOfClass("Tool")
-        
-        if not tool then
-            notify("❌ Gagal Item", "Asset ID " .. toolId .. " dimuat, tetapi bukan Tool.", 4, ICON_ID)
-            assetModel:Destroy()
-            return
+    -- 1. CARA PALING ANDAL: Cari Tool berdasarkan NAMA di lokasi umum game
+    if targetName and targetName ~= "" then
+        toolTemplate = ReplicatedStorage:FindFirstChild(targetName) 
+        if not toolTemplate then
+            toolTemplate = StarterPack:FindFirstChild(targetName)
         end
-    else
-        notify("❌ Gagal Item", "Gagal memuat asset: Cek ID " .. toolId .. " atau izin.", 4, ICON_ID)
+        -- Cari di Workspace jika ditempatkan di sana (misalnya, item WorldModel)
+        if not toolTemplate then
+             toolTemplate = Workspace:FindFirstChild(targetName)
+        end
+    end
+
+    -- 2. CADANGAN: Coba gunakan InsertService (jika pencarian nama gagal, atau ID yang ditentukan)
+    if not toolTemplate and toolId and toolId > 0 then
+        local success, itemModel = pcall(function()
+            return InsertService:LoadAsset(toolId)
+        end)
+        
+        if success and itemModel then
+            local tool = itemModel:FindFirstChildOfClass("Tool")
+            if tool then
+                -- Ambil Tool keluar dari model yang dimuat
+                toolTemplate = tool
+                toolTemplate.Parent = nil 
+                
+                -- Cleanup model container
+                itemModel:Destroy()
+            end
+        end
+    end
+    
+    -- 3. Verifikasi Akhir
+    if not toolTemplate or not toolTemplate:IsA("Tool") then
+        notify("❌ Gagal Item", "Item **" .. (targetName or tostring(toolId)) .. "** tidak ditemukan atau bukan Tool. Periksa NAMA atau ID Anda.", 4, ICON_ID)
         return
     end
 
-    -- 2. Dapatkan nama Tool yang sebenarnya
-    STARTPACK_ITEM_NAME = tool.Name
+    local actualToolName = toolTemplate.Name
+    STARTPACK_ITEM_NAME = actualToolName
     
-    -- 3. Cek apakah Tool sudah ada di ransel pemain
-    if LocalPlayer.Backpack:FindFirstChild(STARTPACK_ITEM_NAME) then
-        notify("ℹ️ Item Sudah Ada", "**" .. STARTPACK_ITEM_NAME .. "** sudah ada di ransel Anda.", 3, ICON_ID)
-        assetModel:Destroy()
+    -- 4. Cek duplikat di ransel pemain saat ini
+    if LocalPlayer.Backpack:FindFirstChild(actualToolName) then
+        notify("ℹ️ Item Sudah Ada", "**" .. actualToolName .. "** sudah ada di ransel Anda.", 3, ICON_ID)
         return
     end
     
-    -- 4. Kloning Tool dan berikan ke pemain
-    local clonedTool = tool:Clone()
+    -- 5. Kloning Tool dan kelola respawn (Logika StarterPack)
     
-    -- 5. Tambahkan Tool ke StarterPack (memastikan item respawn)
-    if not StarterPack:FindFirstChild(STARTPACK_ITEM_NAME) then
-        -- Jika tool belum ada di StarterPack (seperti fungsi Startpack)
-        clonedTool.Parent = StarterPack
+    -- Tambahkan Tool ke StarterPack (memastikan item respawn)
+    if not StarterPack:FindFirstChild(actualToolName) then
+        -- Jika tool belum ada di StarterPack, gunakan template Tool yang ditemukan
+        local toolForStarterPack = toolTemplate:Clone()
+        toolForStarterPack.Parent = StarterPack
         
         -- Berikan Tool ke Backpack pemain saat ini
-        local secondClone = clonedTool:Clone()
-        secondClone.Parent = LocalPlayer.Backpack
+        local toolForBackpack = toolForStarterPack:Clone()
+        toolForBackpack.Parent = LocalPlayer.Backpack
         
-        notify("✅ Item Diberikan (Respawn Aktif)", "**" .. STARTPACK_ITEM_NAME .. "** ditambahkan ke ransel dan StarterPack.", 5, ICON_ID)
+        notify("✅ Item Diberikan (Respawn Aktif)", "**" .. actualToolName .. "** ditambahkan ke ransel dan StarterPack.", 5, ICON_ID)
     else
         -- Jika tool sudah ada di StarterPack, cukup berikan klonnya ke Backpack
-        local existingTool = StarterPack:FindFirstChild(STARTPACK_ITEM_NAME)
+        local existingTool = StarterPack:FindFirstChild(actualToolName)
         local newClone = existingTool:Clone()
         newClone.Parent = LocalPlayer.Backpack
         
-        notify("✅ Item Diberikan", "**" .. STARTPACK_ITEM_NAME .. "** ditambahkan ke ransel Anda. (Respawn sudah aktif)", 4, ICON_ID)
+        notify("✅ Item Diberikan", "**" .. actualToolName .. "** ditambahkan ke ransel Anda.", 4, ICON_ID)
     end
     
-    assetModel:Destroy() -- Hapus model asset yang dimuat dari InsertService
+    -- Jika toolTemplate adalah hasil dari InsertService, tool tersebut sudah di-Destroy di langkah 2
+    -- Jika toolTemplate berasal dari game (R.Storage/S.Pack), biarkan saja.
 
-    -- PERBARUI Teks Tombol (jika diperlukan setelah mendapatkan nama yang sebenarnya)
+    -- PERBARUI Teks Tombol
     local ItemButton = PlayerGui:FindFirstChild(GUI_NAME):FindFirstChild("MainFrame"):FindFirstChild("ItemButton")
     if ItemButton then
-         ItemButton.Text = "⛏️ GET: " .. STARTPACK_ITEM_NAME
+         ItemButton.Text = "⛏️ GET: " .. actualToolName
     end
 end
 
 ---
 
--- === 6. Pembuatan GUI Utama ===
--- (TIDAK ADA PERUBAHAN SIGNIFIKAN pada struktur GUI, hanya memastikan ItemButton diperbarui)
-
+-- === 6. Pembuatan GUI Utama (DIUBAH UNTUK TARGET_TOOL_NAME) ===
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = GUI_NAME
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
@@ -481,13 +498,13 @@ local CornerClone = Instance.new("UICorner")
 CornerClone.CornerRadius = UDim.new(0, 6)
 CornerClone.Parent = CloneButton
 
--- TOMBOL BARU: Startpack Item
+-- TOMBOL BARU: Startpack Item (Teks diubah ke TARGET_TOOL_NAME)
 local ItemButton = Instance.new("TextButton") 
 ItemButton.Name = "ItemButton"
 ItemButton.Size = UDim2.new(0.9, 0, 0, 30)
 ItemButton.Position = UDim2.new(0.05, 0, 0, 145) 
 ItemButton.BackgroundColor3 = COLOR_ITEM
-ItemButton.Text = "⛏️ GET STARTERPACK (" .. STARTPACK_ITEM_ID .. ")" -- Teks awal
+ItemButton.Text = "⛏️ GET: " .. (TARGET_TOOL_NAME or ID_EKSTERNAL) -- Menggunakan Nama Target jika ada
 ItemButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ItemButton.Font = Enum.Font.SourceSansBold
 ItemButton.TextSize = 16
@@ -590,7 +607,7 @@ local isPlayerListDragging = makeDraggable(PlayerListFrame)
 
 ---
 
--- === 7. Koneksi Tombol Utama (TIDAK BERUBAH) ===
+-- === 7. Koneksi Tombol Utama (DIUBAH UNTUK TARGET_TOOL_NAME) ===
 
 AudioButton.MouseButton1Click:Connect(function()
     if isMainFrameDragging() then return end
@@ -639,7 +656,8 @@ end)
 ItemButton.MouseButton1Click:Connect(function()
     if isMainFrameDragging() then return end
     
-    giveStartpackItem(STARTPACK_ITEM_ID)
+    -- Panggil fungsi dengan NAMA dan ID sebagai cadangan
+    giveStartpackItem(TARGET_TOOL_NAME, ID_EKSTERNAL)
 end)
 
 
@@ -652,6 +670,8 @@ ConsoleCancelButton.MouseButton1Click:Connect(function()
 end)
 
 ---
+
+-- (Bagian Icon Floating - TIDAK BERUBAH)
 
 -- === 8. Icon Floating dan Koneksi Toggle (TIDAK BERUBAH) ===
 local FloatingIcon = Instance.new("TextButton") 
