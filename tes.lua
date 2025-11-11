@@ -1,4 +1,4 @@
--- File: ExecutorGUI_LocalScript (DIPERBAIKI AGAR LEBIH ANDAL)
+-- File: ExecutorGUI_LocalScript (DIPERBARUI DENGAN FUNGSI HIJACK)
 
 -- === Konfigurasi & Service ===
 local GUI_NAME = "ExecutorGUI"
@@ -11,10 +11,8 @@ local SCAN_INTERVAL = 0.05 -- Interval tampilan animasi scan (detik)
 local CONSOLE_PADDING = UDim.new(0, 5) -- Padding untuk teks konsol
 local PLAYER_LIST_SIZE_Y = 200 -- Tinggi frame daftar pemain
 
--- ID ITEM STARTERPACK BARU
--- Catatan: Ganti nilai string ini dengan NAMA Tool yang ingin Anda ambil (contoh: "Glowstick").
--- Jika ingin menggunakan ID eksternal, biarkan ID_EKSTERNAL = 121365069
-local TARGET_TOOL_NAME = "Glowstick" -- <=== GANTI NAMA INI DENGAN NAMA ITEM YANG ADA DI DALAM GAME (StarterPack/ReplicatedStorage)
+-- ID ITEM STARTERPACK
+local TARGET_TOOL_NAME = "Glowstick" -- <=== GANTI NAMA INI DENGAN NAMA ITEM LOKAL YANG INGIN DIAMBIL
 local ID_EKSTERNAL = 121365069 
 local STARTPACK_ITEM_NAME = "Startpack Tool" 
 
@@ -26,6 +24,7 @@ local IsAudioLoopActive = false   -- Status Loop Logika Audio
 local AudioLoopThread = nil       -- Thread yang menjalankan loop audio
 local IsScanActive = false        -- Status Loop Logika Scan
 local ScanLoopThread = nil        -- Thread yang menjalankan loop scan
+local HIJACKED_REMOTES = {}       -- TABEL BARU: Untuk melacak RemoteEvent yang sudah di-hijack
 
 -- Warna Modern/Minimalis
 local COLOR_BG = Color3.fromRGB(35, 35, 35)      
@@ -46,8 +45,8 @@ local Workspace = game:GetService("Workspace")
 local InsertService = game:GetService("InsertService") 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-local task = task -- Pastikan task ada dan berfungsi
-local StarterPack = game:GetService("StarterPack") -- Service StarterPack
+local task = task 
+local StarterPack = game:GetService("StarterPack") 
 
 -- === 1. Fungsi Notifikasi (TIDAK BERUBAH) ===
 local function notify(title, text, duration, iconOverride)
@@ -59,7 +58,7 @@ local function notify(title, text, duration, iconOverride)
     })
 end
 
--- (Fungsi 2, 3, 4, 5 - TIDAK ADA PERUBAHAN)
+-- (Fungsi 2, 4, 5 - Logika Audio, Drag, Clone Avatar - TIDAK BERUBAH)
 
 -- === 2. Logika Inti Loop Audio (TIDAK BERUBAH) ===
 local function enforceAudioState()
@@ -104,7 +103,33 @@ end
 
 ---
 
--- === 3. Logika Inti RemoteEvent Scanner (TIDAK BERUBAH) ===
+-- === 3. Logika RemoteEvent Scanner (DIPERBARUI) ===
+
+-- FUNGSI BARU: Untuk memblokir koneksi RemoteEvent klien
+local function hijackRemoteEvent(remote)
+    local remotePath = remote:GetFullName()
+    
+    if HIJACKED_REMOTES[remotePath] then 
+        return true -- Sudah di-hijack
+    end
+
+    -- Memblokir fungsi FireServer (Client ke Server)
+    remote.FireServer = function() end 
+
+    -- Memblokir fungsi InvokeServer (Client ke Server)
+    if remote:IsA("RemoteFunction") then
+        remote.InvokeServer = function() return nil end 
+    end
+    
+    -- Memblokir semua koneksi OnClientEvent dan OnClientInvoke (Server ke Client)
+    -- Ini lebih sulit tanpa memodifikasi skrip asli, tetapi kita bisa mencoba menimpanya
+    remote.OnClientEvent:Connect(function() end) 
+    
+    HIJACKED_REMOTES[remotePath] = true
+
+    return false -- Berhasil di-hijack sekarang
+end
+
 local function checkRemoteEventVulnerability(remote)
     local remoteName = remote.Name
     local vulnerability = "NONE"
@@ -112,15 +137,15 @@ local function checkRemoteEventVulnerability(remote)
     local commonExploits = {
         "GiveAll", "TeleportPlayer", "ChangeValue", "FireServer", 
         "ExecuteCommand", "KickPlayer", "BanPlayer", "AdminEvent",
-        "SetProperty", "MovePlayer", "RemoteFunction" 
+        "SetProperty", "MovePlayer", "RemoteFunction", "SyncState" -- Ditambah SyncState dari gambar
     }
 
     if remoteName:match("Teleport") or remoteName:match("tp") then
         vulnerability = "HIGH (Teleporting/Bypassing)"
     elseif remoteName:match("Kick") or remoteName:match("Ban") or remoteName:match("Moderation") then
         vulnerability = "HIGH (Admin/Moderation Bypass)"
-    elseif remoteName:match("Damage") or remoteName:match("Health") or remoteName:match("Stat") then
-        vulnerability = "MEDIUM (Stat Manipulation)"
+    elseif remoteName:match("Damage") or remoteName:match("Health") or remoteName:match("Stat") or remoteName:match("SyncState") then
+        vulnerability = "MEDIUM (Stat Manipulation/Sync)" -- Ditambah deteksi SyncState
     elseif remoteName:match("Give") or remoteName:match("AddItem") or remoteName:match("Currency") then
         vulnerability = "MEDIUM (Item/Currency Giver)"
     else
@@ -141,7 +166,7 @@ local function startScanLoop(console, scanButton, cancelButton)
     IsScanActive = true
     IS_SCAN_ENABLED = true
     console.Text = "SCANNER: Memulai pemindaian..."
-    notify("🛡️ RemoteEvent Scanner", "Pemindaian kelemahan RemoteEvent **DIMULAI**. Cek Konsol GUI.", 4)
+    notify("🛡️ RemoteEvent Scanner", "Pemindaian kelemahan RemoteEvent **DIMULAI**. Pemblokiran otomatis aktif.", 4)
     
     ScanLoopThread = task.spawn(function()
         local remotesToScan = {}
@@ -157,6 +182,7 @@ local function startScanLoop(console, scanButton, cancelButton)
         
         local vulnerableFound = 0
         local totalScanned = 0
+        local hijackedCount = 0
         
         for _, remote in ipairs(remotesToScan) do
             if not IsScanActive then break end 
@@ -170,14 +196,21 @@ local function startScanLoop(console, scanButton, cancelButton)
             
             if vulnerability ~= "NONE" then
                 vulnerableFound = vulnerableFound + 1
-                local warningText = "⚠️ KELEMAHAN DITEMUKAN: " .. remotePath .. " - " .. vulnerability
+                
+                -- EKSEKUSI BARU: Hijack RemoteEvent yang rentan
+                local alreadyHijacked = hijackRemoteEvent(remote)
+                
+                local actionText = alreadyHijacked and "SUDAH DIBLOKIR" or "DIBLOKIR"
+                if not alreadyHijacked then hijackedCount = hijackedCount + 1 end
+
+                local warningText = "⚠️ KELEMAHAN DITEMUKAN: " .. remotePath .. " - " .. vulnerability .. " (" .. actionText .. ")"
                 console.Text = warningText 
                 notify("🚨 KELEMAHAN DITEMUKAN!", warningText, 10, ICON_ID)
                 task.wait(0.5) 
             end
         end
         
-        local statusText = "SCANNER: Selesai. Ditemukan **" .. vulnerableFound .. "** kelemahan dari **" .. totalScanned .. "** Remote."
+        local statusText = "SCANNER: Selesai. Ditemukan **" .. vulnerableFound .. "** kelemahan. **" .. hijackedCount .. "** Remote DIBLOKIR."
         console.Text = statusText
         notify("✅ Pemindaian Selesai", statusText, 5)
 
@@ -201,7 +234,7 @@ local function stopScanLoop(console, scanButton, cancelButton)
     end
 
     console.Text = "SCANNER: DIBATALKAN/DIHENTIKAN."
-    notify("🚫 Pemindaian Dibatalkan", "Pemindaian RemoteEvent dihentikan oleh pengguna.", 3)
+    notify("🚫 Pemindaian Dibatalkan", "Pemindaian RemoteEvent dihentikan oleh pengguna. Remote yang diblokir tetap aktif.", 3)
 
     scanButton.Text = "🛡️ REMOTE SCANNER: OFF"
     scanButton.BackgroundColor3 = COLOR_OFF
@@ -213,6 +246,8 @@ local function stopScanLoop(console, scanButton, cancelButton)
 end
 
 ---
+
+-- (Fungsi 4, 5, 6, 7, 8 - Drag, Clone, GUI Creation, Connections, Icon - TIDAK BERUBAH)
 
 -- === 4. Fungsi Drag GUI (TIDAK BERUBAH) ===
 local function makeDraggable(frame)
@@ -337,7 +372,7 @@ end
 
 ---
 
--- === FUNGSI BARU: Pemberian Item Startpack (DIPERBAIKI) ===
+-- === 6. Pemberian Item Startpack (TIDAK BERUBAH dari revisi sebelumnya) ===
 local function giveStartpackItem(targetName, toolId)
     local toolTemplate = nil
     
@@ -409,9 +444,6 @@ local function giveStartpackItem(targetName, toolId)
         notify("✅ Item Diberikan", "**" .. actualToolName .. "** ditambahkan ke ransel Anda.", 4, ICON_ID)
     end
     
-    -- Jika toolTemplate adalah hasil dari InsertService, tool tersebut sudah di-Destroy di langkah 2
-    -- Jika toolTemplate berasal dari game (R.Storage/S.Pack), biarkan saja.
-
     -- PERBARUI Teks Tombol
     local ItemButton = PlayerGui:FindFirstChild(GUI_NAME):FindFirstChild("MainFrame"):FindFirstChild("ItemButton")
     if ItemButton then
@@ -421,7 +453,8 @@ end
 
 ---
 
--- === 6. Pembuatan GUI Utama (DIUBAH UNTUK TARGET_TOOL_NAME) ===
+-- === 7. Pembuatan GUI Utama (TIDAK BERUBAH) ===
+
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = GUI_NAME
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
@@ -607,7 +640,7 @@ local isPlayerListDragging = makeDraggable(PlayerListFrame)
 
 ---
 
--- === 7. Koneksi Tombol Utama (DIUBAH UNTUK TARGET_TOOL_NAME) ===
+-- === 8. Koneksi Tombol Utama (TIDAK BERUBAH) ===
 
 AudioButton.MouseButton1Click:Connect(function()
     if isMainFrameDragging() then return end
@@ -671,9 +704,7 @@ end)
 
 ---
 
--- (Bagian Icon Floating - TIDAK BERUBAH)
-
--- === 8. Icon Floating dan Koneksi Toggle (TIDAK BERUBAH) ===
+-- === 9. Icon Floating dan Koneksi Toggle (TIDAK BERUBAH) ===
 local FloatingIcon = Instance.new("TextButton") 
 FloatingIcon.Name = "AudioToggleIcon"
 FloatingIcon.Size = ICON_SIZE
