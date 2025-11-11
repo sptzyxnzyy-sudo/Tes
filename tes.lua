@@ -1,3 +1,5 @@
+-- File: ExecutorGUI_LocalScript
+
 -- === Konfigurasi & Service ===
 local GUI_NAME = "ExecutorGUI"
 local ICON_ID = "rbxassetid://7335147596" -- Icon Asset ID untuk Notifikasi
@@ -43,7 +45,7 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local task = task -- Pastikan task ada dan berfungsi
 
--- === 1. Fungsi Notifikasi (Tidak Berubah) ===
+-- === 1. Fungsi Notifikasi ===
 local function notify(title, text, duration, iconOverride)
     StarterGui:SetCore("SendNotification", {
         Title = title,
@@ -55,7 +57,7 @@ end
 
 ---
 
--- === 2. Logika Inti Loop Audio (Tidak Berubah) ===
+-- === 2. Logika Inti Loop Audio ===
 local function enforceAudioState()
     for _, part in Workspace:GetDescendants() do
         if part:IsA("BasePart") then
@@ -98,7 +100,7 @@ end
 
 ---
 
--- === 3. Logika Inti RemoteEvent Scanner (Tidak Berubah) ===
+-- === 3. Logika Inti RemoteEvent Scanner ===
 local function checkRemoteEventVulnerability(remote)
     local remoteName = remote.Name
     local vulnerability = "NONE"
@@ -208,7 +210,7 @@ end
 
 ---
 
--- === 4. Fungsi Drag GUI (Optimized) (Tidak Berubah) ===
+-- === 4. Fungsi Drag GUI (Optimized) ===
 local function makeDraggable(frame)
     local dragging = false
     local dragStartPos = nil
@@ -254,7 +256,7 @@ end
 
 ---
 
--- === 5. Logika Clone Avatar (DIPERBARUI) ===
+-- === 5. Logika Clone Avatar ===
 local function cloneAvatar(targetPlayer)
     if not targetPlayer or not targetPlayer.Character then
         notify("❌ Gagal Clone", "Karakter target tidak ditemukan.", 3)
@@ -339,7 +341,7 @@ local function giveStartpackItem(toolId)
     end)
     
     if not success or not item then
-        notify("❌ Gagal Item", "Gagal memuat asset dengan ID: " .. toolId .. ".", 4, ICON_ID)
+        notify("❌ Gagal Item", "Gagal memuat asset dengan ID: " .. toolId .. ". Cek ID Asset.", 4, ICON_ID)
         return
     end
 
@@ -352,7 +354,7 @@ local function giveStartpackItem(toolId)
         
         notify("✅ Item Diberikan", "**" .. STARTPACK_ITEM_NAME .. "** (" .. toolId .. ") telah ditambahkan ke ransel Anda.", 5, ICON_ID)
     else
-        notify("❌ Gagal Item", "Asset ID " .. toolId .. " dimuat, tetapi bukan Tool.", 4, ICON_ID)
+        notify("❌ Gagal Item", "Asset ID " .. toolId .. " dimuat, tetapi bukan Tool. (Tipe Objek: " .. item.ClassName .. ")", 4, ICON_ID)
     end
     
     item:Destroy()
@@ -364,14 +366,11 @@ end
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = GUI_NAME
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
--- ***CATATAN PENTING***: Karena skrip ini adalah LocalScript yang berjalan di setiap klien, 
--- kita harus mencari PlayerGui untuk menempatkan ScreenGui. 
--- Jika diletakkan di StarterGui, baris ini harus dihapus.
 ScreenGui.Parent = PlayerGui 
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 250, 0, 225) -- Diperluas untuk tombol Item
-MainFrame.Position = UDim2.new(0.5, -125, 0.5, -112.5) -- Posisikan ulang
+MainFrame.Size = UDim2.new(0, 250, 0, 225) 
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -112.5) 
 MainFrame.BackgroundColor3 = COLOR_BG
 MainFrame.BorderSizePixel = 0
 MainFrame.Visible = false 
@@ -440,7 +439,7 @@ CornerClone.Parent = CloneButton
 -- TOMBOL BARU: Startpack Item
 local ItemButton = Instance.new("TextButton") 
 ItemButton.Size = UDim2.new(0.9, 0, 0, 30)
-ItemButton.Position = UDim2.new(0.05, 0, 0, 145) -- Posisikan di bawah CloneButton
+ItemButton.Position = UDim2.new(0.05, 0, 0, 145) 
 ItemButton.BackgroundColor3 = COLOR_ITEM
 ItemButton.Text = "⛏️ GET STARTERPACK (" .. STARTPACK_ITEM_ID .. ")"
 ItemButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -500,7 +499,7 @@ CornerCancel.Parent = ConsoleCancelButton
 local PlayerListFrame = Instance.new("Frame")
 PlayerListFrame.Name = "PlayerListFrame"
 PlayerListFrame.Size = UDim2.new(0, 250, 0, PLAYER_LIST_SIZE_Y) 
-PlayerListFrame.Position = UDim2.new(0.5, -125, 0.5, 130) -- Posisikan ulang
+PlayerListFrame.Position = UDim2.new(0.5, -125, 0.5, 130) 
 PlayerListFrame.BackgroundColor3 = COLOR_BG
 PlayerListFrame.BorderSizePixel = 0
 PlayerListFrame.Visible = false 
@@ -612,7 +611,7 @@ end)
 
 ---
 
--- === 8. Icon Floating dan Koneksi Toggle (Diperbarui) ===
+-- === 8. Icon Floating dan Koneksi Toggle ===
 local FloatingIcon = Instance.new("TextButton") 
 FloatingIcon.Name = "AudioToggleIcon"
 FloatingIcon.Size = ICON_SIZE
