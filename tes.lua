@@ -4,9 +4,9 @@ local ICON_ID = "rbxassetid://7335147596"
 local FLOATING_ICON_EMOJI = "🛡️"
 local ICON_SIZE = UDim2.new(0, 50, 0, 50) 
 local DRAG_THRESHOLD = 5 
-local LOOP_INTERVAL = 0.5 
-local SCAN_INTERVAL = 0.005 
-local CONSOLE_PADDING = UDim.new(0, 5) 
+local LOOP_INTERVAL = 0.5 -- Tidak digunakan, bisa dihapus atau diabaikan
+local SCAN_INTERVAL = 0.005 -- Tidak digunakan, bisa dihapus atau diabaikan
+local CONSOLE_PADDING = UDim.new(0, 5) -- Tidak digunakan, bisa dihapus atau diabaikan
 local BUTTON_HEIGHT = 30 
 local BUTTON_SPACING = 5  
 
@@ -22,11 +22,16 @@ local COLOR_WARN = Color3.fromRGB(255, 50, 50)
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
-local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+local RunService = game:GetService("RunService") -- Ditambahkan untuk RenderStepped
+local ReplicatedStorage = game:GetService("ReplicatedStorage") -- Ditambahkan
+
+local LocalPlayer = Players.LocalPlayer or Players.LocalPlayer:Wait() -- Menunggu LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui") -- Memastikan LocalPlayer tersedia
 local task = task
 
 -- Variabel
 local IS_GUI_VISIBLE = false
+local isMainFrameDraggingFunction = function() return false end -- Deklarasi awal
 
 -- === 1. Fungsi Notifikasi ===
 local function notify(title, text, duration, iconOverride)
@@ -38,7 +43,7 @@ local function notify(title, text, duration, iconOverride)
     })
 end
 
--- === 7. Fungsi Drag GUI ===
+-- === 7. Fungsi Drag GUI (Diperbarui untuk mengembalikan status dragging) ===
 local function makeDraggable(frame)
     local dragging = false
     local dragStartPos = nil
@@ -60,9 +65,11 @@ local function makeDraggable(frame)
     dragArea.InputChanged:Connect(function(input)
         if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragging then
             local delta = input.Position - dragStartPos
-            if (delta.X * delta.X + delta.Y * delta.Y) > (DRAG_THRESHOLD * DRAG_THRESHOLD) then
+            -- Cek threshold hanya sekali
+            if not isDragging and (delta.X * delta.X + delta.Y * delta.Y) > (DRAG_THRESHOLD * DRAG_THRESHOLD) then
                 isDragging = true
             end
+            
             if isDragging then
                 frame.Position = UDim2.new(startFramePos.X.Scale, startFramePos.X.Offset + delta.X, startFramePos.Y.Scale, startFramePos.Y.Offset + delta.Y)
             end
@@ -75,6 +82,7 @@ local function makeDraggable(frame)
         end
     end)
 
+    -- Mengembalikan fungsi yang melaporkan apakah frame sedang di-drag
     return function()
         return isDragging
     end
@@ -86,8 +94,8 @@ ScreenGui.Name = GUI_NAME
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 ScreenGui.Parent = PlayerGui 
 
-local total_buttons = 3 -- tombol utama + icon toggle + payload
-local main_frame_height = 30 + (total_buttons * BUTTON_HEIGHT) + ((total_buttons - 1) * BUTTON_SPACING) + 15 
+local total_buttons = 2 -- Mengubah jumlah tombol yang akan dihitung di Frame: PayloadButton + IconToggleButton
+local main_frame_height = 30 + (total_buttons * BUTTON_HEIGHT) + ((total_buttons + 1) * BUTTON_SPACING) -- Perhitungan ketinggian Frame (Title 30 + (2 tombol) + (3 spasi) )
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 250, 0, main_frame_height) 
@@ -105,84 +113,76 @@ local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Name = "DragHandle" 
 TitleLabel.Size = UDim2.new(1, 0, 0, 30)
 TitleLabel.BackgroundColor3 = COLOR_ACCENT
-TitleLabel.Text = "🛠️ PANEL (1 FITUR)"
+TitleLabel.Text = "🛠️ PANEL (2 FITUR)"
 TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleLabel.Font = Enum.Font.SourceSansSemibold
 TitleLabel.TextSize = 18
 TitleLabel.Active = true 
 TitleLabel.Parent = MainFrame
 
+-- *** Menghapus 'IconButton' yang redundan atau tidak digunakan sebagai tombol utama ***
+
 local function getButtonY(index)
+    -- Menghitung posisi Y relatif terhadap TitleLabel (tinggi 30)
     return 30 + (BUTTON_SPACING * index) + (BUTTON_HEIGHT * (index - 1))
 end
 
--- Tombol Utama 1 (toggle GUI)
-local IconButton = Instance.new("TextButton") 
-IconButton.Name = "IconButton"
-IconButton.Size = UDim2.new(0.9, 0, 0, BUTTON_HEIGHT)
-IconButton.Position = UDim2.new(0.05, 0, 0, getButtonY(1))
-IconButton.BackgroundColor3 = COLOR_OFF
-IconButton.Text = "🎭 ICON TOGGLE (Baru)"
-IconButton.Parent = MainFrame
-
--- Tombol 2: Run Payload
+-- Tombol 1: Run Payload (Posisi ke-1)
 local function runPayload()
-    if isMainFrameDragging() then return end
+    if isMainFrameDraggingFunction() then return end -- Menggunakan fungsi drag state
     notify("🚀 Payload", "Menjalankan payload...", 3)
-    local workspace = game:GetService("Workspace")
+    
     local modelName = "sptzyy"
     local zyy = nil
-    local lastFired = nil
-
+    
     -- Hapus objek dengan nama modelName dari workspace
-    for _, obj in ipairs(workspace:GetChildren()) do
+    for _, obj in ipairs(Workspace:GetChildren()) do
         if obj.Name == modelName then
             obj:Destroy()
         end
     end
 
     -- Deteksi saat objek modelName ditambahkan
-    workspace.ChildAdded:Connect(function(child)
-        if child.Name == modelName and zyy == nil then
-            zyy = lastFired
+    Workspace.ChildAdded:Connect(function(child)
+        if child.Name == modelName and zyy == nil and child:IsA("RemoteEvent") then -- Memastikan RemoteEvent
+            zyy = child 
             print("Found zyy!")
         end
     end)
 
     local payload = "KONTOL MESUM😂"
 
-    -- Kirim payload ke RemoteEvent
-    for _, remote in ipairs(game.ReplicatedStorage:GetDescendants()) do
+    -- Kirim payload ke RemoteEvent (MENGGUNAKAN ReplicatedStorage yang sudah di-service)
+    for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
         if remote:IsA("RemoteEvent") then
             pcall(function()
                 remote:FireServer(payload)
             end)
-            lastFired = remote
-            game:GetService("RunService").RenderStepped:Wait()
+            RunService.RenderStepped:Wait()
         end
     end
-
+    
     task.wait(0.5)
 
     -- Kirim payload admin ID
     local adminPayloads = {9880962516}
-    for _, remote in ipairs(game.ReplicatedStorage:GetDescendants()) do
+    for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
         if remote:IsA("RemoteEvent") then
             for _, payloadID in ipairs(adminPayloads) do
                 pcall(function()
                     remote:FireServer(payloadID)
                 end)
             end
-            lastFired = remote
-            game:GetService("RunService").RenderStepped:Wait()
+            RunService.RenderStepped:Wait()
         end
     end
 
     -- Kumpulkan OwnerID
     local ownerIDList = {}
-    for _, obj in ipairs(workspace:GetChildren()) do
-        if obj:FindFirstChild("OwnerID") then
-            local ownerID = obj.OwnerID.Value
+    for _, obj in ipairs(Workspace:GetChildren()) do
+        local ownerIDValue = obj:FindFirstChild("OwnerID")
+        if ownerIDValue and ownerIDValue:IsA("IntValue") or ownerIDValue:IsA("NumberValue") then
+            local ownerID = ownerIDValue.Value
             if not table.find(ownerIDList, ownerID) then
                 table.insert(ownerIDList, ownerID)
             end
@@ -191,20 +191,20 @@ local function runPayload()
 
     -- Kirim ke semua OwnerID
     for _, ownerID in ipairs(ownerIDList) do
-        for _, remote in ipairs(game.ReplicatedStorage:GetDescendants()) do
+        for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
             if remote:IsA("RemoteEvent") then
                 pcall(function()
                     remote:FireServer(ownerID)
                 end)
-                lastFired = remote
-                game:GetService("RunService").RenderStepped:Wait()
+                RunService.RenderStepped:Wait()
             end
         end
     end
-
+    
     -- Kirim payload ke zyy jika ketemu
-    if zyy and typeof(zyy) == "Instance" then
-        local playerName = game.Players.LocalPlayer.Name
+    if zyy and zyy:IsA("RemoteEvent") then
+        local playerName = LocalPlayer.Name
+        -- Payload inject GUI (Contoh: menggunakan InsertService untuk memuat aset)
         local insertPayload = [[
             local player = game.Players:FindFirstChild("]] .. playerName .. [[")
             if player and player:FindFirstChild("PlayerGui") then
@@ -216,11 +216,13 @@ local function runPayload()
                 asset:Destroy()
             end
         ]]
-        zyy:FireServer(insertPayload)
+        pcall(function()
+            zyy:FireServer(insertPayload) -- Diasumsikan 'zyy' adalah RemoteEvent
+        end)
     else
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "sptzyy",
-            Text = ":(",
+            Text = "RemoteEvent sptzyy tidak ditemukan. :(",
             Icon = "",
             Duration = 5,
         })
@@ -230,36 +232,27 @@ end
 local PayloadButton = Instance.new("TextButton")
 PayloadButton.Name = "PayloadButton"
 PayloadButton.Size = UDim2.new(0.9, 0, 0, BUTTON_HEIGHT)
-PayloadButton.Position = UDim2.new(0.05, 0, 0, getButtonY(2))
-PayloadButton.BackgroundColor3 = COLOR_OFF
+PayloadButton.Position = UDim2.new(0.05, 0, 0, getButtonY(1))
+PayloadButton.BackgroundColor3 = COLOR_ACCENT -- Mengganti ke COLOR_ACCENT agar menonjol
 PayloadButton.Text = "🚀 Run Payload"
 PayloadButton.Parent = MainFrame
-
-PayloadButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-PayloadButton.Font = Enum.Font.SourceSansBold
-local CornerPayload = Instance.new("UICorner")
-CornerPayload.CornerRadius = UDim.new(0, 6)
-CornerPayload.Parent = PayloadButton
 PayloadButton.MouseButton1Click = runPayload
 
--- Tombol 3: Icon toggle (placeholder)
+-- Tombol 2: Icon toggle (Posisi ke-2)
 local function toggleIcon()
-    if isMainFrameDragging() then return end
+    if isMainFrameDraggingFunction() then return end -- Menggunakan fungsi drag state
     notify("🎭 Icon Toggle", "Fitur icon toggle belum diimplementasikan.", 2)
+    -- Implementasi: Misalnya, mengubah transparansi/visibilitas FloatingIcon
+    -- FloatingIcon.Visible = not FloatingIcon.Visible
 end
+
 local IconToggleButton = Instance.new("TextButton")
 IconToggleButton.Name = "IconToggleButton"
 IconToggleButton.Size = UDim2.new(0.9, 0, 0, BUTTON_HEIGHT)
-IconToggleButton.Position = UDim2.new(0.05, 0, 0, getButtonY(3))
+IconToggleButton.Position = UDim2.new(0.05, 0, 0, getButtonY(2))
 IconToggleButton.BackgroundColor3 = COLOR_OFF
-IconToggleButton.Text = "🎭 ICON TOGGLE (Baru)"
+IconToggleButton.Text = "🎭 ICON TOGGLE"
 IconToggleButton.Parent = MainFrame
-
-IconToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-IconToggleButton.Font = Enum.Font.SourceSansBold
-local CornerIconToggle = Instance.new("UICorner")
-CornerIconToggle.CornerRadius = UDim.new(0, 6)
-CornerIconToggle.Parent = IconToggleButton
 IconToggleButton.MouseButton1Click = toggleIcon
 
 -- Style semua tombol
@@ -273,40 +266,36 @@ for _, btn in ipairs(MainFrame:GetChildren()) do
     end
 end
 
--- === 8. Support drag GUI
-local function isMainFrameDragging()
-    -- placeholder, nanti update jika perlu
-    return false
-end
+-- === 8. Support drag GUI (diperbarui)
+isMainFrameDraggingFunction = makeDraggable(MainFrame) -- Menghubungkan drag function ke MainFrame
 
 -- === 3. Icon floating dan toggle
 local FloatingIcon = Instance.new("TextButton") 
-FloatingIcon.Name = "AudioToggleIcon"
+FloatingIcon.Name = "FloatingIcon" -- Nama diubah
 FloatingIcon.Size = ICON_SIZE
 FloatingIcon.Position = UDim2.new(0.02, 0, 0.85, 0) 
-FloatingIcon.BackgroundTransparency = 0.1 
+FloatingIcon.BackgroundTransparency = 0 
 FloatingIcon.BackgroundColor3 = COLOR_ACCENT 
 FloatingIcon.Text = FLOATING_ICON_EMOJI 
+FloatingIcon.Font = Enum.Font.SourceSans
+FloatingIcon.TextSize = ICON_SIZE.Offset.X * 0.7 -- Ukuran emoji proporsional
 FloatingIcon.Parent = ScreenGui 
 
 local CornerIcon = Instance.new("UICorner")
 CornerIcon.CornerRadius = UDim.new(0.5, 0) 
 CornerIcon.Parent = FloatingIcon
 
-local isIconDragging = makeDraggable(FloatingIcon)
+local isIconDragging = makeDraggable(FloatingIcon) -- Menggunakan fungsi drag state dari FloatingIcon
 
-FloatingIcon.MouseButton1Click = function()
+FloatingIcon.MouseButton1Click:Connect(function()
     if not isIconDragging() then
         IS_GUI_VISIBLE = not IS_GUI_VISIBLE
         MainFrame.Visible = IS_GUI_VISIBLE 
         
-        if not IS_GUI_VISIBLE then
-            -- jika ingin menutup
-        end
-
         notify("⚙️ GUI Status", "Panel Eksekutor: " .. (IS_GUI_VISIBLE and "Terlihat" or "Tersembunyi"), 2)
     end
-end
+end)
 
 -- === 4. Finalisasi & Notifikasi
 notify("✅ Executor Loaded", "Floating Icon " .. FLOATING_ICON_EMOJI .. " aktif. Klik untuk buka panel.", 4)
+
