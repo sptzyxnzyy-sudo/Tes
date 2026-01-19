@@ -1,137 +1,114 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
-
 local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
 
--- Create Main ScreenGui
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "ModernSystemGui"
-screenGui.ResetOnSpawn = false -- Tetap ada saat respawn
-screenGui.Parent = playerGui
-
----------------------------------------
--- 1. ANIMASI LOADING (Tengah Layar)
----------------------------------------
-local function createLoadingScreen()
-    local loadingFrame = Instance.new("Frame")
-    loadingFrame.Size = UDim2.new(1, 0, 1, 0)
-    loadingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    loadingFrame.ZIndex = 10
-    loadingFrame.Parent = screenGui
-
-    local spinner = Instance.new("ImageLabel")
-    spinner.Size = UDim2.new(0, 80, 0, 80)
-    spinner.Position = UDim2.new(0.5, 0, 0.5, 0)
-    spinner.AnchorPoint = Vector2.new(0.5, 0.5)
-    spinner.BackgroundTransparency = 1
-    spinner.Image = "rbxassetid://6033328132" -- Icon Loading Bulat
-    spinner.ImageColor3 = Color3.fromRGB(0, 170, 255)
-    spinner.Parent = loadingFrame
-
-    -- Animasi Putar
-    local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1)
-    local tween = TweenService:Create(spinner, tweenInfo, {Rotation = 360})
-    tween:Play()
-
-    -- Hilangkan loading setelah 3 detik
-    task.delay(3, function()
-        TweenService:Create(loadingFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
-        TweenService:Create(spinner, TweenInfo.new(0.5), {ImageTransparency = 1}):Play()
-        task.wait(0.5)
-        loadingFrame:Destroy()
-    end)
+-- Hapus UI lama jika ada
+if player.PlayerGui:FindFirstChild("ModernSystemGui") then
+    player.PlayerGui.ModernSystemGui:Destroy()
 end
 
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ModernSystemGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player.PlayerGui
+
 ---------------------------------------
--- 2. UI PROFILE (Modern Design)
+-- 1. UI PROFILE (Pojok Kanan Atas)
 ---------------------------------------
 local function createProfileUI()
     local profileFrame = Instance.new("Frame")
     profileFrame.Size = UDim2.new(0, 250, 0, 80)
     profileFrame.Position = UDim2.new(1, -20, 0, 20)
     profileFrame.AnchorPoint = Vector2.new(1, 0)
-    profileFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    profileFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     profileFrame.BorderSizePixel = 0
     profileFrame.Parent = screenGui
 
-    -- Rounded Corner
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = profileFrame
-
-    -- Shadow/Stroke
-    local stroke = Instance.new("UIStroke")
+    Instance.new("UICorner", profileFrame).CornerRadius = UDim.new(0, 12)
+    local stroke = Instance.new("UIStroke", profileFrame)
     stroke.Thickness = 2
-    stroke.Color = Color3.fromRGB(50, 50, 50)
-    stroke.Parent = profileFrame
+    stroke.Color = Color3.fromRGB(0, 170, 255)
 
-    -- Profile Picture
     local img = Instance.new("ImageLabel")
-    img.Size = UDim2.new(0, 60, 0, 60)
+    img.Size = UDim2.new(0, 55, 0, 55)
     img.Position = UDim2.new(0, 10, 0.5, 0)
     img.AnchorPoint = Vector2.new(0, 0.5)
-    img.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
     img.Image = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
     img.Parent = profileFrame
-    
-    local imgCorner = Instance.new("UICorner")
-    imgCorner.CornerRadius = UDim.new(1, 0)
-    imgCorner.Parent = img
+    Instance.new("UICorner", img).CornerRadius = UDim.new(1, 0)
 
-    -- Name & ID Labels
     local nameLabel = Instance.new("TextLabel")
-    nameLabel.Text = player.DisplayName .. " (@" .. player.Name .. ")"
-    nameLabel.Position = UDim2.new(0, 80, 0.25, 0)
+    nameLabel.Text = player.DisplayName
+    nameLabel.Position = UDim2.new(0, 75, 0.25, 0)
     nameLabel.Size = UDim2.new(0, 160, 0, 20)
     nameLabel.TextColor3 = Color3.new(1, 1, 1)
     nameLabel.TextXAlignment = Enum.TextXAlignment.Left
     nameLabel.Font = Enum.Font.GothamBold
-    nameLabel.TextSize = 14
     nameLabel.BackgroundTransparency = 1
     nameLabel.Parent = profileFrame
 
     local idLabel = Instance.new("TextLabel")
-    idLabel.Text = "ID: " .. player.UserId
-    idLabel.Position = UDim2.new(0, 80, 0.55, 0)
-    idLabel.Size = UDim2.new(0, 160, 0, 20)
-    idLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    idLabel.Text = "@" .. player.Name .. "\nID: " .. player.UserId
+    idLabel.Position = UDim2.new(0, 75, 0.6, 0)
+    idLabel.Size = UDim2.new(0, 160, 0, 30)
+    idLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
     idLabel.TextXAlignment = Enum.TextXAlignment.Left
     idLabel.Font = Enum.Font.Gotham
-    idLabel.TextSize = 12
+    idLabel.TextSize = 10
     idLabel.BackgroundTransparency = 1
     idLabel.Parent = profileFrame
 end
 
 ---------------------------------------
--- 3. TOGGLE SWITCH (Server Disconnect)
+-- 2. FITUR SERVER DISCONNECT (Executor Version)
 ---------------------------------------
-local function createDisconnectToggle()
+-- Karena Client tidak bisa Kick, kita gunakan loop untuk membebani 
+-- replikasi data ke pemain lain atau mencoba crash/lag.
+local isKilling = false
+
+local function startDisconnectLoop()
+    task.spawn(function()
+        while isKilling do
+            -- Logika ini mencoba mengirim paket data berlebih (Spam Replikate)
+            -- agar koneksi pemain lain (Client-side) mengalami desync/lag berat.
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= player and p.Character then
+                    -- Mencoba memanipulasi posisi replikasi (hanya bekerja di beberapa game)
+                    p.Character:MoveTo(Vector3.new(math.huge, math.huge, math.huge))
+                end
+            end
+            task.wait(0.1) 
+        end
+    end)
+end
+
+---------------------------------------
+-- 3. TOGGLE SWITCH
+---------------------------------------
+local function createToggle()
     local toggleFrame = Instance.new("Frame")
-    toggleFrame.Size = UDim2.new(0, 200, 0, 40)
+    toggleFrame.Size = UDim2.new(0, 250, 0, 45)
     toggleFrame.Position = UDim2.new(1, -20, 0, 110)
     toggleFrame.AnchorPoint = Vector2.new(1, 0)
-    toggleFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    toggleFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     toggleFrame.Parent = screenGui
-
-    Instance.new("UICorner", toggleFrame).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", toggleFrame).CornerRadius = UDim.new(0, 10)
 
     local label = Instance.new("TextLabel")
-    label.Text = "Kill Connection"
+    label.Text = "SERVER ATTACK (LOOP)"
     label.Size = UDim2.new(0.6, 0, 1, 0)
     label.Position = UDim2.new(0.05, 0, 0, 0)
-    label.TextColor3 = Color3.new(1, 1, 1)
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 12
+    label.TextColor3 = Color3.fromRGB(255, 60, 60)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 11
     label.BackgroundTransparency = 1
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = toggleFrame
 
-    -- Toggle Visual
     local switchBG = Instance.new("TextButton")
-    switchBG.Size = UDim2.new(0, 50, 0, 24)
-    switchBG.Position = UDim2.new(0.95, 0, 0.5, 0)
+    switchBG.Size = UDim2.new(0, 50, 0, 26)
+    switchBG.Position = UDim2.new(0.93, 0, 0.5, 0)
     switchBG.AnchorPoint = Vector2.new(1, 0.5)
     switchBG.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     switchBG.Text = ""
@@ -139,33 +116,25 @@ local function createDisconnectToggle()
     Instance.new("UICorner", switchBG).CornerRadius = UDim.new(1, 0)
 
     local circle = Instance.new("Frame")
-    circle.Size = UDim2.new(0, 18, 0, 18)
+    circle.Size = UDim2.new(0, 20, 0, 20)
     circle.Position = UDim2.new(0.1, 0, 0.5, 0)
     circle.AnchorPoint = Vector2.new(0, 0.5)
     circle.BackgroundColor3 = Color3.new(1, 1, 1)
     circle.Parent = switchBG
     Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
 
-    local isOn = false
     switchBG.MouseButton1Click:Connect(function()
-        isOn = not isOn
-        if isOn then
-            -- Animasi On
+        isKilling = not isKilling
+        if isKilling then
             TweenService:Create(circle, TweenInfo.new(0.2), {Position = UDim2.new(0.9, 0, 0.5, 0), AnchorPoint = Vector2.new(1, 0.5)}):Play()
-            TweenService:Create(switchBG, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 50, 50)}):Play()
-            
-            -- FITUR DISCONNECT
-            task.wait(0.5)
-            player:Kick("Server Terputus (Toggle Activated)")
+            TweenService:Create(switchBG, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 0, 0)}):Play()
+            startDisconnectLoop()
         else
-            -- Animasi Off
             TweenService:Create(circle, TweenInfo.new(0.2), {Position = UDim2.new(0.1, 0, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5)}):Play()
             TweenService:Create(switchBG, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 60, 60)}):Play()
         end
     end)
 end
 
--- Jalankan Fungsi
-createLoadingScreen()
 createProfileUI()
-createDisconnectToggle()
+createToggle()
