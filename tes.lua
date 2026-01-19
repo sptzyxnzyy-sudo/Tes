@@ -1,366 +1,171 @@
-local modelName = "sptzyy"
-local zyy = nil
-local lastFired = nil
-local espObjects = {}
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 
--- Fungsi untuk menampilkan notifikasi
-local function showNotification(title, text, duration)
-    duration = duration or 3
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = title,
-        Text = text,
-        Icon = "",
-        Duration = duration,
-    })
-end
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 
--- Fungsi untuk membuat ESP box dan line
-local function createESP(player)
-    if player == game.Players.LocalPlayer then return end
-    
-    local esp = {}
-    
-    -- Box Highlight
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "ESP_Highlight_" .. player.Name
-    highlight.Adornee = nil
-    highlight.FillColor = Color3.fromRGB(255, 0, 0)
-    highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
-    highlight.FillTransparency = 0.8
-    highlight.OutlineTransparency = 0
-    highlight.Parent = game.CoreGui
-    
-    -- Line ke local player
-    local line = Instance.new("Frame")
-    line.Name = "ESP_Line_" .. player.Name
-    line.BackgroundColor3 = Color3.fromRGB(255, 255, 0)
-    line.BorderSizePixel = 0
-    line.Size = UDim2.new(0, 2, 0, 100)
-    line.Visible = false
-    line.ZIndex = 10
-    line.Parent = game.CoreGui
-    
-    -- Info label
-    local infoLabel = Instance.new("TextLabel")
-    infoLabel.Name = "ESP_Info_" .. player.Name
-    infoLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    infoLabel.BackgroundTransparency = 0.3
-    infoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    infoLabel.TextSize = 12
-    infoLabel.Font = Enum.Font.GothamBold
-    infoLabel.Text = ""
-    infoLabel.Size = UDim2.new(0, 120, 0, 35)
-    infoLabel.Visible = false
-    infoLabel.ZIndex = 10
-    infoLabel.Parent = game.CoreGui
-    
-    esp.highlight = highlight
-    esp.line = line
-    esp.infoLabel = infoLabel
-    
-    return esp
-end
+-- Create Main ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ModernSystemGui"
+screenGui.ResetOnSpawn = false -- Tetap ada saat respawn
+screenGui.Parent = playerGui
 
--- Fungsi untuk update ESP position
-local function updateESP(player, esp)
-    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
-        esp.highlight.Adornee = nil
-        esp.line.Visible = false
-        esp.infoLabel.Visible = false
-        return
-    end
-    
-    local rootPart = player.Character.HumanoidRootPart
-    local localPlayer = game.Players.LocalPlayer
-    local localRoot = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
-    
-    if not localRoot then return end
-    
-    -- Update highlight
-    esp.highlight.Adornee = player.Character
-    
-    -- Update line position dan rotation
-    local distance = (rootPart.Position - localRoot.Position).Magnitude
-    local direction = (rootPart.Position - localRoot.Position).Unit
-    
-    -- Calculate screen positions
-    local rootPos, rootVisible = workspace.CurrentCamera:WorldToViewportPoint(rootPart.Position)
-    local localPos, localVisible = workspace.CurrentCamera:WorldToViewportPoint(localRoot.Position)
-    
-    if rootVisible and localVisible then
-        -- Line dari local player ke target
-        local angle = math.atan2(rootPos.Y - localPos.Y, rootPos.X - localPos.X)
-        local length = math.min(distance * 0.5, 150)
-        
-        esp.line.Visible = true
-        esp.line.Size = UDim2.new(0, 2, 0, length)
-        esp.line.Position = UDim2.new(0, localPos.X, 0, localPos.Y)
-        esp.line.Rotation = math.deg(angle)
-        
-        -- Update info label
-        local health = "DEAD"
-        local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid and humanoid.Health > 0 then
-            health = math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth)
-        end
-        
-        esp.infoLabel.Text = string.format(
-            "%s\n%d studs\n%s",
-            player.Name,
-            math.floor(distance),
-            health
-        )
-        
-        -- Position info label di atas kepala player
-        esp.infoLabel.Position = UDim2.new(0, rootPos.X - 60, 0, rootPos.Y - 40)
-        esp.infoLabel.Visible = true
-        
-        -- Update warna berdasarkan health
-        if humanoid then
-            if humanoid.Health <= 0 then
-                esp.highlight.FillColor = Color3.fromRGB(100, 100, 100)
-                esp.line.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-            elseif humanoid.Health / humanoid.MaxHealth < 0.3 then
-                esp.highlight.FillColor = Color3.fromRGB(255, 0, 0)
-                esp.line.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-            elseif humanoid.Health / humanoid.MaxHealth < 0.6 then
-                esp.highlight.FillColor = Color3.fromRGB(255, 165, 0)
-                esp.line.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
-            else
-                esp.highlight.FillColor = Color3.fromRGB(0, 255, 0)
-                esp.line.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-            end
-        end
-    else
-        esp.line.Visible = false
-        esp.infoLabel.Visible = false
-    end
-end
+---------------------------------------
+-- 1. ANIMASI LOADING (Tengah Layar)
+---------------------------------------
+local function createLoadingScreen()
+    local loadingFrame = Instance.new("Frame")
+    loadingFrame.Size = UDim2.new(1, 0, 1, 0)
+    loadingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    loadingFrame.ZIndex = 10
+    loadingFrame.Parent = screenGui
 
--- Fungsi untuk setup ESP semua pemain
-local function setupESP()
-    -- Setup ESP untuk pemain yang sudah ada
-    for _, player in ipairs(game.Players:GetPlayers()) do
-        if player ~= game.Players.LocalPlayer and not espObjects[player] then
-            espObjects[player] = createESP(player)
-        end
-    end
-    
-    -- Listen untuk pemain baru
-    game.Players.PlayerAdded:Connect(function(player)
-        task.wait(1)
-        espObjects[player] = createESP(player)
-    end)
-    
-    -- Listen untuk pemain yang leave
-    game.Players.PlayerRemoving:Connect(function(player)
-        if espObjects[player] then
-            espObjects[player].highlight:Destroy()
-            espObjects[player].line:Destroy()
-            espObjects[player].infoLabel:Destroy()
-            espObjects[player] = nil
-        end
-    end)
-    
-    -- Update loop untuk ESP
-    game:GetService("RunService").RenderStepped:Connect(function()
-        for player, esp in pairs(espObjects) do
-            updateESP(player, esp)
-        end
+    local spinner = Instance.new("ImageLabel")
+    spinner.Size = UDim2.new(0, 80, 0, 80)
+    spinner.Position = UDim2.new(0.5, 0, 0.5, 0)
+    spinner.AnchorPoint = Vector2.new(0.5, 0.5)
+    spinner.BackgroundTransparency = 1
+    spinner.Image = "rbxassetid://6033328132" -- Icon Loading Bulat
+    spinner.ImageColor3 = Color3.fromRGB(0, 170, 255)
+    spinner.Parent = loadingFrame
+
+    -- Animasi Putar
+    local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1)
+    local tween = TweenService:Create(spinner, tweenInfo, {Rotation = 360})
+    tween:Play()
+
+    -- Hilangkan loading setelah 3 detik
+    task.delay(3, function()
+        TweenService:Create(loadingFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
+        TweenService:Create(spinner, TweenInfo.new(0.5), {ImageTransparency = 1}):Play()
+        task.wait(0.5)
+        loadingFrame:Destroy()
     end)
 end
 
--- Fungsi untuk kill semua pemain
-local function killAllPlayers()
-    local killCount = 0
-    local playersKilled = {}
-    local failedKills = {}
+---------------------------------------
+-- 2. UI PROFILE (Modern Design)
+---------------------------------------
+local function createProfileUI()
+    local profileFrame = Instance.new("Frame")
+    profileFrame.Size = UDim2.new(0, 250, 0, 80)
+    profileFrame.Position = UDim2.new(1, -20, 0, 20)
+    profileFrame.AnchorPoint = Vector2.new(1, 0)
+    profileFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    profileFrame.BorderSizePixel = 0
+    profileFrame.Parent = screenGui
+
+    -- Rounded Corner
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = profileFrame
+
+    -- Shadow/Stroke
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 2
+    stroke.Color = Color3.fromRGB(50, 50, 50)
+    stroke.Parent = profileFrame
+
+    -- Profile Picture
+    local img = Instance.new("ImageLabel")
+    img.Size = UDim2.new(0, 60, 0, 60)
+    img.Position = UDim2.new(0, 10, 0.5, 0)
+    img.AnchorPoint = Vector2.new(0, 0.5)
+    img.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    img.Image = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+    img.Parent = profileFrame
     
-    -- Method 1: Set health to 0
-    for _, player in ipairs(game.Players:GetPlayers()) do
-        if player ~= game.Players.LocalPlayer then
-            local success = pcall(function()
-                if player.Character then
-                    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-                    if humanoid and humanoid.Health > 0 then
-                        humanoid.Health = 0
-                        table.insert(playersKilled, player.Name)
-                        killCount = killCount + 1
-                    end
-                end
-            end)
+    local imgCorner = Instance.new("UICorner")
+    imgCorner.CornerRadius = UDim.new(1, 0)
+    imgCorner.Parent = img
+
+    -- Name & ID Labels
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Text = player.DisplayName .. " (@" .. player.Name .. ")"
+    nameLabel.Position = UDim2.new(0, 80, 0.25, 0)
+    nameLabel.Size = UDim2.new(0, 160, 0, 20)
+    nameLabel.TextColor3 = Color3.new(1, 1, 1)
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextSize = 14
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Parent = profileFrame
+
+    local idLabel = Instance.new("TextLabel")
+    idLabel.Text = "ID: " .. player.UserId
+    idLabel.Position = UDim2.new(0, 80, 0.55, 0)
+    idLabel.Size = UDim2.new(0, 160, 0, 20)
+    idLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    idLabel.TextXAlignment = Enum.TextXAlignment.Left
+    idLabel.Font = Enum.Font.Gotham
+    idLabel.TextSize = 12
+    idLabel.BackgroundTransparency = 1
+    idLabel.Parent = profileFrame
+end
+
+---------------------------------------
+-- 3. TOGGLE SWITCH (Server Disconnect)
+---------------------------------------
+local function createDisconnectToggle()
+    local toggleFrame = Instance.new("Frame")
+    toggleFrame.Size = UDim2.new(0, 200, 0, 40)
+    toggleFrame.Position = UDim2.new(1, -20, 0, 110)
+    toggleFrame.AnchorPoint = Vector2.new(1, 0)
+    toggleFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    toggleFrame.Parent = screenGui
+
+    Instance.new("UICorner", toggleFrame).CornerRadius = UDim.new(0, 8)
+
+    local label = Instance.new("TextLabel")
+    label.Text = "Kill Connection"
+    label.Size = UDim2.new(0.6, 0, 1, 0)
+    label.Position = UDim2.new(0.05, 0, 0, 0)
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 12
+    label.BackgroundTransparency = 1
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = toggleFrame
+
+    -- Toggle Visual
+    local switchBG = Instance.new("TextButton")
+    switchBG.Size = UDim2.new(0, 50, 0, 24)
+    switchBG.Position = UDim2.new(0.95, 0, 0.5, 0)
+    switchBG.AnchorPoint = Vector2.new(1, 0.5)
+    switchBG.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    switchBG.Text = ""
+    switchBG.Parent = toggleFrame
+    Instance.new("UICorner", switchBG).CornerRadius = UDim.new(1, 0)
+
+    local circle = Instance.new("Frame")
+    circle.Size = UDim2.new(0, 18, 0, 18)
+    circle.Position = UDim2.new(0.1, 0, 0.5, 0)
+    circle.AnchorPoint = Vector2.new(0, 0.5)
+    circle.BackgroundColor3 = Color3.new(1, 1, 1)
+    circle.Parent = switchBG
+    Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
+
+    local isOn = false
+    switchBG.MouseButton1Click:Connect(function()
+        isOn = not isOn
+        if isOn then
+            -- Animasi On
+            TweenService:Create(circle, TweenInfo.new(0.2), {Position = UDim2.new(0.9, 0, 0.5, 0), AnchorPoint = Vector2.new(1, 0.5)}):Play()
+            TweenService:Create(switchBG, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 50, 50)}):Play()
             
-            if not success then
-                table.insert(failedKills, player.Name)
-            end
+            -- FITUR DISCONNECT
+            task.wait(0.5)
+            player:Kick("Server Terputus (Toggle Activated)")
+        else
+            -- Animasi Off
+            TweenService:Create(circle, TweenInfo.new(0.2), {Position = UDim2.new(0.1, 0, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5)}):Play()
+            TweenService:Create(switchBG, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 60, 60)}):Play()
         end
-    end
-    
-    task.wait(0.5)
-    
-    -- Method 2: BreakJoints untuk yang belum mati
-    for _, player in ipairs(game.Players:GetPlayers()) do
-        if player ~= game.Players.LocalPlayer and not table.find(playersKilled, player.Name) then
-                local success = pcall(function()
-                    if player.Character then
-                        player.Character:BreakJoints()
-                        table.insert(playersKilled, player.Name)
-                        killCount = killCount + 1
-                    end
-                end)
-                
-                if not success then
-                    table.insert(failedKills, player.Name)
-                end
-            end
-        end
-    
-    return killCount, playersKilled, failedKills
-end
-
--- Notifikasi memulai proses
-showNotification("🔥 SPTZYY PRO ULTIMATE", "Starting execution with ESP...", 2)
-
--- Setup ESP system langsung jalan
-setupESP()
-showNotification("👁️ ESP SYSTEM", "ESP activated for all players", 2)
-
--- Hapus objek dengan nama modelName dari workspace
-local deletedCount = 0
-for _, obj in ipairs(workspace:GetChildren()) do
-    if obj.Name == modelName then
-        pcall(function()
-            obj:Destroy()
-            deletedCount = deletedCount + 1
-        end)
-    end
-end
-
-showNotification("🧹 CLEANUP", "Removed "..deletedCount.." objects", 2)
-
--- Deteksi saat objek dengan nama modelName ditambahkan ke workspace
-workspace.ChildAdded:Connect(function(child)
-    if child.Name == modelName and zyy == nil then
-        zyy = lastFired
-        showNotification("🎯 TARGET FOUND", modelName.." object linked!", 2)
-end)
-
--- Eksekusi Mass Kill langsung
-task.wait(1)
-showNotification("🚨 MASS KILL", "Executing kill sequence...", 2)
-
-local killCount, playersKilled, failedKills = killAllPlayers()
-
-task.wait(1)
-
-local payload = "KONTOL MESUM😂"
-
--- FASE 1: Kirim payload ke RemoteEvents
-local phase1Count = 0
-for _, remote in ipairs(game.ReplicatedStorage:GetDescendants()) do
-    if remote:IsA("RemoteEvent") then
-        pcall(function()
-            remote:FireServer(payload)
-            phase1Count = phase1Count + 1
-        end)
-        lastFired = remote
-    end
-end
-
-showNotification("📡 PHASE 1", phase1Count.." events triggered", 2)
-
-task.wait(0.3)
-
--- FASE 2: Kirim payload kosong
-local phase2Count = 0
-for _, remote in ipairs(game.ReplicatedStorage:GetDescendants()) do
-    if remote:IsA("RemoteEvent") then
-        pcall(function()
-            remote:FireServer()
-            phase2Count = phase2Count + 1
-        end)
-        lastFired = remote
-    end
-end
-
-showNotification("📡 PHASE 2", phase2Count.." events triggered", 2)
-
--- FITUR AVATAR
-pcall(function()
-    local player = game.Players.LocalPlayer
-    if player.Character then
-        local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            local desc = humanoid:GetAppliedDescription()
-            desc.Name = "⚡ SPTZYY PRO ⚡"
-            humanoid:ApplyDescription(desc)
-        end
-    end
-end)
-
-showNotification("👤 AVATAR", "Title: ⚡ SPTZYY PRO ⚡", 2)
-
--- PROSES AKHIR
-task.wait(0.5)
-
-if zyy and typeof(zyy) == "Instance" then
-    pcall(function()
-        local playerName = game.Players.LocalPlayer.Name
-        local insertPayload = [[
-            local player = game.Players:FindFirstChild("]] .. playerName .. [[")
-            if player and player:FindFirstChild("PlayerGui") then
-                local asset = game:GetService("InsertService"):LoadAsset(73729830375562)
-                asset.Parent = player.PlayerGui
-                for _, child in ipairs(asset:GetChildren()) do
-                    child.Parent = player.PlayerGui
-                end
-                asset:Destroy()
-            end
-        ]]
-        zyy:FireServer(insertPayload)
-        showNotification("🎉 SUCCESS", "Final payload delivered!", 3)
     end)
-else
-    showNotification("⚠️ WARNING", modelName.." not found", 2)
 end
 
--- NOTIFIKASI HASIL AKHIR
-task.wait(1)
-
-local totalPlayers = #game.Players:GetPlayers() - 1 -- exclude local player
-if totalPlayers < 0 then totalPlayers = 0 end
-
-local successRate = totalPlayers > 0 and math.floor((killCount / totalPlayers) * 100) or 100
-
--- Tampilkan hasil kill
-if killCount == totalPlayers then
-    showNotification("💀 MASS KILL COMPLETE", 
-        killCount.."/"..totalPlayers.." killed ("..successRate.."%)", 4)
-elseif killCount > 0 then
-    showNotification("⚠️ MASS KILL PARTIAL", 
-        killCount.."/"..totalPlayers.." killed ("..successRate.."%)", 4)
-else
-    showNotification("❌ MASS KILL FAILED", 
-        "0/"..totalPlayers.." killed", 4)
-end
-
--- INFO ESP AKTIF
-task.wait(1)
-showNotification("👁️ ESP ACTIVE", 
-    "Tracking "..totalPlayers.." players\n"..
-    "Lines: VISIBLE\n"..
-    "Info: ON", 4)
-
--- SUMMARY FINAL
-task.wait(1)
-
-showNotification("📊 EXECUTION COMPLETE", 
-    "Kill: "..killCount.."/"..totalPlayers.."\n"..
-    "ESP: ALWAYS ON\n"..
-    "Status: OPERATIONAL", 5)
-
--- Auto refresh ESP saat character respawn
-game.Players.LocalPlayer.CharacterAdded:Connect(function(character)
-    task.wait(2)
-    showNotification("🔄 ESP REFRESH", "ESP system updated", 2)
-end
+-- Jalankan Fungsi
+createLoadingScreen()
+createProfileUI()
+createDisconnectToggle()
