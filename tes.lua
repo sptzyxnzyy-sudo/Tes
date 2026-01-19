@@ -1,42 +1,50 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
-local StarterGui = game:GetService("StarterGui")
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
 -- Pembersihan UI lama
-if LocalPlayer.PlayerGui:FindFirstChild("SptzyPlayerList") then
-    LocalPlayer.PlayerGui.SptzyPlayerList:Destroy()
+if LocalPlayer.PlayerGui:FindFirstChild("SptzyModernExplorer") then
+    LocalPlayer.PlayerGui.SptzyModernExplorer:Destroy()
 end
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "SptzyPlayerList"
+screenGui.Name = "SptzyModernExplorer"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer.PlayerGui
 
 ---------------------------------------
--- 1. MAIN CONTAINER (DRAGGABLE)
+-- 1. MAIN CONTAINER (MODERN DARK THEME)
 ---------------------------------------
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 300, 0, 400)
-mainFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
-mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+mainFrame.Size = UDim2.new(0, 350, 0, 450)
+mainFrame.Position = UDim2.new(0.5, -175, 0.5, -225)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
-mainFrame.Draggable = true -- Support geser manual
+mainFrame.Draggable = true
 mainFrame.Parent = screenGui
 
 local stroke = Instance.new("UIStroke", mainFrame)
 stroke.Thickness = 2
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 15)
+stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 16)
+
+-- Header Glow Line
+local headerLine = Instance.new("Frame")
+headerLine.Size = UDim2.new(1, 0, 0, 2)
+headerLine.Position = UDim2.new(0, 0, 0, 55)
+headerLine.BorderSizePixel = 0
+headerLine.Parent = mainFrame
 
 ---------------------------------------
--- 2. RAINBOW TITLE: SPTZY
+-- 2. BRAINBROW TITLE LOGIC
 ---------------------------------------
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Text = "SPTZY EXPLORER"
-titleLabel.Size = UDim2.new(1, 0, 0, 50)
+titleLabel.Text = "SPTZY EXPLORER V9"
+titleLabel.Size = UDim2.new(1, 0, 0, 55)
 titleLabel.Font = Enum.Font.GothamBlack
-titleLabel.TextSize = 22
+titleLabel.TextSize = 20
 titleLabel.BackgroundTransparency = 1
 titleLabel.Parent = mainFrame
 
@@ -47,109 +55,132 @@ task.spawn(function()
         local color = Color3.fromHSV(h % 1, 0.7, 1)
         titleLabel.TextColor3 = color
         stroke.Color = color
+        headerLine.BackgroundColor3 = color
         task.wait()
     end
 end)
 
 ---------------------------------------
--- 3. SCROLLING PLAYER LIST
+-- 3. ENHANCED SCROLLING SYSTEM
 ---------------------------------------
 local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Name = "PlayerScroll"
-scrollFrame.Position = UDim2.new(0, 10, 0, 60)
+scrollFrame.Name = "PlayerList"
+scrollFrame.Position = UDim2.new(0, 10, 0, 65)
 scrollFrame.Size = UDim2.new(1, -20, 1, -80)
 scrollFrame.BackgroundTransparency = 1
-scrollFrame.ScrollBarThickness = 3
-scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(255, 255, 255)
+scrollFrame.ScrollBarThickness = 0 -- Sembunyikan bar agar rapi tapi tetap bisa scroll
 scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollFrame.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y -- Support scroll luas tanpa terpotong
 scrollFrame.Parent = mainFrame
 
 local layout = Instance.new("UIListLayout", scrollFrame)
-layout.Padding = UDim.new(0, 8)
-layout.SortOrder = Enum.SortOrder.Name
+layout.Padding = UDim.new(0, 10)
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 ---------------------------------------
--- 4. FUNCTION: UPDATE LIST
+-- 4. PLAYER CARD TEMPLATE
 ---------------------------------------
-local function updateList()
-    -- Bersihkan list lama
-    for _, child in pairs(scrollFrame:GetChildren()) do
-        if child:IsA("Frame") then child:Destroy() end
+local function createPlayerCard(player)
+    local card = Instance.new("Frame")
+    card.Size = UDim2.new(1, -5, 0, 70)
+    card.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    card.BorderSizePixel = 0
+    card.Parent = scrollFrame
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
+
+    -- Avatar Profile
+    local img = Instance.new("ImageLabel")
+    img.Size = UDim2.new(0, 50, 0, 50)
+    img.Position = UDim2.new(0, 10, 0.5, -25)
+    img.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    img.Image = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+    img.Parent = card
+    Instance.new("UICorner", img).CornerRadius = UDim.new(1, 0)
+
+    -- Name Info
+    local name = Instance.new("TextLabel")
+    name.Text = player.DisplayName
+    name.Size = UDim2.new(0, 140, 0, 20)
+    name.Position = UDim2.new(0, 70, 0, 15)
+    name.Font = Enum.Font.GothamBold
+    name.TextColor3 = Color3.new(1,1,1)
+    name.TextSize = 13
+    name.TextXAlignment = Enum.TextXAlignment.Left
+    name.BackgroundTransparency = 1
+    name.Parent = card
+
+    local user = Instance.new("TextLabel")
+    user.Text = "@" .. player.Name
+    user.Size = UDim2.new(0, 140, 0, 15)
+    user.Position = UDim2.new(0, 70, 0, 35)
+    user.Font = Enum.Font.Gotham
+    user.TextColor3 = Color3.fromRGB(150, 150, 150)
+    user.TextSize = 10
+    user.TextXAlignment = Enum.TextXAlignment.Left
+    user.BackgroundTransparency = 1
+    user.Parent = card
+
+    -- ACTION BUTTONS
+    local btnContainer = Instance.new("Frame")
+    btnContainer.Size = UDim2.new(0, 80, 1, 0)
+    btnContainer.Position = UDim2.new(1, -90, 0, 0)
+    btnContainer.BackgroundTransparency = 1
+    btnContainer.Parent = card
+
+    local function createActionButton(text, color, pos, callback)
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.new(1, 0, 0, 25)
+        b.Position = pos
+        b.BackgroundColor3 = color
+        b.Text = text
+        b.Font = Enum.Font.GothamBold
+        b.TextColor3 = Color3.new(1,1,1)
+        b.TextSize = 10
+        b.Parent = btnContainer
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+        b.MouseButton1Click:Connect(callback)
     end
 
-    for _, player in pairs(Players:GetPlayers()) do
-        local card = Instance.new("Frame")
-        card.Size = UDim2.new(1, -10, 0, 60)
-        card.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-        card.Parent = scrollFrame
-        Instance.new("UICorner", card)
+    -- View Camera
+    createActionButton("VIEW", Color3.fromRGB(50, 50, 200), UDim2.new(0, 0, 0, 8), function()
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            Camera.CameraSubject = player.Character.Humanoid
+        end
+    end)
 
-        -- Profile Icon
-        local icon = Instance.new("ImageLabel")
-        icon.Size = UDim2.new(0, 45, 0, 45)
-        icon.Position = UDim2.new(0, 8, 0.5, -22)
-        icon.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        icon.Image = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
-        icon.Parent = card
-        Instance.new("UICorner", icon).CornerRadius = UDim.new(1, 0)
-
-        -- Name Label
-        local nameLabel = Instance.new("TextLabel")
-        nameLabel.Text = player.DisplayName
-        nameLabel.Position = UDim2.new(0, 65, 0.5, -18)
-        nameLabel.Size = UDim2.new(1, -75, 0, 20)
-        nameLabel.Font = Enum.Font.GothamBold
-        nameLabel.TextColor3 = Color3.new(1, 1, 1)
-        nameLabel.TextSize = 14
-        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-        nameLabel.BackgroundTransparency = 1
-        nameLabel.Parent = card
-
-        -- Username Label
-        local userLabel = Instance.new("TextLabel")
-        userLabel.Text = "@" .. player.Name
-        userLabel.Position = UDim2.new(0, 65, 0.5, 2)
-        userLabel.Size = UDim2.new(1, -75, 0, 15)
-        userLabel.Font = Enum.Font.Gotham
-        userLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-        userLabel.TextSize = 11
-        userLabel.TextXAlignment = Enum.TextXAlignment.Left
-        userLabel.BackgroundTransparency = 1
-        userLabel.Parent = card
-
-        -- Efek Hover
-        card.MouseEnter:Connect(function()
-            TweenService:Create(card, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(40, 40, 40)}):Play()
-        end)
-        card.MouseLeave:Connect(function()
-            TweenService:Create(card, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(25, 25, 25)}):Play()
-        end)
-    end
-    
-    -- Auto adjust canvas
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+    -- Teleport To
+    createActionButton("GOTO", Color3.fromRGB(50, 150, 50), UDim2.new(0, 0, 0, 37), function()
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = player.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, -3)
+        end
+    end)
 end
 
--- Update saat ada yang masuk/keluar
-Players.PlayerAdded:Connect(updateList)
-Players.PlayerRemoving:Connect(updateList)
-
--- Inisialisasi
-updateList()
-
 ---------------------------------------
--- 5. CLOSE BUTTON
+-- 5. REFRESH LOGIC
 ---------------------------------------
-local closeBtn = Instance.new("TextButton")
-closeBtn.Text = "X"
-closeBtn.Size = UDim2.new(0, 30, 0, 30)
-closeBtn.Position = UDim2.new(1, -40, 0, 10)
-closeBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-closeBtn.TextColor3 = Color3.new(1,1,1)
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.Parent = mainFrame
-Instance.new("UICorner", closeBtn)
+local function refresh()
+    for _, c in pairs(scrollFrame:GetChildren()) do
+        if c:IsA("Frame") then c:Destroy() end
+    end
+    for _, p in pairs(Players:GetPlayers()) do
+        createPlayerCard(p)
+    end
+end
 
-closeBtn.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
-end)
+Players.PlayerAdded:Connect(refresh)
+Players.PlayerRemoving:Connect(refresh)
+refresh()
+
+-- Close Button
+local close = Instance.new("TextButton")
+close.Text = "×"
+close.Size = UDim2.new(0, 30, 0, 30)
+close.Position = UDim2.new(1, -35, 0, 12)
+close.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+close.TextColor3 = Color3.new(1,1,1)
+close.Font = Enum.Font.GothamBold
+close.TextSize = 20
+close.Parent = mainFrame
+Instance.new("UICorner", close)
+close.MouseButton1Click:Connect(function() screenGui:Destroy() end)
