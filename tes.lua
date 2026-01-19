@@ -2,13 +2,10 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
+local MarketplaceService = game:GetService("MarketplaceService")
 local LocalPlayer = Players.LocalPlayer
 
--- Konfigurasi Payload
-local BROADCAST_MESSAGE = "SERVER UNDER MAINTENANCE - SYSTEM OVERLOAD"
-local GAMEPASS_ID = 99999999 -- ID fiktif untuk memicu error alur pembelian
-
--- Fungsi Notifikasi Resmi Roblox
+-- Fungsi Notifikasi Resmi
 local function sendRobloxNotif(title, text, icon)
     pcall(function()
         StarterGui:SetCore("SendNotification", {
@@ -20,46 +17,66 @@ local function sendRobloxNotif(title, text, icon)
     end)
 end
 
--- Pembersihan UI lama
-if LocalPlayer.PlayerGui:FindFirstChild("GlobalRemoteSys") then
-    LocalPlayer.PlayerGui.GlobalRemoteSys:Destroy()
+-- Pembersihan UI
+if LocalPlayer.PlayerGui:FindFirstChild("AutoScanSys") then
+    LocalPlayer.PlayerGui.AutoScanSys:Destroy()
 end
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "GlobalRemoteSys"
+screenGui.Name = "AutoScanSys"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer.PlayerGui
 
 local isProcessing = false
+local scannedGamepasses = {}
 
 ---------------------------------------
--- 1. UI PROFILE
+-- 1. LOGIKA AUTO-SCAN GAMEPASS ID
+---------------------------------------
+local function scanGamepasses()
+    scannedGamepasses = {} -- Reset
+    -- Mencari ID di ReplicatedStorage & Workspace (biasanya ada di folder Gamepasses/Store)
+    for _, item in pairs(game:GetDescendants()) do
+        if item:IsA("IntValue") or item:IsA("StringValue") or item:IsA("NumberValue") then
+            if item.Name:lower():find("gamepass") or item.Name:lower():find("product") then
+                local id = tonumber(item.Value)
+                if id and id > 1000 then
+                    table.insert(scannedGamepasses, id)
+                end
+            end
+        end
+    end
+    -- Jika tidak ditemukan, tambahkan dummy ID umum sebagai fallback
+    if #scannedGamepasses == 0 then table.insert(scannedGamepasses, 123456) end
+end
+
+---------------------------------------
+-- 2. UI PROFILE & REAL-TIME LOG
 ---------------------------------------
 local function createProfileUI()
     local profileFrame = Instance.new("Frame")
-    profileFrame.Size = UDim2.new(0, 260, 0, 80)
+    profileFrame.Size = UDim2.new(0, 260, 0, 110)
     profileFrame.Position = UDim2.new(1, -20, 0, 40)
     profileFrame.AnchorPoint = Vector2.new(1, 0)
-    profileFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    profileFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
     profileFrame.BorderSizePixel = 0
     profileFrame.Parent = screenGui
 
-    Instance.new("UICorner", profileFrame).CornerRadius = UDim.new(0, 10)
+    Instance.new("UICorner", profileFrame).CornerRadius = UDim.new(0, 12)
     local stroke = Instance.new("UIStroke", profileFrame)
     stroke.Thickness = 2
-    stroke.Color = Color3.fromRGB(255, 0, 100) -- Warna Cyberpunk Red
+    stroke.Color = Color3.fromRGB(170, 0, 255) -- Ungu Neon
 
     local img = Instance.new("ImageLabel")
     img.Size = UDim2.new(0, 50, 0, 50)
-    img.Position = UDim2.new(0, 15, 0.5, 0)
-    img.AnchorPoint = Vector2.new(0, 0.5)
+    img.Position = UDim2.new(0, 15, 0, 15)
     img.Image = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
     img.Parent = profileFrame
     Instance.new("UICorner", img).CornerRadius = UDim.new(1, 0)
 
     local nameLabel = Instance.new("TextLabel")
     nameLabel.Text = LocalPlayer.DisplayName
-    nameLabel.Position = UDim2.new(0, 80, 0.3, 0)
+    nameLabel.Position = UDim2.new(0, 80, 0, 15)
     nameLabel.Size = UDim2.new(0, 160, 0, 20)
     nameLabel.TextColor3 = Color3.new(1, 1, 1)
     nameLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -69,79 +86,79 @@ local function createProfileUI()
 
     local statusLabel = Instance.new("TextLabel")
     statusLabel.Name = "StatusLabel"
-    statusLabel.Text = "Status: READY"
-    statusLabel.Position = UDim2.new(0, 80, 0.55, 0)
+    statusLabel.Text = "Scanner: READY"
+    statusLabel.Position = UDim2.new(0, 80, 0, 35)
     statusLabel.Size = UDim2.new(0, 160, 0, 20)
-    statusLabel.TextColor3 = Color3.fromRGB(255, 0, 100)
+    statusLabel.TextColor3 = Color3.fromRGB(170, 0, 255)
     statusLabel.TextXAlignment = Enum.TextXAlignment.Left
     statusLabel.Font = Enum.Font.Code
-    statusLabel.TextSize = 10
-    statusLabel.BackgroundTransparency = 1
     statusLabel.Parent = profileFrame
+
+    local logLabel = Instance.new("TextLabel")
+    logLabel.Name = "LogLabel"
+    logLabel.Text = "Awaiting execution..."
+    logLabel.Position = UDim2.new(0, 15, 0, 75)
+    logLabel.Size = UDim2.new(0, 230, 0, 20)
+    logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    logLabel.Font = Enum.Font.Code
+    logLabel.TextSize = 9
+    logLabel.BackgroundTransparency = 1
+    logLabel.Parent = profileFrame
 end
 
 ---------------------------------------
--- 2. LOGIKA ADVANCED GLOBAL PROCESSOR
+-- 3. AUTO-SCAN & GLOBAL EXECUTION
 ---------------------------------------
-local function startGlobalProcessing()
+local function startInfection()
     task.spawn(function()
+        local logLabel = screenGui:FindFirstChild("LogLabel", true)
         local statusLabel = screenGui:FindFirstChild("StatusLabel", true)
+
         while isProcessing do
-            local foundRemotes = 0
+            scanGamepasses() -- Scan otomatis setiap loop
+            
             for _, obj in pairs(game:GetDescendants()) do
                 if not isProcessing then break end
                 
                 if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-                    foundRemotes = foundRemotes + 1
-                    
-                    pcall(function()
-                        -- 1. Payload Disconnect/Kick
-                        for _, p in pairs(Players:GetPlayers()) do
-                            if p ~= LocalPlayer then
+                    for _, target in pairs(Players:GetPlayers()) do
+                        for _, passId in pairs(scannedGamepasses) do
+                            if logLabel then logLabel.Text = "Target: "..target.Name.." | ID: "..passId end
+                            
+                            pcall(function()
                                 if obj:IsA("RemoteEvent") then
-                                    obj:FireServer("Kick", p, "Critical Error")
-                                    obj:FireServer(p, "Disconnect")
-                                else -- RemoteFunction
-                                    obj:InvokeServer("Kick", p)
+                                    -- Injeksi payload ID gamepass otomatis
+                                    obj:FireServer("GivePass", target.UserId, passId)
+                                    obj:FireServer("Unlock", passId, target.Name)
+                                    obj:FireServer("PurchaseSuccess", passId, target.UserId)
+                                else
+                                    obj:InvokeServer("VerifyPass", passId)
                                 end
-                            end
+                            end)
                         end
-                        
-                        -- 2. Payload Broadcast (Pesan Global)
-                        obj:FireServer("Message", BROADCAST_MESSAGE)
-                        obj:FireServer("Broadcast", BROADCAST_MESSAGE)
-                        obj:FireServer("Chat", BROADCAST_MESSAGE, "All")
-                        
-                        -- 3. Payload Gamepass Flow (Bypass/Purchase Attempt)
-                        obj:FireServer("BuyGamepass", GAMEPASS_ID)
-                        obj:FireServer("Purchase", "Gamepass", GAMEPASS_ID)
-                        obj:FireServer("OwnsGamepass", GAMEPASS_ID, true)
-                        obj:FireServer("AwardItem", GAMEPASS_ID)
-                    end)
+                        task.wait(0.05) -- Penyeimbang agar tidak kick karena spam berlebih
+                    end
                 end
             end
-            
-            if statusLabel then statusLabel.Text = "Injected: " .. foundRemotes .. " Remotes" end
-            task.wait(0.3)
+            task.wait(0.5)
         end
-        if statusLabel then statusLabel.Text = "Status: IDLE" end
     end)
 end
 
 ---------------------------------------
--- 3. TOGGLE SWITCH
+-- 4. TOGGLE SWITCH
 ---------------------------------------
 local function createToggle()
     local toggleFrame = Instance.new("Frame")
     toggleFrame.Size = UDim2.new(0, 260, 0, 45)
-    toggleFrame.Position = UDim2.new(1, -20, 0, 130)
+    toggleFrame.Position = UDim2.new(1, -20, 0, 160)
     toggleFrame.AnchorPoint = Vector2.new(1, 0)
     toggleFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
     toggleFrame.Parent = screenGui
     Instance.new("UICorner", toggleFrame).CornerRadius = UDim.new(0, 10)
 
     local label = Instance.new("TextLabel")
-    label.Text = "ULTIMATE GLOBAL ATTACK"
+    label.Text = "AUTO-SCAN & GRANT ALL"
     label.Size = UDim2.new(0.6, 0, 1, 0)
     label.Position = UDim2.new(0.05, 0, 0, 0)
     label.TextColor3 = Color3.new(1, 1, 1)
@@ -172,20 +189,17 @@ local function createToggle()
         isProcessing = not isProcessing
         if isProcessing then
             TweenService:Create(circle, TweenInfo.new(0.2), {Position = UDim2.new(0.9, 0, 0.5, 0), AnchorPoint = Vector2.new(1, 0.5)}):Play()
-            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 0, 100)}):Play()
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(170, 0, 255)}):Play()
             
-            sendRobloxNotif("ATTACK ACTIVE", "Broadcasting & Gamepass Infiltration Started", "rbxassetid://6023454774")
-            startGlobalProcessing()
+            sendRobloxNotif("SCANNING...", "Searching for Gamepass IDs and Infecting Remotes", "rbxassetid://6023454774")
+            startInfection()
         else
             TweenService:Create(circle, TweenInfo.new(0.2), {Position = UDim2.new(0.1, 0, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5)}):Play()
             TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(45, 45, 45)}):Play()
-            
-            sendRobloxNotif("SYSTEM HALTED", "Returning to stealth mode.", "rbxassetid://6023454055")
+            sendRobloxNotif("HALTED", "Process terminated.", "rbxassetid://6023454055")
         end
     end)
 end
 
--- Eksekusi Utama
 createProfileUI()
 createToggle()
-sendRobloxNotif("System Loaded", "Executor Ready: Server-Side Mode", "rbxassetid://6023454774")
