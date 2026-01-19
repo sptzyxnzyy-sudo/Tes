@@ -1,194 +1,155 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local StarterGui = game:GetService("StarterGui")
-local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
 
----------------------------------------
--- 1. ANTI-KICK (SILENT PROTECTION)
----------------------------------------
-local mt = getrawmetatable(game)
-local oldNamecall = mt.__namecall
-setreadonly(mt, false)
-
-mt.__namecall = newcclosure(function(self, ...)
-    local method = getnamecallmethod()
-    if tostring(method) == "Kick" or tostring(method) == "kick" then
-        if self == LocalPlayer then
-            return nil 
-        end
-    end
-    return oldNamecall(self, unpack({...}))
-end)
-setreadonly(mt, true)
-
--- Pembersihan UI
-if LocalPlayer.PlayerGui:FindFirstChild("SptzyV7Progress") then
-    LocalPlayer.PlayerGui.SptzyV7Progress:Destroy()
+-- Pembersihan UI lama
+if LocalPlayer.PlayerGui:FindFirstChild("SptzyPlayerList") then
+    LocalPlayer.PlayerGui.SptzyPlayerList:Destroy()
 end
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "SptzyV7Progress"
+screenGui.Name = "SptzyPlayerList"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer.PlayerGui
 
-local isProcessing = false
-local crashData = string.rep("SPTZY_BYPASS_", 900)
-local TP_VOID = CFrame.new(0, -99999, 0)
+---------------------------------------
+-- 1. MAIN CONTAINER (DRAGGABLE)
+---------------------------------------
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 300, 0, 400)
+mainFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
+mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true -- Support geser manual
+mainFrame.Parent = screenGui
+
+local stroke = Instance.new("UIStroke", mainFrame)
+stroke.Thickness = 2
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 15)
 
 ---------------------------------------
--- 2. UI MINIMALIS + PROGRESS BAR
+-- 2. RAINBOW TITLE: SPTZY
 ---------------------------------------
-local function createProfileUI()
-    local profileFrame = Instance.new("Frame")
-    profileFrame.Size = UDim2.new(0, 260, 0, 130)
-    profileFrame.Position = UDim2.new(1, -20, 0, 40)
-    profileFrame.AnchorPoint = Vector2.new(1, 0)
-    profileFrame.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
-    profileFrame.BorderSizePixel = 0
-    profileFrame.Parent = screenGui
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Text = "SPTZY EXPLORER"
+titleLabel.Size = UDim2.new(1, 0, 0, 50)
+titleLabel.Font = Enum.Font.GothamBlack
+titleLabel.TextSize = 22
+titleLabel.BackgroundTransparency = 1
+titleLabel.Parent = mainFrame
 
-    local stroke = Instance.new("UIStroke", profileFrame)
-    stroke.Thickness = 2
-    Instance.new("UICorner", profileFrame).CornerRadius = UDim.new(0, 12)
+task.spawn(function()
+    local h = 0
+    while true do
+        h = h + 0.01
+        local color = Color3.fromHSV(h % 1, 0.7, 1)
+        titleLabel.TextColor3 = color
+        stroke.Color = color
+        task.wait()
+    end
+end)
 
-    -- RAINBOW TITLE: SPTZY
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Text = "SPTZY V7"
-    titleLabel.Position = UDim2.new(0, 15, 0, 10)
-    titleLabel.Size = UDim2.new(0, 230, 0, 35)
-    titleLabel.Font = Enum.Font.GothamBlack
-    titleLabel.TextSize = 28
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.Parent = profileFrame
+---------------------------------------
+-- 3. SCROLLING PLAYER LIST
+---------------------------------------
+local scrollFrame = Instance.new("ScrollingFrame")
+scrollFrame.Name = "PlayerScroll"
+scrollFrame.Position = UDim2.new(0, 10, 0, 60)
+scrollFrame.Size = UDim2.new(1, -20, 1, -80)
+scrollFrame.BackgroundTransparency = 1
+scrollFrame.ScrollBarThickness = 3
+scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(255, 255, 255)
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollFrame.Parent = mainFrame
 
-    task.spawn(function()
-        local hue = 0
-        while true do
-            hue = hue + 0.01
-            local color = Color3.fromHSV(hue % 1, 0.8, 1)
-            titleLabel.TextColor3 = color
-            stroke.Color = color
-            task.wait()
-        end
-    end)
+local layout = Instance.new("UIListLayout", scrollFrame)
+layout.Padding = UDim.new(0, 8)
+layout.SortOrder = Enum.SortOrder.Name
 
-    local statusLabel = Instance.new("TextLabel")
-    statusLabel.Name = "StatusLabel"
-    statusLabel.Text = "Status: System Idle"
-    statusLabel.Position = UDim2.new(0, 15, 0, 50)
-    statusLabel.Size = UDim2.new(0, 230, 0, 20)
-    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    statusLabel.Font = Enum.Font.GothamMedium
-    statusLabel.TextSize = 10
-    statusLabel.BackgroundTransparency = 1
-    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-    statusLabel.Parent = profileFrame
+---------------------------------------
+-- 4. FUNCTION: UPDATE LIST
+---------------------------------------
+local function updateList()
+    -- Bersihkan list lama
+    for _, child in pairs(scrollFrame:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
 
-    -- PROGRESS BAR BACKGROUND
-    local barBg = Instance.new("Frame")
-    barBg.Name = "BarBackground"
-    barBg.Size = UDim2.new(0, 230, 0, 8)
-    barBg.Position = UDim2.new(0, 15, 0, 85)
-    barBg.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    barBg.BorderSizePixel = 0
-    barBg.Parent = profileFrame
-    Instance.new("UICorner", barBg).CornerRadius = UDim.new(1, 0)
+    for _, player in pairs(Players:GetPlayers()) do
+        local card = Instance.new("Frame")
+        card.Size = UDim2.new(1, -10, 0, 60)
+        card.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+        card.Parent = scrollFrame
+        Instance.new("UICorner", card)
 
-    -- PROGRESS BAR FILL
-    local barFill = Instance.new("Frame")
-    barFill.Name = "BarFill"
-    barFill.Size = UDim2.new(0, 0, 1, 0)
-    barFill.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
-    barFill.BorderSizePixel = 0
-    barFill.Parent = barBg
-    Instance.new("UICorner", barFill).CornerRadius = UDim.new(1, 0)
+        -- Profile Icon
+        local icon = Instance.new("ImageLabel")
+        icon.Size = UDim2.new(0, 45, 0, 45)
+        icon.Position = UDim2.new(0, 8, 0.5, -22)
+        icon.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        icon.Image = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+        icon.Parent = card
+        Instance.new("UICorner", icon).CornerRadius = UDim.new(1, 0)
 
-    -- Glow effect on bar fill
-    local barGlow = Instance.new("UIStroke", barFill)
-    barGlow.Color = Color3.fromRGB(0, 255, 150)
-    barGlow.Thickness = 1
-    barGlow.Transparency = 0.5
+        -- Name Label
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Text = player.DisplayName
+        nameLabel.Position = UDim2.new(0, 65, 0.5, -18)
+        nameLabel.Size = UDim2.new(1, -75, 0, 20)
+        nameLabel.Font = Enum.Font.GothamBold
+        nameLabel.TextColor3 = Color3.new(1, 1, 1)
+        nameLabel.TextSize = 14
+        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Parent = card
+
+        -- Username Label
+        local userLabel = Instance.new("TextLabel")
+        userLabel.Text = "@" .. player.Name
+        userLabel.Position = UDim2.new(0, 65, 0.5, 2)
+        userLabel.Size = UDim2.new(1, -75, 0, 15)
+        userLabel.Font = Enum.Font.Gotham
+        userLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+        userLabel.TextSize = 11
+        userLabel.TextXAlignment = Enum.TextXAlignment.Left
+        userLabel.BackgroundTransparency = 1
+        userLabel.Parent = card
+
+        -- Efek Hover
+        card.MouseEnter:Connect(function()
+            TweenService:Create(card, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(40, 40, 40)}):Play()
+        end)
+        card.MouseLeave:Connect(function()
+            TweenService:Create(card, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(25, 25, 25)}):Play()
+        end)
+    end
+    
+    -- Auto adjust canvas
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
 end
 
----------------------------------------
--- 3. LOGIKA LOOP + PROGRESS BAR ANIMATION
----------------------------------------
-local function startExecution()
-    task.spawn(function()
-        local status = screenGui:FindFirstChild("StatusLabel", true)
-        local fill = screenGui:FindFirstChild("BarFill", true)
-        
-        while isProcessing do
-            local allPlayers = Players:GetPlayers()
-            for i, player in ipairs(allPlayers) do
-                if not isProcessing then break end
-                
-                if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") then
-                    -- Animasi Progress Bar
-                    if fill then
-                        local percent = i / #allPlayers
-                        TweenService:Create(fill, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Size = UDim2.new(percent, 0, 1, 0)}):Play()
-                    end
-                    
-                    if status then status.Text = "Targeting: " .. player.DisplayName end
-                    Camera.CameraSubject = player.Character.Humanoid
+-- Update saat ada yang masuk/keluar
+Players.PlayerAdded:Connect(updateList)
+Players.PlayerRemoving:Connect(updateList)
 
-                    -- Remote Execution
-                    for _, remote in pairs(game:GetDescendants()) do
-                        if not isProcessing then break end
-                        if remote:IsA("RemoteEvent") then
-                            pcall(function()
-                                remote:FireServer("Teleport", player, TP_VOID)
-                                remote:FireServer("Kick", player, crashData)
-                            end)
-                        end
-                    end
-                    task.wait(1.5)
-                end
-            end
-            
-            -- Reset bar setelah satu putaran server
-            if fill then fill.Size = UDim2.new(0, 0, 1, 0) end
-            task.wait(0.1)
-        end
-        
-        if status then status.Text = "Status: System Idle" end
-        if fill then fill.Size = UDim2.new(0, 0, 1, 0) end
-    end)
-end
+-- Inisialisasi
+updateList()
 
 ---------------------------------------
--- 4. TOGGLE BUTTON
+-- 5. CLOSE BUTTON
 ---------------------------------------
-local function createToggle()
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 260, 0, 45)
-    btn.Position = UDim2.new(1, -20, 0, 180)
-    btn.AnchorPoint = Vector2.new(1, 0)
-    btn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    btn.Font = Enum.Font.GothamBold
-    btn.Text = "ACTIVATE SPTZY ENGINE"
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.TextSize = 12
-    btn.Parent = screenGui
-    Instance.new("UICorner", btn)
+local closeBtn = Instance.new("TextButton")
+closeBtn.Text = "X"
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -40, 0, 10)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+closeBtn.TextColor3 = Color3.new(1,1,1)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.Parent = mainFrame
+Instance.new("UICorner", closeBtn)
 
-    btn.MouseButton1Click:Connect(function()
-        isProcessing = not isProcessing
-        if isProcessing then
-            btn.Text = "STOP ENGINE"
-            btn.BackgroundColor3 = Color3.fromRGB(180, 0, 50)
-            startExecution()
-        else
-            btn.Text = "ACTIVATE SPTZY ENGINE"
-            btn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-            Camera.CameraSubject = LocalPlayer.Character.Humanoid
-        end
-    end)
-end
-
-createProfileUI()
-createToggle()
+closeBtn.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
