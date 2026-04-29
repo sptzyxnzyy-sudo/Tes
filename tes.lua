@@ -1,165 +1,328 @@
-local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
-local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
 
--- Create Canvas
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "IkyyPremium_V3"
-ScreenGui.Parent = CoreGui
-ScreenGui.ResetOnSpawn = false
-
--- Main Frame
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-MainFrame.BorderSizePixel = 0
-MainFrame.Position = UDim2.new(0.5, -110, 0.5, -100)
-MainFrame.Size = UDim2.new(0, 220, 0, 280)
-MainFrame.Active = true
-MainFrame.Draggable = true
-
--- Rainbow Border Effect
-local Border = Instance.new("Frame")
-Border.Name = "RainbowBorder"
-Border.Parent = MainFrame
-Border.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-Border.BorderSizePixel = 0
-Border.Position = UDim2.new(0, -2, 0, -2)
-Border.Size = UDim2.new(1, 4, 1, 4)
-Border.ZIndex = 0
-
-local UICorner_B = Instance.new("UICorner")
-UICorner_B.CornerRadius = UDim.new(0, 8)
-UICorner_B.Parent = Border
-
-local UICorner_M = Instance.new("UICorner")
-UICorner_M.CornerRadius = UDim.new(0, 8)
-UICorner_M.Parent = MainFrame
-
--- Profile Section
-local ProfileFrame = Instance.new("Frame")
-ProfileFrame.Size = UDim2.new(1, 0, 0, 60)
-ProfileFrame.BackgroundTransparency = 1
-ProfileFrame.Parent = MainFrame
-
-local AvatarImg = Instance.new("ImageLabel")
-AvatarImg.Size = UDim2.new(0, 45, 0, 45)
-AvatarImg.Position = UDim2.new(0, 10, 0, 10)
-AvatarImg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-AvatarImg.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. LocalPlayer.UserId .. "&width=420&height=420&format=png"
-AvatarImg.Parent = ProfileFrame
-
-local UICorner_A = Instance.new("UICorner")
-UICorner_A.CornerRadius = UDim.new(1, 0)
-UICorner_A.Parent = AvatarImg
-
-local UserName = Instance.new("TextLabel")
-UserName.Text = LocalPlayer.DisplayName
-UserName.Position = UDim2.new(0, 65, 0, 12)
-UserName.Size = UDim2.new(0, 140, 0, 20)
-UserName.TextColor3 = Color3.fromRGB(255, 255, 255)
-UserName.TextXAlignment = Enum.TextXAlignment.Left
-UserName.Font = Enum.Font.SourceSansBold
-UserName.BackgroundTransparency = 1
-UserName.TextSize = 16
-UserName.Parent = ProfileFrame
-
-local UserTag = Instance.new("TextLabel")
-UserTag.Text = "@" .. LocalPlayer.Name
-UserTag.Position = UDim2.new(0, 65, 0, 28)
-UserTag.Size = UDim2.new(0, 140, 0, 20)
-UserTag.TextColor3 = Color3.fromRGB(180, 180, 180)
-UserTag.TextXAlignment = Enum.TextXAlignment.Left
-UserTag.Font = Enum.Font.SourceSans
-UserTag.BackgroundTransparency = 1
-UserTag.TextSize = 12
-UserTag.Parent = ProfileFrame
-
--- Buttons Container
-local Container = Instance.new("Frame")
-Container.Position = UDim2.new(0, 0, 0, 70)
-Container.Size = UDim2.new(1, 0, 1, -70)
-Container.BackgroundTransparency = 1
-Container.Parent = MainFrame
-
-local UIList = Instance.new("UIListLayout")
-UIList.Parent = Container
-UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-UIList.Padding = UDim.new(0, 10)
-
--- Rainbow Logic
-task.spawn(function()
-    while true do
-        for i = 0, 1, 0.01 do
-            local color = Color3.fromHSV(i, 1, 1)
-            Border.BackgroundColor3 = color
-            task.wait(0.02)
-        end
-    end
-end)
-
--- Button Function
-local function CreateStyledButton(name, icon, color, func)
-    local Btn = Instance.new("TextButton")
-    Btn.Size = UDim2.new(0.9, 0, 0, 45)
-    Btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    Btn.Text = "          " .. name -- Spacing for icon
-    Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Btn.Font = Enum.Font.SourceSansSemibold
-    Btn.TextSize = 15
-    Btn.TextXAlignment = Enum.TextXAlignment.Left
-    Btn.Parent = Container
-    
-    local UICorner_Btn = Instance.new("UICorner")
-    UICorner_Btn.CornerRadius = UDim.new(0, 6)
-    UICorner_Btn.Parent = Btn
-    
-    local IconImg = Instance.new("ImageLabel")
-    IconImg.Size = UDim2.new(0, 25, 0, 25)
-    IconImg.Position = UDim2.new(0, 10, 0.5, -12)
-    IconImg.Image = icon
-    IconImg.BackgroundTransparency = 1
-    IconImg.Parent = Btn
-    
-    local Active = false
-    Btn.MouseButton1Click:Connect(function()
-        Active = not Active
-        if Active then
-            Btn.BackgroundColor3 = color
-            task.spawn(function()
-                while Active do
-                    pcall(func)
-                    task.wait()
-                end
-            end)
-        else
-            Btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-        end
-    end)
+-- Membersihkan UI lama jika ada
+if CoreGui:FindFirstChild("SptzyyToolboxFinal") then 
+    CoreGui.SptzyyToolboxFinal:Destroy() 
 end
 
--- ICONS: Beli (Cart icon), Jual (Dollar icon)
-local CART_ICON = "rbxassetid://6031764630"
-local SELL_ICON = "rbxassetid://6031154871"
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SptzyyToolboxFinal"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = CoreGui
 
--- Add Buttons
-CreateStyledButton("AUTO BELI PADI", CART_ICON, Color3.fromRGB(0, 102, 204), function()
-    game:GetService("ReplicatedStorage").Remotes.TutorialRemotes.RequestShop:InvokeServer("BUY", "Bibit Padi", 1)
+-- ==========================================
+-- OPEN BUTTON (Icon Store)
+-- ==========================================
+local OpenBtn = Instance.new("ImageButton")
+OpenBtn.Name = "OpenButton"
+OpenBtn.Size = UDim2.new(0, 45, 0, 45)
+OpenBtn.Position = UDim2.new(0, 10, 0.5, -22)
+OpenBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+OpenBtn.Image = "rbxassetid://10734950309" -- Icon Store/Marketplace
+OpenBtn.Visible = false -- Sembunyi saat GUI terbuka
+OpenBtn.Active = true
+OpenBtn.Draggable = true
+OpenBtn.Parent = ScreenGui
+
+local OpenCorner = Instance.new("UICorner")
+OpenCorner.CornerRadius = UDim.new(0, 10)
+OpenCorner.Parent = OpenBtn
+
+-- ==========================================
+-- MAIN FRAME (300x300)
+-- ==========================================
+local Main = Instance.new("Frame")
+Main.Name = "MainFrame"
+Main.Size = UDim2.new(0, 300, 0, 300)
+Main.Position = UDim2.new(0.5, -150, 0.5, -150)
+Main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+Main.Parent = ScreenGui
+
+local function addCorner(obj, r)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, r or 4)
+    c.Parent = obj
+end
+addCorner(Main, 8)
+
+-- Tombol Close (X) di Kanan Atas
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -35, 0, 5)
+CloseBtn.Text = "×"
+CloseBtn.Font = Enum.Font.SourceSansBold
+CloseBtn.TextSize = 25
+CloseBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Parent = Main
+
+-- ==========================================
+-- HEADER SECTION
+-- ==========================================
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -60, 0, 25)
+Title.Position = UDim2.new(0, 10, 0, 5)
+Title.Text = "SEARCH TOOLBOX"
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 18
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.BackgroundTransparency = 1
+Title.Parent = Main
+
+local Credit = Instance.new("TextLabel")
+Credit.Size = UDim2.new(1, -60, 0, 15)
+Credit.Position = UDim2.new(0, 10, 0, 22)
+Credit.Text = "by @sptzyy"
+Credit.Font = Enum.Font.SourceSans
+Credit.TextSize = 11
+Credit.TextColor3 = Color3.fromRGB(150, 150, 150)
+Credit.TextXAlignment = Enum.TextXAlignment.Left
+Credit.BackgroundTransparency = 1
+Credit.Parent = Main
+
+-- ==========================================
+-- SEARCH INPUT (SUPPORT EDIT)
+-- ==========================================
+local Input = Instance.new("TextBox")
+Input.Size = UDim2.new(1, -20, 0, 25)
+Input.Position = UDim2.new(0, 10, 0, 45)
+Input.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+Input.PlaceholderText = "Cari asset..."
+Input.Text = ""
+Input.TextColor3 = Color3.fromRGB(255, 255, 255)
+Input.Font = Enum.Font.SourceSans
+Input.TextSize = 13
+Input.ClearTextOnFocus = false
+Input.Parent = Main
+addCorner(Input, 4)
+
+-- ==========================================
+-- LIST PAGE (GRID 3 KOLOM)
+-- ==========================================
+local ListPage = Instance.new("ScrollingFrame")
+ListPage.Size = UDim2.new(1, -10, 1, -85)
+ListPage.Position = UDim2.new(0, 5, 0, 80)
+ListPage.BackgroundTransparency = 1
+ListPage.ScrollBarThickness = 2
+ListPage.Parent = Main
+
+local Grid = Instance.new("UIGridLayout")
+Grid.CellSize = UDim2.new(0, 92, 0, 110)
+Grid.CellPadding = UDim2.new(0, 3, 0, 5)
+Grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
+Grid.Parent = ListPage
+
+local WelcomeMsg = Instance.new("TextLabel")
+WelcomeMsg.Size = UDim2.new(1, -20, 1, 0)
+WelcomeMsg.Position = UDim2.new(0, 10, 0, 0)
+WelcomeMsg.Text = "Masukkan kata kunci di atas.\n\nKlik asset untuk detail & Copy ID."
+WelcomeMsg.Font = Enum.Font.SourceSansItalic
+WelcomeMsg.TextSize = 14
+WelcomeMsg.TextColor3 = Color3.fromRGB(100, 100, 100)
+WelcomeMsg.TextWrapped = true
+WelcomeMsg.BackgroundTransparency = 1
+WelcomeMsg.Parent = ListPage
+
+-- ==========================================
+-- DETAIL PAGE
+-- ==========================================
+local DetailPage = Instance.new("Frame")
+DetailPage.Size = UDim2.new(1, 0, 1, -40)
+DetailPage.Position = UDim2.new(0, 0, 0, 40)
+DetailPage.BackgroundColor3 = Main.BackgroundColor3
+DetailPage.Visible = false
+DetailPage.Parent = Main
+addCorner(DetailPage, 8)
+
+local BackBtn = Instance.new("TextButton")
+BackBtn.Size = UDim2.new(0, 30, 0, 30)
+BackBtn.Position = UDim2.new(0, 5, 0, 5)
+BackBtn.Text = "←"
+BackBtn.Font = Enum.Font.SourceSansBold
+BackBtn.TextSize = 25
+BackBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+BackBtn.BackgroundTransparency = 1
+BackBtn.Parent = DetailPage
+
+local DetImg = Instance.new("ImageLabel")
+DetImg.Size = UDim2.new(0, 120, 0, 120)
+DetImg.Position = UDim2.new(0.5, -60, 0, 20)
+DetImg.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+DetImg.Parent = DetailPage
+addCorner(DetImg)
+
+local DetName = Instance.new("TextLabel")
+DetName.Size = UDim2.new(1, -40, 0, 35)
+DetName.Position = UDim2.new(0, 20, 0, 145)
+DetName.Font = Enum.Font.SourceSansBold
+DetName.TextSize = 16
+DetName.TextColor3 = Color3.fromRGB(255, 255, 255)
+DetName.TextWrapped = true
+DetName.BackgroundTransparency = 1
+DetName.Parent = DetailPage
+
+local DetCreator = Instance.new("TextLabel")
+DetCreator.Size = UDim2.new(0, 160, 0, 20)
+DetCreator.Position = UDim2.new(0, 20, 0, 180)
+DetCreator.TextSize = 13
+DetCreator.TextColor3 = Color3.fromRGB(180, 180, 180)
+DetCreator.TextXAlignment = Enum.TextXAlignment.Left
+DetCreator.BackgroundTransparency = 1
+DetCreator.Parent = DetailPage
+
+local MenuBtn = Instance.new("TextButton")
+MenuBtn.Size = UDim2.new(0, 25, 0, 25)
+MenuBtn.Position = UDim2.new(1, -40, 0, 178)
+MenuBtn.Text = "≡"
+MenuBtn.Font = Enum.Font.SourceSansBold
+MenuBtn.TextSize = 22
+MenuBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+MenuBtn.BackgroundTransparency = 1
+MenuBtn.Parent = DetailPage
+
+local Dropdown = Instance.new("TextButton")
+Dropdown.Size = UDim2.new(0, 80, 0, 25)
+Dropdown.Position = UDim2.new(1, -90, 0, 205)
+Dropdown.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Dropdown.Text = "Copy ID"
+Dropdown.Font = Enum.Font.SourceSans
+Dropdown.TextSize = 13
+Dropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
+Dropdown.Visible = false
+Dropdown.ZIndex = 10
+Dropdown.Parent = DetailPage
+addCorner(Dropdown, 4)
+
+-- ==========================================
+-- LOGIC
+-- ==========================================
+local currentId = ""
+
+-- Fungsi Open/Close
+CloseBtn.MouseButton1Click:Connect(function()
+    Main.Visible = false
+    OpenBtn.Visible = true
 end)
 
-CreateStyledButton("AUTO SELL PADI", SELL_ICON, Color3.fromRGB(153, 0, 0), function()
-    game:GetService("ReplicatedStorage").Remotes.TutorialRemotes.RequestSell:InvokeServer("SELL", "Padi", 45)
+OpenBtn.MouseButton1Click:Connect(function()
+    Main.Visible = true
+    OpenBtn.Visible = false
 end)
 
--- Watermark
-local WM = Instance.new("TextLabel")
-WM.Text = "IKYY EXECUTOR v3"
-WM.Position = UDim2.new(0, 0, 1, -25)
-WM.Size = UDim2.new(1, 0, 0, 20)
-WM.BackgroundTransparency = 1
-WM.TextColor3 = Color3.fromRGB(80, 80, 80)
-WM.TextSize = 10
-WM.Parent = MainFrame
+local function httpRequest(opt)
+    local f = (syn and syn.request) or (http and http.request) or http_request or request
+    return f(opt)
+end
+
+local function clearList()
+    for _, v in pairs(ListPage:GetChildren()) do
+        if v:IsA("Frame") then v:Destroy() end
+    end
+end
+
+local function showDetail(data)
+    currentId = tostring(data.asset.id)
+    DetImg.Image = "rbxthumb://type=Asset&id="..currentId.."&w=420&h=420"
+    DetName.Text = data.asset.name
+    DetCreator.Text = "by " .. data.creator.name
+    
+    Dropdown.Visible = false
+    ListPage.Visible = false
+    Title.Visible = false
+    Credit.Visible = false
+    Input.Visible = false
+    DetailPage.Visible = true
+end
+
+BackBtn.MouseButton1Click:Connect(function()
+    DetailPage.Visible = false
+    Title.Visible = true
+    Credit.Visible = true
+    Input.Visible = true
+    ListPage.Visible = true
+end)
+
+MenuBtn.MouseButton1Click:Connect(function()
+    Dropdown.Visible = not Dropdown.Visible
+end)
+
+Dropdown.MouseButton1Click:Connect(function()
+    setclipboard(currentId)
+    Dropdown.Text = "Copied!"
+    task.wait(1)
+    Dropdown.Text = "Copy ID"
+    Dropdown.Visible = false
+end)
+
+local function Search(kw)
+    clearList()
+    if kw == "" then
+        WelcomeMsg.Visible = true
+        return
+    end
+    WelcomeMsg.Visible = false
+    
+    local success, res = pcall(function()
+        return httpRequest({Url = "https://apis.roblox.com/toolbox-service/v1/marketplace/10?limit=30&keyword="..HttpService:UrlEncode(kw), Method = "GET"})
+    end)
+    
+    if success and res and res.StatusCode == 200 then
+        local items = HttpService:JSONDecode(res.Body).data
+        local ids = {}
+        for _, v in pairs(items) do table.insert(ids, tostring(v.id)) end
+        
+        if #ids == 0 then
+            WelcomeMsg.Text = "Asset tidak ditemukan."
+            WelcomeMsg.Visible = true
+            return
+        end
+        
+        local detRes = httpRequest({Url = "https://apis.roblox.com/toolbox-service/v1/items/details?assetIds="..table.concat(ids, ","), Method = "GET"})
+        if detRes and detRes.StatusCode == 200 then
+            for _, data in pairs(HttpService:JSONDecode(detRes.Body).data) do
+                local Card = Instance.new("Frame")
+                Card.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+                Card.Parent = ListPage
+                addCorner(Card, 6)
+                
+                local Img = Instance.new("ImageLabel")
+                Img.Size = UDim2.new(1, -10, 0, 70)
+                Img.Position = UDim2.new(0, 5, 0, 5)
+                Img.Image = "rbxthumb://type=Asset&id="..data.asset.id.."&w=150&h=150"
+                Img.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+                Img.Parent = Card
+                addCorner(Img, 4)
+                
+                local Info = Instance.new("TextLabel")
+                Info.Size = UDim2.new(1, -6, 0, 30)
+                Info.Position = UDim2.new(0, 3, 0, 78)
+                Info.Text = data.asset.name .. "\nID: " .. data.asset.id
+                Info.TextColor3 = Color3.fromRGB(255, 255, 255)
+                Info.TextSize = 9
+                Info.Font = Enum.Font.SourceSansBold
+                Info.TextWrapped = true
+                Info.BackgroundTransparency = 1
+                Info.Parent = Card
+                
+                local btn = Instance.new("TextButton")
+                btn.Size = UDim2.new(1, 0, 1, 0)
+                btn.BackgroundTransparency = 1
+                btn.Text = ""
+                btn.Parent = Card
+                btn.MouseButton1Click:Connect(function() showDetail(data) end)
+            end
+            ListPage.CanvasSize = UDim2.new(0,0,0,Grid.AbsoluteContentSize.Y + 10)
+        end
+    end
+end
+
+Input.FocusLost:Connect(function(enter)
+    if enter then
+        Search(Input.Text)
+    end
+end)
