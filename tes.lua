@@ -1,23 +1,31 @@
 local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
 
-if CoreGui:FindFirstChild("SptzyyToolboxFinal") then 
-    CoreGui.SptzyyToolboxFinal:Destroy() 
+-- Pembersihan UI lama
+if CoreGui:FindFirstChild("SptzyyToolboxPro") then 
+    CoreGui.SptzyyToolboxPro:Destroy() 
 end
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SptzyyToolboxFinal"
+ScreenGui.Name = "SptzyyToolboxPro"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = CoreGui
 
--- Variabel Logika Pagination
-local cursors = { [1] = "" } -- Menyimpan cursor tiap halaman
+-- Variabel Logika Pagination & State
+local cursors = { [1] = "" } 
 local currentPage = 1
 local currentKeyword = ""
 local isFetching = false
+local currentAssetId = ""
+
+local function addCorner(obj, r)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, r or 4)
+    c.Parent = obj
+end
 
 -- ==========================================
--- MAIN FRAME & OPEN/CLOSE
+-- OPEN BUTTON (Icon Store)
 -- ==========================================
 local OpenBtn = Instance.new("ImageButton")
 OpenBtn.Size = UDim2.new(0, 45, 0, 45)
@@ -28,10 +36,11 @@ OpenBtn.Visible = false
 OpenBtn.Active = true
 OpenBtn.Draggable = true
 OpenBtn.Parent = ScreenGui
-local OpenCorner = Instance.new("UICorner")
-OpenCorner.CornerRadius = UDim.new(0, 10)
-OpenCorner.Parent = OpenBtn
+addCorner(OpenBtn, 10)
 
+-- ==========================================
+-- MAIN FRAME (300x300)
+-- ==========================================
 local Main = Instance.new("Frame")
 Main.Size = UDim2.new(0, 300, 0, 300)
 Main.Position = UDim2.new(0.5, -150, 0.5, -150)
@@ -40,12 +49,6 @@ Main.BorderSizePixel = 0
 Main.Active = true
 Main.Draggable = true
 Main.Parent = ScreenGui
-
-local function addCorner(obj, r)
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, r or 4)
-    c.Parent = obj
-end
 addCorner(Main, 8)
 
 local CloseBtn = Instance.new("TextButton")
@@ -59,7 +62,7 @@ CloseBtn.BackgroundTransparency = 1
 CloseBtn.Parent = Main
 
 -- ==========================================
--- HEADER & SEARCH INPUT
+-- HEADER & INPUT
 -- ==========================================
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -60, 0, 25)
@@ -74,9 +77,10 @@ Title.Parent = Main
 
 local Input = Instance.new("TextBox")
 Input.Size = UDim2.new(1, -20, 0, 25)
-Input.Position = UDim2.new(0, 10, 0, 45)
+Input.Position = UDim2.new(0, 10, 0, 40)
 Input.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 Input.PlaceholderText = "Cari asset..."
+Input.Text = ""
 Input.TextColor3 = Color3.fromRGB(255, 255, 255)
 Input.Font = Enum.Font.SourceSans
 Input.TextSize = 13
@@ -85,32 +89,32 @@ Input.Parent = Main
 addCorner(Input, 4)
 
 -- ==========================================
--- PAGINATION NAV (Panah Kiri & Kanan)
+-- PAGINATION NAVIGATION (DI ATAS HASIL)
 -- ==========================================
 local NavFrame = Instance.new("Frame")
-NavFrame.Size = UDim2.new(1, -10, 0, 25)
-NavFrame.Position = UDim2.new(0, 5, 0, 75)
+NavFrame.Size = UDim2.new(1, -20, 0, 25)
+NavFrame.Position = UDim2.new(0, 10, 0, 70)
 NavFrame.BackgroundTransparency = 1
 NavFrame.Visible = false
 NavFrame.Parent = Main
 
 local PrevBtn = Instance.new("TextButton")
-PrevBtn.Size = UDim2.new(0, 25, 1, 0)
-PrevBtn.Position = UDim2.new(0, 5, 0, 0)
-PrevBtn.Text = " < "
+PrevBtn.Size = UDim2.new(0, 30, 1, 0)
+PrevBtn.Position = UDim2.new(0, 0, 0, 0)
+PrevBtn.Text = "←"
 PrevBtn.Font = Enum.Font.SourceSansBold
 PrevBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-PrevBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+PrevBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 PrevBtn.Parent = NavFrame
 addCorner(PrevBtn)
 
 local NextBtn = Instance.new("TextButton")
-NextBtn.Size = UDim2.new(0, 25, 1, 0)
+NextBtn.Size = UDim2.new(0, 30, 1, 0)
 NextBtn.Position = UDim2.new(1, -30, 0, 0)
-NextBtn.Text = " > "
+NextBtn.Text = "→"
 NextBtn.Font = Enum.Font.SourceSansBold
 NextBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-NextBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+NextBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 NextBtn.Parent = NavFrame
 addCorner(NextBtn)
 
@@ -120,16 +124,16 @@ PageIndicator.Position = UDim2.new(0, 35, 0, 0)
 PageIndicator.Text = "Page 1"
 PageIndicator.TextColor3 = Color3.fromRGB(200, 200, 200)
 PageIndicator.Font = Enum.Font.SourceSans
-PageIndicator.TextSize = 12
+PageIndicator.TextSize = 11
 PageIndicator.BackgroundTransparency = 1
 PageIndicator.Parent = NavFrame
 
 -- ==========================================
--- LIST CONTAINER
+-- LIST CONTAINER (SCROLLING)
 -- ==========================================
 local ListPage = Instance.new("ScrollingFrame")
 ListPage.Size = UDim2.new(1, -10, 1, -110)
-ListPage.Position = UDim2.new(0, 5, 0, 105)
+ListPage.Position = UDim2.new(0, 5, 0, 100)
 ListPage.BackgroundTransparency = 1
 ListPage.ScrollBarThickness = 2
 ListPage.Parent = Main
@@ -140,12 +144,102 @@ Grid.CellPadding = UDim2.new(0, 3, 0, 5)
 Grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
 Grid.Parent = ListPage
 
+local WelcomeMsg = Instance.new("TextLabel")
+WelcomeMsg.Size = UDim2.new(1, -20, 0, 60)
+WelcomeMsg.Position = UDim2.new(0, 10, 0.3, 0)
+WelcomeMsg.Text = "Cari asset dan gunakan panah untuk navigasi halaman."
+WelcomeMsg.Font = Enum.Font.SourceSansItalic
+WelcomeMsg.TextSize = 14
+WelcomeMsg.TextColor3 = Color3.fromRGB(100, 100, 100)
+WelcomeMsg.TextWrapped = true
+WelcomeMsg.BackgroundTransparency = 1
+WelcomeMsg.Parent = ListPage
+
 -- ==========================================
--- LOGIC & API
+-- DETAIL PAGE
+-- ==========================================
+local DetailPage = Instance.new("Frame")
+DetailPage.Size = UDim2.new(1, 0, 1, -40)
+DetailPage.Position = UDim2.new(0, 0, 0, 40)
+DetailPage.BackgroundColor3 = Main.BackgroundColor3
+DetailPage.Visible = false
+DetailPage.Parent = Main
+addCorner(DetailPage, 8)
+
+local BackBtn = Instance.new("TextButton")
+BackBtn.Size = UDim2.new(0, 30, 0, 30)
+BackBtn.Position = UDim2.new(0, 5, 0, 5)
+BackBtn.Text = "←"
+BackBtn.Font = Enum.Font.SourceSansBold
+BackBtn.TextSize = 25
+BackBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+BackBtn.BackgroundTransparency = 1
+BackBtn.Parent = DetailPage
+
+local DetImg = Instance.new("ImageLabel")
+DetImg.Size = UDim2.new(0, 120, 0, 120)
+DetImg.Position = UDim2.new(0.5, -60, 0, 20)
+DetImg.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+DetImg.Parent = DetailPage
+addCorner(DetImg)
+
+local DetName = Instance.new("TextLabel")
+DetName.Size = UDim2.new(1, -40, 0, 35)
+DetName.Position = UDim2.new(0, 20, 0, 145)
+DetName.Font = Enum.Font.SourceSansBold
+DetName.TextSize = 15
+DetName.TextColor3 = Color3.fromRGB(255, 255, 255)
+DetName.TextWrapped = true
+DetName.BackgroundTransparency = 1
+DetName.Parent = DetailPage
+
+local DetCreator = Instance.new("TextLabel")
+DetCreator.Size = UDim2.new(0, 160, 0, 20)
+DetCreator.Position = UDim2.new(0, 20, 0, 180)
+DetCreator.TextSize = 13
+DetCreator.TextColor3 = Color3.fromRGB(180, 180, 180)
+DetCreator.TextXAlignment = Enum.TextXAlignment.Left
+DetCreator.BackgroundTransparency = 1
+DetCreator.Parent = DetailPage
+
+local MenuBtn = Instance.new("TextButton")
+MenuBtn.Size = UDim2.new(0, 25, 0, 25)
+MenuBtn.Position = UDim2.new(1, -40, 0, 178)
+MenuBtn.Text = "≡"
+MenuBtn.Font = Enum.Font.SourceSansBold
+MenuBtn.TextSize = 22
+MenuBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+MenuBtn.BackgroundTransparency = 1
+MenuBtn.Parent = DetailPage
+
+local Dropdown = Instance.new("TextButton")
+Dropdown.Size = UDim2.new(0, 80, 0, 25)
+Dropdown.Position = UDim2.new(1, -90, 0, 205)
+Dropdown.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Dropdown.Text = "Copy ID"
+Dropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
+Dropdown.Visible = false
+Dropdown.Parent = DetailPage
+addCorner(Dropdown, 4)
+
+-- ==========================================
+-- CORE LOGIC & API
 -- ==========================================
 local function httpRequest(opt)
     local f = (syn and syn.request) or (http and http.request) or http_request or request
     return f(opt)
+end
+
+local function showDetail(data)
+    currentAssetId = tostring(data.asset.id)
+    DetImg.Image = "rbxthumb://type=Asset&id="..currentAssetId.."&w=420&h=420"
+    DetName.Text = data.asset.name
+    DetCreator.Text = "by " .. data.creator.name
+    Dropdown.Visible = false
+    ListPage.Visible = false
+    NavFrame.Visible = false
+    Input.Visible = false
+    DetailPage.Visible = true
 end
 
 local function renderItems(dataList)
@@ -179,7 +273,7 @@ local function renderItems(dataList)
         btn.BackgroundTransparency = 1
         btn.Text = ""
         btn.Parent = Card
-        btn.MouseButton1Click:Connect(function() setclipboard(tostring(data.asset.id)) end)
+        btn.MouseButton1Click:Connect(function() showDetail(data) end)
     end
     ListPage.CanvasPosition = Vector2.new(0,0)
     ListPage.CanvasSize = UDim2.new(0,0,0,Grid.AbsoluteContentSize.Y + 10)
@@ -196,13 +290,11 @@ local function Search(kw, cursor, pageNum)
     if res and res.StatusCode == 200 then
         local body = HttpService:JSONDecode(res.Body)
         
-        -- Logika Page
         currentPage = pageNum
         cursors[currentPage + 1] = body.nextPageCursor or ""
         
-        -- Update Navigasi
         NavFrame.Visible = true
-        PageIndicator.Text = "Page "..currentPage.." / Total Results: "..(body.totalResults or "...")
+        PageIndicator.Text = "Page "..currentPage.." | Results: "..(body.totalResults or "...")
         PrevBtn.Visible = (currentPage > 1)
         NextBtn.Visible = (body.nextPageCursor ~= nil and body.nextPageCursor ~= "")
 
@@ -214,12 +306,26 @@ local function Search(kw, cursor, pageNum)
             if detRes and detRes.StatusCode == 200 then
                 renderItems(HttpService:JSONDecode(detRes.Body).data)
             end
+        else
+            WelcomeMsg.Text = "Tidak ada hasil."
+            WelcomeMsg.Visible = true
         end
     end
     isFetching = false
 end
 
--- Event Tombol Navigasi
+-- ==========================================
+-- EVENTS
+-- ==========================================
+Input.FocusLost:Connect(function(enter)
+    if enter and Input.Text ~= "" then
+        currentKeyword = Input.Text
+        cursors = { [1] = "" }
+        WelcomeMsg.Visible = false
+        Search(currentKeyword, "", 1)
+    end
+end)
+
 NextBtn.MouseButton1Click:Connect(function()
     if not isFetching and cursors[currentPage + 1] ~= "" then
         Search(currentKeyword, cursors[currentPage + 1], currentPage + 1)
@@ -232,14 +338,8 @@ PrevBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-Input.FocusLost:Connect(function(enter)
-    if enter and Input.Text ~= "" then
-        currentKeyword = Input.Text
-        cursors = { [1] = "" } -- Reset cursors
-        Search(currentKeyword, "", 1)
-    end
-end)
-
--- Toggle UI
 CloseBtn.MouseButton1Click:Connect(function() Main.Visible = false OpenBtn.Visible = true end)
 OpenBtn.MouseButton1Click:Connect(function() Main.Visible = true OpenBtn.Visible = false end)
+BackBtn.MouseButton1Click:Connect(function() DetailPage.Visible = false NavFrame.Visible = true Input.Visible = true ListPage.Visible = true end)
+MenuBtn.MouseButton1Click:Connect(function() Dropdown.Visible = not Dropdown.Visible end)
+Dropdown.MouseButton1Click:Connect(function() setclipboard(currentAssetId) Dropdown.Text = "Copied!" task.wait(1) Dropdown.Text = "Copy ID" Dropdown.Visible = false end)
