@@ -1,7 +1,6 @@
 local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
 
--- Membersihkan UI lama jika ada
 if CoreGui:FindFirstChild("SptzyyToolboxFinal") then 
     CoreGui.SptzyyToolboxFinal:Destroy() 
 end
@@ -11,29 +10,31 @@ ScreenGui.Name = "SptzyyToolboxFinal"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = CoreGui
 
+-- Variabel Logika Scrolling
+local currentCursor = ""
+local isFetching = false
+local currentKeyword = ""
+
 -- ==========================================
 -- OPEN BUTTON (Icon Store)
 -- ==========================================
 local OpenBtn = Instance.new("ImageButton")
-OpenBtn.Name = "OpenButton"
 OpenBtn.Size = UDim2.new(0, 45, 0, 45)
 OpenBtn.Position = UDim2.new(0, 10, 0.5, -22)
 OpenBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-OpenBtn.Image = "rbxassetid://10734950309" -- Icon Store/Marketplace
-OpenBtn.Visible = false -- Sembunyi saat GUI terbuka
+OpenBtn.Image = "rbxassetid://10734950309"
+OpenBtn.Visible = false
 OpenBtn.Active = true
 OpenBtn.Draggable = true
 OpenBtn.Parent = ScreenGui
-
 local OpenCorner = Instance.new("UICorner")
 OpenCorner.CornerRadius = UDim.new(0, 10)
 OpenCorner.Parent = OpenBtn
 
 -- ==========================================
--- MAIN FRAME (300x300)
+-- MAIN FRAME
 -- ==========================================
 local Main = Instance.new("Frame")
-Main.Name = "MainFrame"
 Main.Size = UDim2.new(0, 300, 0, 300)
 Main.Position = UDim2.new(0.5, -150, 0.5, -150)
 Main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
@@ -49,7 +50,6 @@ local function addCorner(obj, r)
 end
 addCorner(Main, 8)
 
--- Tombol Close (X) di Kanan Atas
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 30, 0, 30)
 CloseBtn.Position = UDim2.new(1, -35, 0, 5)
@@ -60,9 +60,6 @@ CloseBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
 CloseBtn.BackgroundTransparency = 1
 CloseBtn.Parent = Main
 
--- ==========================================
--- HEADER SECTION
--- ==========================================
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -60, 0, 25)
 Title.Position = UDim2.new(0, 10, 0, 5)
@@ -85,9 +82,6 @@ Credit.TextXAlignment = Enum.TextXAlignment.Left
 Credit.BackgroundTransparency = 1
 Credit.Parent = Main
 
--- ==========================================
--- SEARCH INPUT (SUPPORT EDIT)
--- ==========================================
 local Input = Instance.new("TextBox")
 Input.Size = UDim2.new(1, -20, 0, 25)
 Input.Position = UDim2.new(0, 10, 0, 45)
@@ -101,9 +95,6 @@ Input.ClearTextOnFocus = false
 Input.Parent = Main
 addCorner(Input, 4)
 
--- ==========================================
--- LIST PAGE (GRID 3 KOLOM)
--- ==========================================
 local ListPage = Instance.new("ScrollingFrame")
 ListPage.Size = UDim2.new(1, -10, 1, -85)
 ListPage.Position = UDim2.new(0, 5, 0, 80)
@@ -120,7 +111,7 @@ Grid.Parent = ListPage
 local WelcomeMsg = Instance.new("TextLabel")
 WelcomeMsg.Size = UDim2.new(1, -20, 1, 0)
 WelcomeMsg.Position = UDim2.new(0, 10, 0, 0)
-WelcomeMsg.Text = "Masukkan kata kunci di atas.\n\nKlik asset untuk detail & Copy ID."
+WelcomeMsg.Text = "Gunakan scroll untuk melihat semua hasil."
 WelcomeMsg.Font = Enum.Font.SourceSansItalic
 WelcomeMsg.TextSize = 14
 WelcomeMsg.TextColor3 = Color3.fromRGB(100, 100, 100)
@@ -129,7 +120,7 @@ WelcomeMsg.BackgroundTransparency = 1
 WelcomeMsg.Parent = ListPage
 
 -- ==========================================
--- DETAIL PAGE
+-- DETAIL PAGE & LOGIC
 -- ==========================================
 local DetailPage = Instance.new("Frame")
 DetailPage.Size = UDim2.new(1, 0, 1, -40)
@@ -190,139 +181,118 @@ Dropdown.Size = UDim2.new(0, 80, 0, 25)
 Dropdown.Position = UDim2.new(1, -90, 0, 205)
 Dropdown.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 Dropdown.Text = "Copy ID"
-Dropdown.Font = Enum.Font.SourceSans
-Dropdown.TextSize = 13
 Dropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
 Dropdown.Visible = false
-Dropdown.ZIndex = 10
 Dropdown.Parent = DetailPage
 addCorner(Dropdown, 4)
 
--- ==========================================
--- LOGIC
--- ==========================================
-local currentId = ""
-
--- Fungsi Open/Close
-CloseBtn.MouseButton1Click:Connect(function()
-    Main.Visible = false
-    OpenBtn.Visible = true
-end)
-
-OpenBtn.MouseButton1Click:Connect(function()
-    Main.Visible = true
-    OpenBtn.Visible = false
-end)
+-- Logic Functions
+local currentAssetId = ""
 
 local function httpRequest(opt)
     local f = (syn and syn.request) or (http and http.request) or http_request or request
     return f(opt)
 end
 
-local function clearList()
-    for _, v in pairs(ListPage:GetChildren()) do
-        if v:IsA("Frame") then v:Destroy() end
+local function renderItems(dataList)
+    for _, data in pairs(dataList) do
+        local Card = Instance.new("Frame")
+        Card.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+        Card.Parent = ListPage
+        addCorner(Card, 6)
+        
+        local Img = Instance.new("ImageLabel")
+        Img.Size = UDim2.new(1, -10, 0, 70)
+        Img.Position = UDim2.new(0, 5, 0, 5)
+        Img.Image = "rbxthumb://type=Asset&id="..data.asset.id.."&w=150&h=150"
+        Img.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        Img.Parent = Card
+        addCorner(Img, 4)
+        
+        local Info = Instance.new("TextLabel")
+        Info.Size = UDim2.new(1, -6, 0, 30)
+        Info.Position = UDim2.new(0, 3, 0, 78)
+        Info.Text = data.asset.name .. "\nID: " .. data.asset.id
+        Info.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Info.TextSize = 9
+        Info.Font = Enum.Font.SourceSansBold
+        Info.TextWrapped = true
+        Info.BackgroundTransparency = 1
+        Info.Parent = Card
+        
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, 0, 1, 0)
+        btn.BackgroundTransparency = 1
+        btn.Text = ""
+        btn.Parent = Card
+        btn.MouseButton1Click:Connect(function()
+            currentAssetId = tostring(data.asset.id)
+            DetImg.Image = "rbxthumb://type=Asset&id="..currentAssetId.."&w=420&h=420"
+            DetName.Text = data.asset.name
+            DetCreator.Text = "by " .. data.creator.name
+            Dropdown.Visible = false
+            ListPage.Visible = false
+            Title.Visible = false
+            Credit.Visible = false
+            Input.Visible = false
+            DetailPage.Visible = true
+        end)
     end
+    ListPage.CanvasSize = UDim2.new(0,0,0,Grid.AbsoluteContentSize.Y + 10)
 end
 
-local function showDetail(data)
-    currentId = tostring(data.asset.id)
-    DetImg.Image = "rbxthumb://type=Asset&id="..currentId.."&w=420&h=420"
-    DetName.Text = data.asset.name
-    DetCreator.Text = "by " .. data.creator.name
+local function ExecuteSearch(kw, cursor)
+    if isFetching then return end
+    isFetching = true
     
-    Dropdown.Visible = false
-    ListPage.Visible = false
-    Title.Visible = false
-    Credit.Visible = false
-    Input.Visible = false
-    DetailPage.Visible = true
-end
-
-BackBtn.MouseButton1Click:Connect(function()
-    DetailPage.Visible = false
-    Title.Visible = true
-    Credit.Visible = true
-    Input.Visible = true
-    ListPage.Visible = true
-end)
-
-MenuBtn.MouseButton1Click:Connect(function()
-    Dropdown.Visible = not Dropdown.Visible
-end)
-
-Dropdown.MouseButton1Click:Connect(function()
-    setclipboard(currentId)
-    Dropdown.Text = "Copied!"
-    task.wait(1)
-    Dropdown.Text = "Copy ID"
-    Dropdown.Visible = false
-end)
-
-local function Search(kw)
-    clearList()
-    if kw == "" then
-        WelcomeMsg.Visible = true
-        return
+    local url = "https://apis.roblox.com/toolbox-service/v1/marketplace/10?limit=30&keyword="..HttpService:UrlEncode(kw)
+    if cursor and cursor ~= "" then
+        url = url .. "&cursor=" .. cursor
     end
-    WelcomeMsg.Visible = false
     
-    local success, res = pcall(function()
-        return httpRequest({Url = "https://apis.roblox.com/toolbox-service/v1/marketplace/10?limit=30&keyword="..HttpService:UrlEncode(kw), Method = "GET"})
-    end)
-    
-    if success and res and res.StatusCode == 200 then
-        local items = HttpService:JSONDecode(res.Body).data
+    local res = httpRequest({Url = url, Method = "GET"})
+    if res and res.StatusCode == 200 then
+        local body = HttpService:JSONDecode(res.Body)
+        currentCursor = body.nextPageCursor or "" -- Simpan cursor untuk halaman selanjutnya
+        
         local ids = {}
-        for _, v in pairs(items) do table.insert(ids, tostring(v.id)) end
+        for _, v in pairs(body.data) do table.insert(ids, tostring(v.id)) end
         
-        if #ids == 0 then
-            WelcomeMsg.Text = "Asset tidak ditemukan."
-            WelcomeMsg.Visible = true
-            return
-        end
-        
-        local detRes = httpRequest({Url = "https://apis.roblox.com/toolbox-service/v1/items/details?assetIds="..table.concat(ids, ","), Method = "GET"})
-        if detRes and detRes.StatusCode == 200 then
-            for _, data in pairs(HttpService:JSONDecode(detRes.Body).data) do
-                local Card = Instance.new("Frame")
-                Card.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-                Card.Parent = ListPage
-                addCorner(Card, 6)
-                
-                local Img = Instance.new("ImageLabel")
-                Img.Size = UDim2.new(1, -10, 0, 70)
-                Img.Position = UDim2.new(0, 5, 0, 5)
-                Img.Image = "rbxthumb://type=Asset&id="..data.asset.id.."&w=150&h=150"
-                Img.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-                Img.Parent = Card
-                addCorner(Img, 4)
-                
-                local Info = Instance.new("TextLabel")
-                Info.Size = UDim2.new(1, -6, 0, 30)
-                Info.Position = UDim2.new(0, 3, 0, 78)
-                Info.Text = data.asset.name .. "\nID: " .. data.asset.id
-                Info.TextColor3 = Color3.fromRGB(255, 255, 255)
-                Info.TextSize = 9
-                Info.Font = Enum.Font.SourceSansBold
-                Info.TextWrapped = true
-                Info.BackgroundTransparency = 1
-                Info.Parent = Card
-                
-                local btn = Instance.new("TextButton")
-                btn.Size = UDim2.new(1, 0, 1, 0)
-                btn.BackgroundTransparency = 1
-                btn.Text = ""
-                btn.Parent = Card
-                btn.MouseButton1Click:Connect(function() showDetail(data) end)
+        if #ids > 0 then
+            local detRes = httpRequest({Url = "https://apis.roblox.com/toolbox-service/v1/items/details?assetIds="..table.concat(ids, ","), Method = "GET"})
+            if detRes and detRes.StatusCode == 200 then
+                renderItems(HttpService:JSONDecode(detRes.Body).data)
             end
-            ListPage.CanvasSize = UDim2.new(0,0,0,Grid.AbsoluteContentSize.Y + 10)
         end
     end
+    isFetching = false
 end
+
+-- Detection Scroll sampai bawah
+ListPage:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+    local pos = ListPage.CanvasPosition.Y
+    local size = ListPage.AbsoluteWindowSize.Y
+    local total = ListPage.CanvasSize.Y.Offset
+    
+    -- Jika sisa scroll tinggal sedikit (50px), load data baru
+    if pos + size >= total - 50 and currentCursor ~= "" and not isFetching then
+        ExecuteSearch(currentKeyword, currentCursor)
+    end
+end)
 
 Input.FocusLost:Connect(function(enter)
     if enter then
-        Search(Input.Text)
+        currentKeyword = Input.Text
+        currentCursor = "" -- Reset cursor untuk pencarian baru
+        for _, v in pairs(ListPage:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
+        WelcomeMsg.Visible = false
+        ExecuteSearch(currentKeyword, "")
     end
 end)
+
+-- UI Toggle
+CloseBtn.MouseButton1Click:Connect(function() Main.Visible = false OpenBtn.Visible = true end)
+OpenBtn.MouseButton1Click:Connect(function() Main.Visible = true OpenBtn.Visible = false end)
+BackBtn.MouseButton1Click:Connect(function() DetailPage.Visible = false Title.Visible = true Credit.Visible = true Input.Visible = true ListPage.Visible = true end)
+MenuBtn.MouseButton1Click:Connect(function() Dropdown.Visible = not Dropdown.Visible end)
+Dropdown.MouseButton1Click:Connect(function() setclipboard(currentAssetId) Dropdown.Text = "Copied!" task.wait(1) Dropdown.Text = "Copy ID" Dropdown.Visible = false end)
